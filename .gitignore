@@ -1,0 +1,75 @@
+# Based on 02_ARSITEKTUR §AG.4. Sample/evidence dirs are anchored to the repo root (/...)
+# so that source folders with the same name (e.g. frontend/src/pages/evidence/) are not ignored.
+
+# ===== Secrets =====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+
+# ===== Claude Code (personal, not shared) =====
+.claude/settings.local.json
+CLAUDE.local.md
+
+# ===== Python =====
+**/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ===== Node / Frontend =====
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+yarn-error.log*
+
+# ===== Android / Gradle =====
+**/.gradle/
+**/build/
+**/local.properties
+**/.kotlin/
+*.apk
+*.aab
+*.dex
+*.xapk
+*.apks
+
+# ===== Runtime Evidence =====
+/var/
+experiments/**/raw_outputs/
+experiments/**/logs/private/
+*.pcap
+*.pcapng
+
+# ===== Raw / Malware Samples =====
+/samples/
+/malware/
+/evidence/
+*.img
+*.bin
+
+# ===== Database local =====
+*.sqlite
+*.sqlite3
+*.dump
+
+# ===== IDE / OS =====
+.idea/
+.vscode/settings.json
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Python build =====
+build/
+dist/
+*.spec.tmp
