@@ -12,28 +12,22 @@ penipuan. Proyek skripsi; bukan pendeteksi malware.
 
 ```
 Claude Code → C:\mrtz\FORENSIC PLATF\Android_ForPlat (Git lokal)
-                 ├─ origin  → GitHub  (sumber utama)
-                 └─ gitlab  → GitLab  (CI/CD: .gitlab-ci.yml)
+                 └─ origin → GitHub (sumber utama) ──mirror──→ GitLab (CI/CD: .gitlab-ci.yml)
+Sesi cloud claude.ai → origin/claude/* ──/integrate──→ main
 ```
 
-Semua perubahan dibuat di repo lokal, lalu di-push ke `origin` dulu, kemudian `gitlab`.
-Jangan mengedit langsung lewat web GitHub/GitLab.
-
-## Setup sekali per clone
-
-```bash
-git remote add gitlab <URL-repo-GitLab>      # origin (GitHub) sudah ada dari clone
-git config core.hooksPath .githooks          # aktifkan pre-commit guard (bukti/sampel/secret)
-git config core.autocrlf false               # line ending diatur .gitattributes
-```
+Semua perintah git dijalankan Claude Code (lihat `CLAUDE.md` §5). User cukup review, testing, dan
+hal di luar terminal. Jangan mengedit langsung lewat web GitHub/GitLab.
 
 ## Perintah Claude Code proyek
 
 | Perintah | Fungsi |
 |---|---|
+| `/setup [gitlab-url]` | doctor + bootstrap lingkungan lokal (git config, toolchain, venv, .env, DB) |
+| `/integrate` | bawa branch hasil sesi cloud (`claude/*`) ke `main` lalu push |
 | `/new-branch feature/<topik>` | buka branch kerja dari `main` terbaru |
 | `/finish-branch` | cek + review + merge `--no-ff` ke `main` + sync dua remote |
-| `/sync` | push ke GitHub lalu GitLab dan verifikasi keduanya sama |
+| `/sync` | push ke GitHub (GitLab ikut via mirror) dan verifikasi |
 | `/milestone v0.xx` | cek kriteria lalu tag milestone / freeze aturan |
 | `/rule-change <APKF-K0x> <deskripsi>` | ubah YAML aturan/KB sesuai batas *authoring* |
 | `/wrap-up` | perbarui `docs/progress.md` di akhir sesi |

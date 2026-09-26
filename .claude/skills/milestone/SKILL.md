@@ -1,6 +1,6 @@
 ---
 name: milestone
-description: Buat tag milestone (v0.05 ... v1.00) atau tag freeze aturan (rules-vN-freeze) di main setelah kriteria terpenuhi, lalu push tag ke GitHub dan GitLab.
+description: Buat tag milestone (v0.05 ... v1.00) atau tag freeze aturan (rules-vN-freeze) di main setelah kriteria terpenuhi, lalu push tag lewat /sync.
 argument-hint: "<tag>  contoh: v0.05 | v0.30 | rules-v1-freeze"
 disable-model-invocation: true
 ---
@@ -24,4 +24,4 @@ Tag: `$ARGUMENTS`. Daftar milestone dan artinya: `02_ARSITEKTUR` §AJ.3 (cek rin
 4. Tambahkan entri di `docs/changelog.md` (buat bila belum ada) dan perbarui `docs/progress.md`
    (milestone tercapai, milestone berikutnya). Commit `docs(progress): reach $ARGUMENTS`.
 5. `git tag -a $ARGUMENTS -m "<deskripsi milestone>"`.
-6. Push commit + tag lewat urutan `/sync`: `origin` dulu, lalu `gitlab`. Verifikasi tag ada di kedua remote.
+6. Push commit + tag lewat alur `/sync` (GitHub dulu; GitLab via mirror atau remote `gitlab`). Verifikasi tag ada di origin.
