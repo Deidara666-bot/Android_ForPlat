@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Pre-commit guard for Android_ForPlat.
+# Blocks secrets, raw evidence, APK/malware binaries, captures, DB dumps and oversized files.
+# Enable once per clone:  git config core.hooksPath .githooks
+# Runs under Git for Windows (Git Bash) and Linux/macOS bash.
+
+MAX_BYTES=5242880 # 5 MiB
+
+# Staged added/copied/modified/renamed paths, NUL-separated so spaces are safe.
+git diff --cached --name-only --diff-filter=ACMR -z | {
+  fail=0
+  report() {
+    echo "pre-commit: BLOCKED  $1  ($2)" >&2
+    fail=1
+  }
+
+  while IFS= read -r -d '' path; do
+    lower=$(printf '%s' "$path" | tr '[:upper:]' '[:lower:]')
+
+    case "$lower" in
+      .env.example|*/.env.example) ;;
+      .env|*/.env|.env.*|*/.env.*)          report "$path" "secret env file" ;;
+    esac
+
+    case "$lower" in
+      *.pem|*.key|*.p12|*.jks|*.keystore)    report "$path" "key or keystore" ;;
+      *.apk|*.aab|*.dex|*.xapk|*.apks)      report "$path" "android binary / possible sample" ;;
+      *.pcap|*.pcapng)                       report "$path" "network capture" ;;
+      *.sqlite|*.sqlite3|*.dump|*.backup)    report "$path" "database dump" ;;
+      *.img|*.bin)                           report "$path" "raw image / binary" ;;
+    esac
+
+    case "$lower" in
+      var/*)                                 report "$path" "runtime evidence dir var/" ;;
+      samples/*|malware/*|evidence/*)        report "$path" "sample / evidence dir" ;;
+      raw_outputs/*|*/raw_outputs/*)         report "$path" "raw acquisition output" ;;
+      */logs/private/*)                      report "$path" "private log" ;;
+      context/*)
+        echo "pre-commit: NOTE  $path  (canonical core changed - only commit approved amendments)" >&2 ;;
+    esac
+
+    if [ -f "$path" ]; then
+      size=$(wc -c < "$path" | tr -d ' ')
+      if [ "$size" -gt "$MAX_BYTES" ]; then
+        report "$path" "file larger than 5 MiB"
+      fi
+    fi
+  done
+
+  if [ "$fail" -ne 0 ]; then
+    echo "pre-commit: unstage the files above (git restore --staged <path>). Do not bypass with --no-verify." >&2
+  fi
+  exit "$fail"
+}
