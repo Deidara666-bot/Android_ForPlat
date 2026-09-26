@@ -44,7 +44,7 @@ yarn-error.log*
 *.apks
 
 # ===== Runtime Evidence =====
-/var/
+var/
 experiments/**/raw_outputs/
 experiments/**/logs/private/
 *.pcap

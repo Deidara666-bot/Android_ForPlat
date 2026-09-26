@@ -18,7 +18,8 @@ Ikuti `.claude/rules/git-workflow.md`. Branch sasaran: `$ARGUMENTS` bila diisi, 
 2. **Push ke GitHub**: `git push -u origin <branch>`. Gagal → berhenti dan laporkan output-nya.
    Tag baru di HEAD yang belum ada di origin: `git push origin <tag>` per tag (⛔ bukan `--tags`).
 3. **GitLab** — tentukan mode:
-   - **mirror** (tidak ada remote `gitlab`, default proyek ini): GitLab menarik dari GitHub otomatis.
+   - **mirror** (tidak ada remote `gitlab`, default proyek ini): GitHub Action `mirror-gitlab` menyalin
+     push ini ke GitLab dalam ±1 menit.
      ⛔ Jangan push ke GitLab. Bila `git config --get forplat.gitlabUrl` terisi, verifikasi:
      `git ls-remote <url> refs/heads/<branch>` — SHA sama → OK; beda → sebutkan bahwa mirror belum
      menyusul (biasanya beberapa menit) dan tidak perlu tindakan; gagal auth → sebutkan cek di web GitLab.

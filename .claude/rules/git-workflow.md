@@ -7,11 +7,12 @@ Dasar: `02_ARSITEKTUR` §AG. Berlaku untuk semua sesi.
 | Remote | Host | Peran |
 |---|---|---|
 | `origin` | GitHub `Deidara666-bot/Android_ForPlat` | **sumber kebenaran**: history, backup, tag milestone, tag freeze |
-| GitLab | project GitLab yang tersambung ke GitHub | **CI/CD** (`.gitlab-ci.yml`: SAST + secret detection, nanti test/lint) |
+| GitLab | project GitLab, diisi GitHub Action `mirror-gitlab` | **CI/CD** (`.gitlab-ci.yml`: SAST + secret detection, nanti test/lint) |
 
 Mode GitLab dideteksi otomatis (hook `SessionStart` melaporkannya):
 
-- **mirror** (default, tidak ada remote lokal `gitlab`): GitLab menarik dari GitHub sendiri.
+- **mirror** (default, tidak ada remote lokal `gitlab`): workflow `.github/workflows/mirror-gitlab.yml`
+  menyalin semua branch & tag GitHub ke GitLab (butuh secret `GITLAB_REPO`, `GITLAB_TOKEN` di GitHub).
   Cukup push ke `origin`. ⛔ Jangan menambah remote `gitlab` atau push ke GitLab — dua jalur tulis ke
   repo mirror bisa membuat mirror berhenti/divergen.
 - **push** (remote `gitlab` ada karena user menyatakan GitLab bukan mirror): push `origin` dulu, baru
@@ -23,8 +24,9 @@ Umum:
   tarik ke lokal dulu (`git merge --no-ff --no-edit origin/<branch>`), baru lanjut.
 - Verifikasi mirror opsional: `git config --local forplat.gitlabUrl` berisi URL GitLab → `/sync` membandingkan
   SHA via `git ls-remote`.
-- Pipeline CI hanya didefinisikan di `.gitlab-ci.yml`, diedit di repo lokal lewat commit biasa. Jangan
-  menambah `.github/workflows/` kecuali user memutuskan.
+- Pipeline CI hanya didefinisikan di `.gitlab-ci.yml`, diedit di repo lokal lewat commit biasa.
+  `.github/workflows/` hanya berisi `mirror-gitlab.yml`; ⛔ jangan menambah job CI di GitHub kecuali user memutuskan.
+- Merge PR di web GitHub (tombol *Merge*) boleh — itu tetap GitHub sebagai sumber; mirror menyalinnya ke GitLab.
 
 ## Otomasi (user tidak perlu menjalankan perintah git)
 
