@@ -31,7 +31,7 @@ git diff --cached --name-only --diff-filter=ACMR -z | {
     esac
 
     case "$lower" in
-      var/*)                                 report "$path" "runtime evidence dir var/" ;;
+      var/*|*/var/*)                         report "$path" "runtime evidence dir var/" ;;
       samples/*|malware/*|evidence/*)        report "$path" "sample / evidence dir" ;;
       raw_outputs/*|*/raw_outputs/*)         report "$path" "raw acquisition output" ;;
       */logs/private/*)                      report "$path" "private log" ;;

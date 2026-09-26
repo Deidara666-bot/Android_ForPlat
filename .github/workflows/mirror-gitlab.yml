@@ -1,0 +1,59 @@
+# Mirror GitHub (source of truth) -> GitLab (CI/CD).
+# Every push, tag, or branch deletion on GitHub is replicated to GitLab, which then runs .gitlab-ci.yml.
+# This workflow only mirrors; CI jobs themselves live in .gitlab-ci.yml.
+#
+# Required GitHub repository secrets (Settings -> Secrets and variables -> Actions):
+#   GITLAB_REPO   host/path of the GitLab project, e.g. gitlab.com/<namespace>/<project>.git
+#   GITLAB_TOKEN  GitLab personal access token with scope write_repository
+#                 (account must be allowed to push to protected main, i.e. Maintainer)
+
+name: mirror-gitlab
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["**"]
+  delete:
+  workflow_dispatch:
+
+concurrency:
+  group: mirror-gitlab
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check secrets
+        env:
+          GITLAB_REPO: ${{ secrets.GITLAB_REPO }}
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: |
+          if [ -z "$GITLAB_REPO" ] || [ -z "$GITLAB_TOKEN" ]; then
+            echo "::error::Secrets GITLAB_REPO and GITLAB_TOKEN must be set to mirror to GitLab."
+            exit 1
+          fi
+
+      - name: Clone all branches and tags from GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git clone --quiet --bare \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo.git
+
+      - name: Push branches and tags to GitLab
+        working-directory: repo.git
+        env:
+          GITLAB_REPO: ${{ secrets.GITLAB_REPO }}
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: |
+          repo="${GITLAB_REPO#https://}"
+          git push --prune "https://oauth2:${GITLAB_TOKEN}@${repo}" \
+            '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+
+      - name: Summary
+        run: echo "Mirrored ${GITHUB_REPOSITORY}@${GITHUB_SHA::7} (${GITHUB_REF}) to GitLab." >> "$GITHUB_STEP_SUMMARY"

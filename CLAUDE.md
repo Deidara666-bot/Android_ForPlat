@@ -88,7 +88,7 @@ Rincian per lapisan ada di `.claude/rules/` (dimuat otomatis sesuai folder yang 
 
 ```
 Claude Code (lokal: C:\mrtz\FORENSIC PLATF\Android_ForPlat) → Git lokal
-      └─ push → origin (GitHub, sumber utama) ──mirror otomatis──→ GitLab (CI/CD)
+      └─ push → origin (GitHub, sumber utama) ──GitHub Action mirror-gitlab──→ GitLab (CI/CD)
 Sesi cloud claude.ai → branch origin/claude/* ──/integrate di lokal──→ main
 ```
 
@@ -100,9 +100,10 @@ Sesi cloud claude.ai → branch origin/claude/* ──/integrate di lokal──�
   - ada `origin/claude/*` yang belum masuk `main` → `/integrate`;
   - `main` lokal lebih maju dari `origin/main` → `/sync main`;
   - aman = working tree bersih, merge tanpa konflik, pemeriksaan tidak gagal. Selain itu tanya user dulu.
-- GitLab: mode **mirror** (default) → cukup push ke `origin`; ⛔ jangan tambah remote/push ke GitLab.
-  Mode **push** hanya bila remote `gitlab` ada. Semua push lewat alur `/sync`.
-- ⛔ Jangan pernah edit/commit langsung lewat web UI GitHub atau GitLab.
+- GitLab diisi oleh `.github/workflows/mirror-gitlab.yml` pada tiap push/tag/hapus branch di GitHub →
+  cukup push ke `origin`; ⛔ jangan tambah remote/push ke GitLab. Mode **push** hanya bila remote `gitlab`
+  ada. Semua push lewat alur `/sync`.
+- ⛔ Jangan pernah edit/commit langsung lewat web UI GitHub atau GitLab (tombol *Merge* PR di GitHub boleh).
 - Branch: `main` + `feature/*`, `fix/*`, `experiment/*`, `docs/*` (sesi cloud: `claude/*`).
   Merge ke `main` pakai `--no-ff --no-edit`. `main` harus selalu bisa jalan dan bebas secret.
 - Commit gaya Conventional: `feat|fix|refactor|test|docs|chore|experiment(scope): ringkasan`,
@@ -110,11 +111,14 @@ Sesi cloud claude.ai → branch origin/claude/* ──/integrate di lokal──�
   atau sebagai housekeeping di atas.
 - ⛔ Tanpa `push --force`, `reset --hard`, rebase branch yang sudah di-push, atau hapus tag, kecuali
   user minta eksplisit.
-- Skill: `/setup`, `/integrate`, `/sync`, `/new-branch`, `/finish-branch`, `/milestone`, `/rule-change`,
-  `/wrap-up`. Detail: `.claude/rules/git-workflow.md`.
+- Skill: `/card`, `/setup`, `/integrate`, `/sync`, `/new-branch`, `/finish-branch`, `/milestone`,
+  `/rule-change`, `/plan-milestone`, `/wrap-up`. Detail: `.claude/rules/git-workflow.md`.
 
 ## 6. Cara kerja per tugas
 
+0. Pekerjaan pengembangan mengikuti **kartu** di `docs/dev/` (`/card v0.XX.N`); nilai terkunci ada di
+   `docs/dev/REF.md` — pakai itu sebelum membuka `context/`. ⛔ Jangan mengubah `docs/dev/**` saat
+   mengerjakan kartu. Milestone baru disusun lewat `/plan-milestone`.
 1. Cek `docs/progress.md` → tahu *increment*/milestone aktif. Jangan lompat urutan *increment*:
    mesin aturan tidak dibangun sebelum fakta ternormalisasi ada; fakta tidak ada sebelum akuisisi + parser.
 2. Bangun **vertical slice** tipis dulu, baru melebar ke target tree `02_ARSITEKTUR` §AE. Jangan
@@ -130,6 +134,7 @@ Jalankan dari folder masing-masing, di dalam venv/`node_modules` proyek (bukan g
 
 | Area | Perintah |
 |---|---|
+| semua (disarankan) | `bash scripts/dev/check.sh <backend\|agent\|frontend\|all>` → `CHECK OK` |
 | agen / backend | `python -m ruff check .` · `python -m ruff format --check .` · `python -m pytest` · (opsional) `python -m mypy app` / `src` |
 | migrasi DB | `alembic upgrade head` pada DB dev, lalu `alembic check` |
 | frontend | `npm run lint` · `npm run build` |
