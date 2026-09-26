@@ -6,28 +6,35 @@ Dasar: `02_ARSITEKTUR` §AG. Berlaku untuk semua sesi.
 
 | Remote | Host | Peran |
 |---|---|---|
-| `origin` | GitHub | **sumber kebenaran**: history, backup, tag milestone, tag freeze |
-| `gitlab` | GitLab | mirror untuk **CI/CD** (`.gitlab-ci.yml`: SAST + secret detection, nanti test/lint) |
+| `origin` | GitHub `Deidara666-bot/Android_ForPlat` | **sumber kebenaran**: history, backup, tag milestone, tag freeze |
+| GitLab | project GitLab yang tersambung ke GitHub | **CI/CD** (`.gitlab-ci.yml`: SAST + secret detection, nanti test/lint) |
 
-- Kedua remote harus menunjuk commit yang sama untuk setiap branch dan tag yang di-push.
-- Push selalu **`origin` dulu**, baru `gitlab`. Kalau push ke `origin` gagal, jangan push ke `gitlab`.
-- Kalau push ke `gitlab` gagal (jaringan/auth), laporkan ke user; jangan mengubah history untuk
-  "memperbaikinya".
-- ⛔ Jangan pernah commit lewat web UI GitHub/GitLab, merge request GitLab, atau fitur "edit file"
-  online. Bila itu terlanjur terjadi, **tarik ke lokal dulu** (`git pull origin <branch>`), lalu sinkronkan.
-- Cek sinkronisasi: `git fetch origin && git fetch gitlab` lalu bandingkan
-  `git rev-parse origin/<branch>` vs `git rev-parse gitlab/<branch>`.
-- Pipeline CI hanya didefinisikan di `.gitlab-ci.yml`. File ini diedit di repo lokal dan ikut alur
-  commit biasa. Jangan menambah `.github/workflows/` kecuali user memutuskan.
+Mode GitLab dideteksi otomatis (hook `SessionStart` melaporkannya):
 
-## Setup sekali per clone (mesin lokal)
+- **mirror** (default, tidak ada remote lokal `gitlab`): GitLab menarik dari GitHub sendiri.
+  Cukup push ke `origin`. ⛔ Jangan menambah remote `gitlab` atau push ke GitLab — dua jalur tulis ke
+  repo mirror bisa membuat mirror berhenti/divergen.
+- **push** (remote `gitlab` ada karena user menyatakan GitLab bukan mirror): push `origin` dulu, baru
+  `gitlab`, untuk branch dan tag yang sama. Push `origin` gagal → jangan push ke `gitlab`.
 
-```bash
-git remote -v                                   # pastikan origin = GitHub
-git remote add gitlab <URL-repo-GitLab>         # bila belum ada
-git config core.hooksPath .githooks             # aktifkan pre-commit guard
-git config core.autocrlf false                  # line ending diatur .gitattributes
-```
+Umum:
+
+- ⛔ Jangan commit lewat web UI GitHub/GitLab, merge request GitLab, atau "edit file" online. Bila terlanjur,
+  tarik ke lokal dulu (`git merge --no-ff --no-edit origin/<branch>`), baru lanjut.
+- Verifikasi mirror opsional: `git config --local forplat.gitlabUrl` berisi URL GitLab → `/sync` membandingkan
+  SHA via `git ls-remote`.
+- Pipeline CI hanya didefinisikan di `.gitlab-ci.yml`, diedit di repo lokal lewat commit biasa. Jangan
+  menambah `.github/workflows/` kecuali user memutuskan.
+
+## Otomasi (user tidak perlu menjalankan perintah git)
+
+- Hook `SessionStart` (`.claude/hooks/session-start.sh`) di setiap sesi: set `core.hooksPath=.githooks` dan
+  `core.autocrlf=false` bila belum, `git fetch --prune origin`, lalu melaporkan branch, perubahan belum
+  di-commit, ahead/behind terhadap origin, mode GitLab, dan branch `origin/claude/*` yang belum masuk `main`.
+- Hasil sesi Claude Code cloud (branch `claude/*`) dibawa ke `main` di mesin lokal lewat `/integrate`.
+- Push selalu lewat alur `/sync`. Setup lingkungan/doctor lewat `/setup`.
+- Merge selalu `--no-edit` (tidak membuka editor). ⛔ Jangan menyuruh user mengetik perintah git; jalankan
+  sendiri, dan hanya minta user melakukan hal yang memang di luar terminal (instal aplikasi, login, review).
 
 ## Branch
 
@@ -41,9 +48,10 @@ git config core.autocrlf false                  # line ending diatur .gitattribu
 | `claude/<nama>` | branch yang ditugaskan untuk sesi Claude Code di cloud |
 
 - Tanpa GitFlow, tanpa branch `dev` kecuali user memutuskan.
-- Merge ke `main`: `git switch main && git pull origin main && git merge --no-ff <branch>`,
-  jalankan pemeriksaan, push ke kedua remote, lalu hapus branch lokal (dan remote bila sudah tidak dipakai).
-- Commit/push/merge/tag hanya dilakukan bila user memintanya (langsung atau lewat skill).
+- Merge ke `main`: `git switch main && git pull origin main && git merge --no-ff --no-edit <branch>`,
+  jalankan pemeriksaan, `/sync`, lalu hapus branch lokal (dan remote bila user setuju).
+- Commit/push/merge/tag dilakukan bila user memintanya, lewat skill, atau sebagai housekeeping awal sesi
+  (CLAUDE.md §5).
 
 ## Commit
 
@@ -64,7 +72,7 @@ Format: `type(scope): ringkasan singkat dalam bahasa Inggris, huruf kecil, tanpa
 - Milestone: `v0.05`, `v0.10`, `v0.20`, `v0.30`, `v0.40`, `v0.45`, `v0.50`, `v0.60`, `v0.70`, `v0.80`,
   `v0.90`, `v1.00` (arti tiap milestone: `02_ARSITEKTUR` §AJ.3). Annotated tag, dibuat di `main`.
 - Freeze aturan sebelum holdout: `rules-v<N>-freeze` (§AG.11), hanya setelah `freeze_manifest.json` ada.
-- Tag di-push ke **kedua** remote. ⛔ Tag yang sudah di-push tidak dipindah/dihapus.
+- Tag di-push lewat `/sync` (GitLab ikut lewat mirror). ⛔ Tag yang sudah di-push tidak dipindah/dihapus.
 
 ## Larangan
 
@@ -77,5 +85,5 @@ Format: `type(scope): ringkasan singkat dalam bahasa Inggris, huruf kecil, tanpa
 
 ## Backup
 
-Minimum: repo lokal + `origin`. `gitlab` adalah salinan ketiga. Bundle offline opsional:
+Minimum: repo lokal + `origin`. GitLab adalah salinan ketiga. Bundle offline opsional:
 `git bundle create ../backup-android-forplat-YYYYMMDD.bundle --all`.

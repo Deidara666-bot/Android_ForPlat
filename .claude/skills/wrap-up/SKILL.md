@@ -1,7 +1,6 @@
 ---
 name: wrap-up
 description: Tutup sesi kerja - ringkas perubahan, perbarui docs/progress.md, catat data OPEN dan status sinkronisasi remote, lalu tawarkan commit dan /sync.
-disable-model-invocation: true
 ---
 
 # /wrap-up — tutup sesi
@@ -14,8 +13,8 @@ disable-model-invocation: true
    - **Langkah berikutnya**: 1–5 butir konkret, berurutan.
    - **Data OPEN**: tandai yang sudah terisi (dengan sumbernya), tambahkan `TODO(open-data)` baru yang
      muncul dari kode.
-   - **Sinkronisasi remote**: apakah `origin` dan `gitlab` sudah sama; bila sesi cloud, tulis bahwa
-     `gitlab` perlu disinkronkan dari lokal.
+   - **Sinkronisasi remote**: apakah branch sudah di-push ke `origin` (GitLab mengikuti via
+     mirror); bila sesi cloud, tulis branch `claude/*` yang perlu `/integrate` dari mesin lokal.
    - **Catatan diagram/naskah**: perubahan kode yang berdampak ke DGM-xx atau BAB III.
    - Tulis tanggal dengan format `YYYY-MM-DD`.
 3. Laporkan ke user: ringkasan, test yang dijalankan + hasilnya (termasuk yang gagal / tidak bisa

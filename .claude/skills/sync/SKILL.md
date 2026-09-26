@@ -1,32 +1,31 @@
 ---
 name: sync
-description: Push branch aktif (dan tag baru) ke origin (GitHub) lalu ke gitlab (GitLab CI/CD), lalu verifikasi kedua remote menunjuk commit yang sama.
+description: Push branch aktif (dan tag baru) ke GitHub (origin) dan pastikan GitLab ikut ter-update - lewat mirror otomatis (default) atau push ke remote gitlab bila remote itu ada. Verifikasi hasilnya.
 argument-hint: "[nama-branch] (opsional, default branch aktif)"
-disable-model-invocation: true
 ---
 
-# /sync — sinkronisasi GitHub (origin) → GitLab (gitlab)
+# /sync — GitHub (origin) → GitLab
 
 Ikuti `.claude/rules/git-workflow.md`. Branch sasaran: `$ARGUMENTS` bila diisi, selain itu branch aktif.
 
 1. **Pra-cek**
-   - `git status --short` → bila ada perubahan belum di-commit, **berhenti** dan tanyakan user
-     (jangan commit otomatis).
-   - `git remote -v` → pastikan `origin` (GitHub) dan `gitlab` ada. Bila `gitlab` tidak ada
-     (mis. sesi cloud), push ke `origin` saja, lalu catat di `docs/progress.md` bagian
-     "Sinkronisasi remote" bahwa `gitlab` perlu disinkronkan dari mesin lokal.
-2. **Cek divergensi**
-   - `git fetch origin` dan `git fetch gitlab`.
-   - Bila `origin/<branch>` atau `gitlab/<branch>` punya commit yang tidak ada di lokal
-     (`git log HEAD..origin/<branch>`), **berhenti**: laporkan dan tanyakan user. Jangan force-push.
-3. **Push berurutan**
-   - `git push -u origin <branch>`; bila gagal → berhenti, laporkan, jangan lanjut ke gitlab.
-   - `git push gitlab <branch>`.
-   - Tag: `git tag --points-at HEAD` / tag lokal yang belum ada di remote → push per tag
-     `git push origin <tag>` lalu `git push gitlab <tag>`. ⛔ Jangan `--tags` membabi buta, jangan hapus tag.
-4. **Verifikasi**
-   - `git rev-parse <branch> origin/<branch> gitlab/<branch>` → ketiganya harus sama.
-   - Laporkan ringkas: branch, SHA, tag yang di-push, status tiap remote. Ingatkan bahwa pipeline GitLab
-     akan berjalan dan hasilnya dicek di GitLab.
+   - `git status --porcelain` → bila ada perubahan belum di-commit, tampilkan dan tanyakan user
+     (jangan commit otomatis kecuali user memang meminta commit di permintaan yang sama).
+   - `git fetch --prune origin`.
+   - Bila `origin/<branch>` punya commit yang tidak ada di lokal (`git log --oneline HEAD..origin/<branch>`):
+     gabungkan dulu dengan `git merge --no-ff --no-edit origin/<branch>` (konflik → abort, tanya user).
+     ⛔ Jangan force-push.
+2. **Push ke GitHub**: `git push -u origin <branch>`. Gagal → berhenti dan laporkan output-nya.
+   Tag baru di HEAD yang belum ada di origin: `git push origin <tag>` per tag (⛔ bukan `--tags`).
+3. **GitLab** — tentukan mode:
+   - **mirror** (tidak ada remote `gitlab`, default proyek ini): GitLab menarik dari GitHub otomatis.
+     ⛔ Jangan push ke GitLab. Bila `git config --get forplat.gitlabUrl` terisi, verifikasi:
+     `git ls-remote <url> refs/heads/<branch>` — SHA sama → OK; beda → sebutkan bahwa mirror belum
+     menyusul (biasanya beberapa menit) dan tidak perlu tindakan; gagal auth → sebutkan cek di web GitLab.
+   - **push** (remote `gitlab` ada): `git push gitlab <branch>` (+ tag yang sama). Gagal → laporkan,
+     jangan ubah history.
+4. **Verifikasi & laporan**: `git rev-parse <branch> origin/<branch>` harus sama. Laporkan singkat:
+   branch, SHA pendek, tag yang di-push, mode GitLab + hasil verifikasinya, dan bahwa pipeline GitLab CI
+   akan berjalan dari commit ini.
 
-⛔ Tanpa `--force`, `--force-with-lease`, atau `--no-verify`.
+⛔ Tanpa `--force`, `--force-with-lease`, `+refspec`, atau `--no-verify`.

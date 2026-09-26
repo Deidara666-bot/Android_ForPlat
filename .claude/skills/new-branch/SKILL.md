@@ -2,7 +2,6 @@
 name: new-branch
 description: Mulai pekerjaan baru di branch sesuai konvensi (feature/fix/experiment/docs) dari main terbaru, dan cocokkan dengan increment aktif di docs/progress.md.
 argument-hint: "<tipe>/<topik>  contoh: feature/agent-device-detection"
-disable-model-invocation: true
 ---
 
 # /new-branch — buka branch kerja baru

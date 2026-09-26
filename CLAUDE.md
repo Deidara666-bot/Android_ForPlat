@@ -84,24 +84,34 @@ Rincian per lapisan ada di `.claude/rules/` (dimuat otomatis sesuai folder yang 
 - ⛔ Jangan commit: `.env`, token, keystore, bukti mentah (`var/`, `raw_outputs/`), dump SMS/kontak
   asli, dump database, `*.apk`, `*.pcap`. Data uji selalu sintetis.
 
-## 5. Alur kerja Git (GitHub = sumber utama, GitLab = CI/CD)
+## 5. Alur kerja Git — otomatis dari Claude Code
 
 ```
 Claude Code (lokal: C:\mrtz\FORENSIC PLATF\Android_ForPlat) → Git lokal
-      ├─ push → origin (GitHub)  : sumber kebenaran, backup, history
-      └─ push → gitlab (GitLab)  : mirror untuk pipeline CI/CD
+      └─ push → origin (GitHub, sumber utama) ──mirror otomatis──→ GitLab (CI/CD)
+Sesi cloud claude.ai → branch origin/claude/* ──/integrate di lokal──→ main
 ```
 
-- Semua perubahan lahir di repo lokal. ⛔ Jangan pernah edit/commit langsung lewat web UI GitHub
-  atau GitLab — kedua remote harus selalu identik.
-- Urutan push: **origin dulu, lalu gitlab**, untuk branch dan tag yang sama. Pakai skill `/sync`.
-- Branch: `main` + `feature/*`, `fix/*`, `experiment/*`, `docs/*`. Merge ke `main` pakai `--no-ff`.
-  `main` harus selalu bisa jalan dan bebas secret.
+- **User tidak menjalankan perintah git.** Claude yang menjalankan semuanya; user cukup review, testing,
+  dan hal di luar terminal (download/instal aplikasi, login, AVD, perangkat fisik).
+- Hook `SessionStart` (`.claude/hooks/session-start.sh`, aktif bila terdaftar di `.claude/settings.json`)
+  menyiapkan git config per-clone dan mencetak laporan `[forplat session-start]`. Tanpa hook itu, user
+  bisa menjalankan `/setup`. Dari laporan tersebut lakukan **housekeeping** bila aman, lalu laporkan singkat:
+  - ada `origin/claude/*` yang belum masuk `main` → `/integrate`;
+  - `main` lokal lebih maju dari `origin/main` → `/sync main`;
+  - aman = working tree bersih, merge tanpa konflik, pemeriksaan tidak gagal. Selain itu tanya user dulu.
+- GitLab: mode **mirror** (default) → cukup push ke `origin`; ⛔ jangan tambah remote/push ke GitLab.
+  Mode **push** hanya bila remote `gitlab` ada. Semua push lewat alur `/sync`.
+- ⛔ Jangan pernah edit/commit langsung lewat web UI GitHub atau GitLab.
+- Branch: `main` + `feature/*`, `fix/*`, `experiment/*`, `docs/*` (sesi cloud: `claude/*`).
+  Merge ke `main` pakai `--no-ff --no-edit`. `main` harus selalu bisa jalan dan bebas secret.
 - Commit gaya Conventional: `feat|fix|refactor|test|docs|chore|experiment(scope): ringkasan`,
-  bahasa Inggris, satu tujuan logis per commit.
+  bahasa Inggris, satu tujuan logis per commit. Commit/push dilakukan saat user meminta, lewat skill,
+  atau sebagai housekeeping di atas.
 - ⛔ Tanpa `push --force`, `reset --hard`, rebase branch yang sudah di-push, atau hapus tag, kecuali
-  user minta eksplisit. Commit dan push hanya bila user minta (atau lewat skill yang user jalankan).
-- Detail lengkap: `.claude/rules/git-workflow.md`.
+  user minta eksplisit.
+- Skill: `/setup`, `/integrate`, `/sync`, `/new-branch`, `/finish-branch`, `/milestone`, `/rule-change`,
+  `/wrap-up`. Detail: `.claude/rules/git-workflow.md`.
 
 ## 6. Cara kerja per tugas
 
@@ -133,9 +143,9 @@ Kalau folder/perintah belum ada karena scaffold belum dibuat, katakan itu — ja
 - Mesin utama: Windows 11 (Lenovo IdeaPad Flex 5i, 16 GB), PowerShell + Git Bash. Path proyek
   mengandung spasi → **selalu kutip path**, dan jangan hardcode path absolut di kode/skrip.
 - Venv terpisah: `agent/.venv` dan `backend/.venv`. Jangan `pip install` global.
-- Sesi Claude Code di cloud (claude.ai/code) tidak punya ADB, AVD, Docker, atau remote `gitlab`:
-  kerjakan kode + test unit saja, push ke branch yang ditugaskan di `origin`, dan tandai di
-  `docs/progress.md` bahwa `gitlab` perlu disinkronkan dari mesin lokal.
+- Sesi Claude Code di cloud (claude.ai/code) tidak punya ADB, AVD, atau Docker: kerjakan kode + test
+  unit saja, push ke branch `claude/*` yang ditugaskan di `origin`. Sesi lokal berikutnya membawanya ke
+  `main` lewat `/integrate` secara otomatis.
 
 ## 9. Bahasa & istilah
 
@@ -150,7 +160,7 @@ Kalau folder/perintah belum ada karena scaffold belum dibuat, katakan itu — ja
 ## 10. Kebijakan perubahan file aturan
 
 File berikut dirancang **tetap** sepanjang pengembangan: `CLAUDE.md`, `.claude/rules/*`,
-`.claude/skills/*`, `.claude/agents/*`, `.claude/settings.json`, `.githooks/*`.
+`.claude/skills/*`, `.claude/agents/*`, `.claude/hooks/*`, `.claude/settings.json`, `.githooks/*`.
 Status, progres, dan data yang berubah-ubah **hanya** masuk `docs/progress.md` (dan nanti
 `docs/changelog.md`). Aturan ini hanya direvisi bila core `context/` naik versi karena amandemen
 resmi, atau user memutuskannya secara eksplisit — jangan mengubahnya atas inisiatif sendiri.
