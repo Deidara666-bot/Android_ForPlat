@@ -22,7 +22,7 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
 
 - 2026-09-26 — Rules Claude Code (`CLAUDE.md`, `.claude/rules|skills|agents|hooks`), pre-commit guard,
   `.gitignore`/`.gitattributes`.
-- 2026-09-26 — Otomasi git: `/setup`, `/integrate`, `/sync`; GitHub Action `mirror-gitlab`.
+- 2026-09-26 — Otomasi git: `/setup`, `/integrate`, `/sync`; GitHub Action `mirror-gitlab` (aktif, terverifikasi).
 - 2026-09-26 — Rencana v0.05–v0.40 disusun ulang & disinkronkan (`docs/dev/`: README, ROADMAP, REF, 5 milestone,
   35 kartu); skill `/card`, `/plan-milestone`; `scripts/dev/check.sh`, `scripts/dev/init-env.sh`.
 - 2026-09-30 — `v0.05.1` (USER, laptop): toolchain terpasang (Node diupgrade ke 24.19.0 LTS; sisanya sudah
@@ -30,9 +30,19 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
 - 2026-09-30 — `v0.05.2`: `docs/environment_baseline.md` dicatat; `.claude/settings.json` diperbarui (hook
   SessionStart, izin git diperluas, pagar `Edit(/docs/dev/**)`) — disetujui user.
 
+## Keputusan user (tercatat)
+
+- 2026-09-26 — Model untuk eksekusi kartu (`/card`): **Sonnet**. `/plan-milestone` tetap disarankan model besar.
+- 2026-09-26 — Migrasi VPS **setelah `v1.00`** (platform & infrastruktur lengkap dulu, semua pengembangan/pengujian
+  lokal). Direncanakan sebagai milestone terpisah lewat `/plan-milestone` setelah tag `v1.00`.
+- 2026-09-26 — Mirror GitHub → GitLab aktif: secret terpasang, workflow `mirror-gitlab` sukses (main `6c094de`);
+  force push di GitLab `main` dimatikan kembali.
+
 ## Keputusan / aksi user yang tertunda
 
-- [ ] Secret GitHub `GITLAB_REPO` + `GITLAB_TOKEN`, lalu jalankan workflow `mirror-gitlab` sekali (README §Mirror).
+- [ ] Hapus remote `gitlab` lokal + branch `gitlab-backup` (isinya cuma 3 commit lama dari web UI GitLab,
+      sudah tidak ada nilai unik — `.gitlab-ci.yml` di `main` sudah mengandung isi yang sama). Ditunda atas
+      permintaan user 2026-09-30; selama remote `gitlab` ada, `/sync` masuk mode "push" ganda ke mirror.
 
 ## Data OPEN (jangan ditebak — isi hanya dari hasil nyata)
 
@@ -51,10 +61,12 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
 
 ## Sinkronisasi remote
 
-- GitHub `main` berisi rules (PR #1). Branch `claude/confident-knuth-ceknlx` berisi putaran ini → `/integrate`
-  di laptop (atau merge PR).
-- `main` di laptop punya commit merge lama yang belum di-push → `/integrate` menggabungkannya dengan `origin/main`.
-- GitLab: terisi setelah secret mirror dipasang dan workflow dijalankan.
+- 2026-09-30 — `/integrate`: `origin/claude/confident-knuth-ceknlx` (`b85f0ff`) digabung ke `main`, push ke
+  GitHub sukses (`main` = `f29eb81`). Tidak ada branch `claude/*` lain yang menunggu.
+- 2026-09-30 — `feature/v0.05` (kartu `v0.05.2`, commit `fdd1806`+`905f1f4`) digabung dengan `main` lalu
+  di-push ke GitHub via `/sync` — sekarang terlihat dari sesi cloud mana pun.
+- Remote `gitlab` masih ada di clone lokal ini (harusnya mode mirror-only, lihat item tertunda di atas) —
+  `/sync` sengaja hanya push ke `origin` sampai remote itu dibereskan.
 
 ## Catatan diagram / naskah
 
