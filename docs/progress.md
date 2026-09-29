@@ -22,13 +22,20 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
 
 - 2026-09-26 — Rules Claude Code (`CLAUDE.md`, `.claude/rules|skills|agents|hooks`), pre-commit guard,
   `.gitignore`/`.gitattributes`.
-- 2026-09-26 — Otomasi git: `/setup`, `/integrate`, `/sync`; GitHub Action `mirror-gitlab`.
+- 2026-09-26 — Otomasi git: `/setup`, `/integrate`, `/sync`; GitHub Action `mirror-gitlab` (aktif, terverifikasi).
 - 2026-09-26 — Rencana v0.05–v0.40 disusun ulang & disinkronkan (`docs/dev/`: README, ROADMAP, REF, 5 milestone,
   35 kartu); skill `/card`, `/plan-milestone`; `scripts/dev/check.sh`, `scripts/dev/init-env.sh`.
 
+## Keputusan user (tercatat)
+
+- 2026-09-26 — Model untuk eksekusi kartu (`/card`): **Sonnet**. `/plan-milestone` tetap disarankan model besar.
+- 2026-09-26 — Migrasi VPS **setelah `v1.00`** (platform & infrastruktur lengkap dulu, semua pengembangan/pengujian
+  lokal). Direncanakan sebagai milestone terpisah lewat `/plan-milestone` setelah tag `v1.00`.
+- 2026-09-26 — Mirror GitHub → GitLab aktif: secret terpasang, workflow `mirror-gitlab` sukses (main `6c094de`);
+  force push di GitLab `main` dimatikan kembali.
+
 ## Keputusan / aksi user yang tertunda
 
-- [ ] Secret GitHub `GITLAB_REPO` + `GITLAB_TOKEN`, lalu jalankan workflow `mirror-gitlab` sekali (README §Mirror).
 - [ ] Setujui perubahan `.claude/settings.json` di kartu `v0.05.2` (hook SessionStart + izin git + pagar `docs/dev`).
       Diblok classifier auto mode saat Claude mencoba mengubah setting-nya sendiri, jadi perlu persetujuan user.
 
@@ -48,10 +55,8 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
 
 ## Sinkronisasi remote
 
-- GitHub `main` berisi rules (PR #1). Branch `claude/confident-knuth-ceknlx` berisi putaran ini → `/integrate`
-  di laptop (atau merge PR).
-- `main` di laptop punya commit merge lama yang belum di-push → `/integrate` menggabungkannya dengan `origin/main`.
-- GitLab: terisi setelah secret mirror dipasang dan workflow dijalankan.
+- GitHub `main` = `6c094de` berisi semua rules + rencana; GitLab ikut lewat `mirror-gitlab`.
+- Tidak ada branch `claude/*` yang menunggu `/integrate` selain yang membawa catatan ini.
 
 ## Catatan diagram / naskah
 
