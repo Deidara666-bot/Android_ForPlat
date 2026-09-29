@@ -1,8 +1,8 @@
 # MAP — peta v0.45 → v1.00 (draf untuk review user)
 
-Tingkat **peta**, bukan kartu. Kartu detail tiap milestone dibuat lewat `/plan-milestone v0.XX` (model besar)
-**setelah tag milestone sebelumnya**, karena kartu harus menyebut nama berkas/fungsi/tabel yang sudah ada
-dan hasil Tier-2 mengubah keanggotaan artefak. Peta ini mengunci: urutan, isi, titik kontrak, pemetaan
+Tingkat **peta**. Kartu draf tiap milestone sudah ada (`v0.45.md` … `v1.00.md`) dan **wajib disegarkan** lewat
+`/plan-milestone v0.XX` (mode *refresh*, model besar) setelah tag milestone sebelumnya, karena kartu harus menyebut
+nama berkas/fungsi/tabel yang benar-benar ada dan hasil Tier-2 mengubah keanggotaan artefak. Peta ini mengunci: urutan, isi, titik kontrak, pemetaan
 operasi, keputusan `[plan]`, jadwal, dan daftar yang boleh dipangkas. Sumber: `01_BREAKDOWN` §8–§18,
 `02_ARSITEKTUR` §N, §V, §Y.3.5–§Z.1, §AA.1, §AC, §AJ.
 
@@ -13,14 +13,14 @@ operasi, keputusan `[plan]`, jadwal, dan daftar yang boleh dipangkas. Sumber: `0
 | 1 | v0.05 · v0.10 | 11 | AVD #1, Galaxy A10, password pemeriksa |
 | 2 | v0.20 · awal v0.30 | ±11 | AVD hidup saat uji |
 | 3 | v0.30 · v0.40 | ±13 | cek layar irisan tegak |
-| 4 | **v0.45** Tier-2 G1 | ±8 | AVD #2, A10 tersambung saat Tier-2 |
-| 5 | **v0.50** · **v0.60** | ±13 | review YAML & hasil 7 kelas skenario |
-| 6 | **v0.70** G2/G3 + rekonstruksi | ±8 | Tier-2 G2/G3 di 3 lingkungan |
-| 7 | **v0.80** simulator + 20 authoring | ±9 | Gemini di Android Studio, pilih aplikasi S-B |
-| 8 | **v0.90** freeze + holdout + S-C + baseline manual | ±8 | **baseline manual** (kerja peneliti), VM S-C |
-| sisa | **v1.00** laporan, dokumen, paket agen | ±6 | review akhir |
+| 4 | **v0.45** Tier-2 G1 | 9 | AVD #2, A10 tersambung saat Tier-2 |
+| 5 | **v0.50** · **v0.60** | 14 | review YAML & hasil 7 kelas skenario |
+| 6 | **v0.70** G2/G3 + rekonstruksi | 9 | Tier-2 G2/G3 di 3 lingkungan |
+| 7 | **v0.80** simulator + 20 authoring | 10 | Gemini di Android Studio, pilih aplikasi S-B |
+| 8 | **v0.90** freeze + holdout + S-C + baseline manual | 8 | **baseline manual** (kerja peneliti), VM S-C |
+| sisa | **v1.00** laporan, dokumen, paket agen | 6 | review akhir |
 
-Total ±87 kartu ≈ 2 kartu/hari kerja. **Ketat.** Bila tertinggal >3 hari, pakai daftar pangkas di bawah
+Total 91 kartu (35 + 56 draf) ≈ 2 kartu/hari kerja. **Ketat.** Bila tertinggal >3 hari, pakai daftar pangkas di bawah
 sebelum menggeser v0.90 (hasil v0.90 = bahan BAB IV).
 
 ## Keputusan yang dipakai peta ini
