@@ -5,6 +5,7 @@
 | Berkas | Fungsi |
 |---|---|
 | `ROADMAP.md` | peta milestone `v0.05`–`v1.00`, increment, dan jalur VPS |
+| `MAP.md` | peta v0.45–v1.00: isi, kontrak, pemetaan operasi, keputusan, jadwal 8 minggu, daftar pangkas |
 | `REF.md` | **semua nilai terkunci** (versi, enum, kolom, rute, perintah). Kartu merujuk `REF §X` |
 | `v0.XX.md` | satu berkas per milestone: peta singkat + kartu `v0.XX.N` |
 
