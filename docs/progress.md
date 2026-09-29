@@ -29,6 +29,9 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
   ada atau lebih tinggi dari target); WSL2/Virtual Machine Platform diaktifkan sehingga Docker Desktop jalan.
 - 2026-09-30 — `v0.05.2`: `docs/environment_baseline.md` dicatat; `.claude/settings.json` diperbarui (hook
   SessionStart, izin git diperluas, pagar `Edit(/docs/dev/**)`) — disetujui user.
+- 2026-09-30 — `.claude/settings.json`: tambah 4 deny yang kelewat di `v0.05.2` (`Read(/experiments/holdout_cases/**)`,
+  `Bash(git push * --force*)`, `Bash(git push * -f*)`, `Bash(git push *+*)`). Remote `gitlab` lokal +
+  branch `gitlab-backup` dihapus — `/sync` sekarang mode mirror-only sesuai desain.
 
 ## Keputusan user (tercatat)
 
@@ -40,9 +43,7 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
 
 ## Keputusan / aksi user yang tertunda
 
-- [ ] Hapus remote `gitlab` lokal + branch `gitlab-backup` (isinya cuma 3 commit lama dari web UI GitLab,
-      sudah tidak ada nilai unik — `.gitlab-ci.yml` di `main` sudah mengandung isi yang sama). Ditunda atas
-      permintaan user 2026-09-30; selama remote `gitlab` ada, `/sync` masuk mode "push" ganda ke mirror.
+- (kosong)
 
 ## Data OPEN (jangan ditebak — isi hanya dari hasil nyata)
 
@@ -65,8 +66,8 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
   GitHub sukses (`main` = `f29eb81`). Tidak ada branch `claude/*` lain yang menunggu.
 - 2026-09-30 — `feature/v0.05` (kartu `v0.05.2`, commit `fdd1806`+`905f1f4`) digabung dengan `main` lalu
   di-push ke GitHub via `/sync` — sekarang terlihat dari sesi cloud mana pun.
-- Remote `gitlab` masih ada di clone lokal ini (harusnya mode mirror-only, lihat item tertunda di atas) —
-  `/sync` sengaja hanya push ke `origin` sampai remote itu dibereskan.
+- 2026-09-30 — Remote `gitlab` lokal + branch `gitlab-backup` dihapus (isinya cuma 3 commit lama dari web UI
+  GitLab, sudah tercakup di `.gitlab-ci.yml` `main`). `/sync` kembali mode mirror-only default.
 
 ## Catatan diagram / naskah
 
