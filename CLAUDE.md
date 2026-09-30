@@ -22,12 +22,14 @@ Dokumen kanonik ada di `context/` dan berstatus **FROZEN**. Pakai berkas dengan 
 | `context/00_SESSION_STARTER_*` | ringkasan keputusan, prinsip epistemik (§5), instruksi AI (§13) |
 | `context/BAB_0*_WORKING_*` | kendali naskah skripsi — bukan spesifikasi kode |
 
-Jika ada konflik: **(1)** keputusan langsung user di sesi berjalan → **(2)** judul → **(3)** naskah
+Jika ada konflik: **(1)** keputusan langsung user di sesi berjalan, termasuk entri `docs/core_deviations.md`
+(berlaku lintas sesi) → **(2)** judul → **(3)** naskah
 BAB I/II `DRAFT FINAL` → **(4)** `01_BREAKDOWN` → **(5)** `02_ARSITEKTUR` → **(6)** `00_SESSION_STARTER`
 → **(7)** dokumen `WORKING` → **(8)** asumsi AI (paling rendah).
 
 - ⛔ Jangan pernah mengedit isi `context/`. Kalau kode butuh sesuatu yang bertentangan dengan core,
-  **berhenti dan tanya user** — perubahan core adalah amandemen versi baru, bukan tambalan diam-diam.
+  **berhenti dan tanya user**. Disetujui + tingkat implementasi → entri `docs/core_deviations.md` di commit yang sama;
+  substansi penelitian → amandemen versi baru (dikumpulkan), bukan tambalan diam-diam. Batasnya di berkas itu.
 - Jangan membaca dokumen `context/` utuh setiap sesi (ratusan KB). Buka **seksi yang relevan** saja
   memakai nomor seksi di tabel di atas.
 - Jangan mengisi data yang masih OPEN (versi Android Galaxy A10, hash sampel, nama package simulator,
@@ -166,6 +168,6 @@ Kalau folder/perintah belum ada karena scaffold belum dibuat, katakan itu — ja
 
 File berikut dirancang **tetap** sepanjang pengembangan: `CLAUDE.md`, `.claude/rules/*`,
 `.claude/skills/*`, `.claude/agents/*`, `.claude/hooks/*`, `.claude/settings.json`, `.githooks/*`.
-Status, progres, dan data yang berubah-ubah **hanya** masuk `docs/progress.md` (dan nanti
-`docs/changelog.md`). Aturan ini hanya direvisi bila core `context/` naik versi karena amandemen
+Status, progres, dan data yang berubah-ubah **hanya** masuk `docs/progress.md`, `docs/core_deviations.md`
+(dan nanti `docs/changelog.md`). Aturan ini hanya direvisi bila core `context/` naik versi karena amandemen
 resmi, atau user memutuskannya secara eksplisit — jangan mengubahnya atas inisiatif sendiri.

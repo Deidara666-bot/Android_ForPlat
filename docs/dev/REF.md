@@ -1,8 +1,9 @@
 # REF — nilai terkunci untuk kartu v0.05–v0.40
 
 Satu-satunya rujukan nilai yang dipakai kartu. Kartu menulis `REF §X`; buka hanya seksi itu.
-Diturunkan dari `context/02_ARSITEKTUR_*` dan `context/01_BREAKDOWN_*` v3.3. Bila REF dan core
-berbeda → core menang; berhenti dan laporkan. Keputusan plan (bukan dari core) ditandai `[plan]`.
+Diturunkan dari `context/02_ARSITEKTUR_*` dan `context/01_BREAKDOWN_*` v3.3. Urutan berlaku:
+`docs/core_deviations.md` → core → REF. Beda REF vs core yang tidak tercatat di register → berhenti dan laporkan.
+Keputusan plan (bukan dari core) ditandai `[plan]`.
 
 ## §SHELL — cara menjalankan perintah
 
@@ -33,7 +34,7 @@ berbeda → core menang; berhenti dan laporkan. Keputusan plan (bukan dari core)
 | Komponen | Versi |
 |---|---|
 | Python | 3.13.x · Node 24 LTS (npm 11) · PostgreSQL image `postgres:18.6` |
-| Android Studio | Quail 3 2026.1.3 · SDK Platform 36 · Build-Tools 36.0.0 · Platform-Tools 37.0.0 |
+| Android Studio | Quail 3 2026.1.3 · SDK Platform 36 · Build-Tools 36.0.0 · Platform-Tools 37.0.1 (DEV-04) |
 | AVD #1 | Pixel 6 · Android 16 / API 36 · **Google APIs** · x86_64 · tanpa akun · tanpa SIM · nama `avd1-api36` |
 
 `backend/requirements.txt` (persis):
@@ -105,7 +106,7 @@ POLL_INTERVAL_SECONDS=2
 VITE_API_BASE_URL=http://localhost:8000
 VITE_WS_BASE_URL=ws://localhost:8000
 ```
-- `[plan]` Password `DATABASE_URL` disamakan dengan compose (`local-dev-only`); core §S.1 menulis `password` yang tidak cocok dengan §R.
+- Password `DATABASE_URL` = `local-dev-only` (DEV-03).
 - Config wajib **gagal keras** bila kunci hilang, dan menolak nilai rahasia `change-me` kecuali `APP_ENV=test`.
 - DB test = nama DB `DATABASE_URL` + `_test` (diturunkan di `conftest.py`, bukan kunci baru).
 
@@ -125,7 +126,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
       - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
 volumes:
   postgres_data:
@@ -136,8 +137,8 @@ CREATE ROLE forensic_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD 'loc
 ALTER DATABASE android_forensic OWNER TO forensic_app;
 CREATE DATABASE android_forensic_test OWNER forensic_app;
 ```
-- `[plan]` Admin terpisah dari user aplikasi karena `POSTGRES_USER` image resmi selalu superuser,
-  sedangkan §AD mewajibkan user aplikasi non-superuser. ⛔ Agen/backend/frontend tidak dikontainerkan.
+- Mount `/var/lib/postgresql`, bukan `…/data` (image 18+; DEV-01). Admin terpisah dari user aplikasi
+  non-superuser (DEV-02). ⛔ Agen/backend/frontend tidak dikontainerkan.
 - Init script hanya jalan pada volume baru. Password di sini khusus dev lokal.
 - psql cepat: `docker compose exec -T postgres psql -U forensic_app -d android_forensic -At -c "<SQL>"`.
   Di kartu disingkat `psql -c "<SQL>"`.
@@ -211,7 +212,7 @@ Semua `id` = UUID (`server_default gen_random_uuid()`); semua waktu `timestamptz
 | `execution_observed` (7) | `event_trigger_execution_observed` · `app_usage_observed` · `activity_observed_resumed` · `process_observed_running` · `uid_network_activity_observed` · `local_endpoint_request_observed` · `lab_network_flow_observed` |
 | `data_present` (4) | `sms_record_observed` · `contact_record_observed` · `call_log_record_observed` · `notification_context_observed` |
 
-⛔ Bukan anggota katalog (meski muncul di contoh core): `permission_observed_granted`,
+⛔ Bukan anggota katalog (meski muncul di contoh core, DEV-05): `permission_observed_granted`,
 `accessibility_service_observed_enabled`, `overlay_permission_observed_active`.
 
 ## §API — rute (prefiks `/api`, semua kecuali health & login butuh auth)

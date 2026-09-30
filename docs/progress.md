@@ -3,7 +3,7 @@
 > Papan status hidup. **Satu-satunya file kendali yang diperbarui tiap sesi** (lewat `/card` dan `/wrap-up`).
 > Aturan tetap di `CLAUDE.md` dan `.claude/`; rencana di `docs/dev/`. Tanggal format `YYYY-MM-DD`.
 
-**Terakhir diperbarui:** 2026-09-30
+**Terakhir diperbarui:** 2026-10-01
 
 ## Posisi saat ini
 
@@ -58,11 +58,12 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
   `v0.05.5` dipindah ke `v0.90.7`; `v0.05.6` jalan tanpa itu; tag `v0.05` dibuat tanpa A10. Tambahan `[plan]`: parser
   ketat (struktur tak dikenali → `failed`). Tanpa amandemen core. Alasan: A10 belum tersedia dalam waktu dekat,
   dan pengembangan dikerjakan dulu sampai software jadi baru pengujian penelitian.
+- 2026-10-01 — Core tidak diamandemen untuk beda tingkat implementasi; dicatat di `docs/core_deviations.md`
+  (DEV-01..05, termasuk mount PostgreSQL). Substansi penelitian tetap lewat amandemen berkelompok. CLAUDE.md §1/§10 disesuaikan.
 
 ## Keputusan / aksi user yang tertunda
 
-- Revisi `REF §DB` dan core `02_ARSITEKTUR` §R: mount volume postgres `…/data` → `/var/lib/postgresql` (image 18.x). Claude
-  tidak boleh mengedit keduanya; amandemen oleh user.
+- Setujui tag `v0.05` (`/milestone v0.05`).
 - Galaxy A10 harus tersedia paling lambat `v0.90.7`, dan versinya dibutuhkan sebelum BAB III 3.3 final. Bila tidak ada
   → keputusan amandemen `G-05` (ganti perangkat / lepas AVD #2 dari A10 / emulator saja dengan batasan dinyatakan).
 
