@@ -9,6 +9,10 @@ disable-model-invocation: true
 
 Milestone: `$ARGUMENTS`. Contoh format: `docs/dev/v0.40.md`. Aturan format: `docs/dev/README.md`.
 
+**Mode refresh** — bila `docs/dev/$ARGUMENTS.md` sudah ada (draf): pertahankan urutan kartu, kelas, kontrak, dan batas;
+sesuaikan nama berkas/fungsi/tabel/rute dengan kode aktual (`grep`), perintah & format dengan hasil Tier-2/milestone
+sebelumnya, dan seksi REF terkait. Hapus baris `DRAF`. Laporkan diff ringkas; perubahan isi/kontrak → tanya user dulu.
+
 1. **Konteks minimum**
    - `docs/dev/ROADMAP.md` (isi milestone), `docs/dev/REF.md`, berkas milestone sebelumnya (kartu terakhirnya +
      peta), `docs/progress.md` (data OPEN, temuan kartu, hasil Tier-2 bila ada).
