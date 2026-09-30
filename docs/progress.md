@@ -32,6 +32,8 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
 - 2026-09-30 — `.claude/settings.json`: tambah 4 deny yang kelewat di `v0.05.2` (`Read(/experiments/holdout_cases/**)`,
   `Bash(git push * --force*)`, `Bash(git push * -f*)`, `Bash(git push *+*)`). Remote `gitlab` lokal +
   branch `gitlab-backup` dihapus — `/sync` sekarang mode mirror-only sesuai desain.
+- 2026-09-30 — `/plan-milestone` (sesi cloud): draft kartu `v0.45`–`v1.00` + `docs/dev/MAP.md` masuk ke
+  `docs/dev/`, status **draf, belum di-review** — jangan dieksekusi sebagai kartu final sebelum user review.
 
 ## Keputusan user (tercatat)
 
@@ -68,6 +70,9 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
   di-push ke GitHub via `/sync` — sekarang terlihat dari sesi cloud mana pun.
 - 2026-09-30 — Remote `gitlab` lokal + branch `gitlab-backup` dihapus (isinya cuma 3 commit lama dari web UI
   GitLab, sudah tercakup di `.gitlab-ci.yml` `main`). `/sync` kembali mode mirror-only default.
+- 2026-09-30 — `/integrate` kedua: `origin/claude/confident-knuth-ceknlx` (`56a86fa`+`8959085`, draft kartu
+  `v0.45`–`v1.00` dari `/plan-milestone`) digabung ke `main` (push `main` = `20c4275`), lalu `main` digabung
+  ke `feature/v0.05` dan di-push (`feature/v0.05` = `675554e`). Tidak ada branch `claude/*` lain yang menunggu.
 
 ## Catatan diagram / naskah
 
