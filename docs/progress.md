@@ -12,8 +12,8 @@
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
 | Milestone aktif | **`v0.05`** (`docs/dev/v0.05.md`), branch `feature/v0.05` |
-| Kartu terakhir | **`v0.05.4`** (2026-09-30) |
-| Kartu berikutnya | **`/card v0.05.6`** (PostgreSQL, smoke test, tag — butuh Docker Desktop jalan). `v0.05.5` dipindah ke `v0.90.7` |
+| Kartu terakhir | **`v0.05.6`** (2026-10-01) — milestone `v0.05` selesai, menunggu `/milestone v0.05` |
+| Kartu berikutnya | **`/card v0.10.1`** setelah tag `v0.05` disetujui (`docs/dev/v0.10.md`) |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
@@ -41,6 +41,10 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
 - 2026-09-30 — `v0.05.4`: AVD `avd1-api36` (API 36, Google APIs, x86_64, `userdebug`) terbaca `adb`; baseline dicatat.
   Uji gagal `su -c id` dijalankan user manual: `su: invalid uid/gid '-c'` (gagal, bukan uid=0; lulus). Image `userdebug`
   punya biner `su` — larangan akar ditegakkan allowlist agen, bukan emulator.
+- 2026-10-01 — `v0.05.6`: PostgreSQL 18.6 naik, `forensic_app` non-superuser, `android_forensic_test` ada, smoke di
+  `docs/smoke/v0.05.md`. Konversi path Git Bash **AKTIF** (pakai `MSYS_NO_PATHCONV=1`). **Temuan:** mount
+  `postgres_data:/var/lib/postgresql/data` di REF §DB dan core §R ditolak image 18.x; `docker-compose.yml` diubah ke
+  `/var/lib/postgresql`. User setuju 2026-10-01.
 
 ## Keputusan user (tercatat)
 
@@ -57,6 +61,8 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
 
 ## Keputusan / aksi user yang tertunda
 
+- Revisi `REF §DB` dan core `02_ARSITEKTUR` §R: mount volume postgres `…/data` → `/var/lib/postgresql` (image 18.x). Claude
+  tidak boleh mengedit keduanya; amandemen oleh user.
 - Galaxy A10 harus tersedia paling lambat `v0.90.7`, dan versinya dibutuhkan sebelum BAB III 3.3 final. Bila tidak ada
   → keputusan amandemen `G-05` (ganti perangkat / lepas AVD #2 dari A10 / emulator saja dengan batasan dinyatakan).
 
