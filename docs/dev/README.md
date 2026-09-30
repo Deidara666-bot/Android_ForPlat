@@ -5,6 +5,7 @@
 | Berkas | Fungsi |
 |---|---|
 | `ROADMAP.md` | peta milestone `v0.05`–`v1.00`, increment, dan jalur VPS |
+| `MAP.md` | peta v0.45–v1.00: isi, kontrak, pemetaan operasi, keputusan, jadwal 8 minggu, daftar pangkas |
 | `REF.md` | **semua nilai terkunci** (versi, enum, kolom, rute, perintah). Kartu merujuk `REF §X` |
 | `v0.XX.md` | satu berkas per milestone: peta singkat + kartu `v0.XX.N` |
 
@@ -14,8 +15,9 @@
   langkah bertanda **USER**, lalu review hasil yang dilaporkan.
 - **Claude:** skill `/card` mengeksekusi satu kartu: baca kartu + seksi REF yang dirujuk → kerjakan →
   `Cek` → `Uji gagal` → commit → catat di `docs/progress.md`.
-- Milestone berikutnya (`v0.45`+) dibuat dengan `/plan-milestone v0.45` — sebaiknya pakai model besar,
-  lalu user review sebelum kartu dijalankan.
+- Kartu `v0.45`–`v1.00` berstatus **draf**. Sebelum kartu pertama milestone itu: `/plan-milestone v0.XX`
+  (mode *refresh*, model besar) menyesuaikan nama berkas/fungsi dengan kode aktual dan hasil milestone sebelumnya;
+  user review, baru `/card`.
 
 ## Format kartu
 

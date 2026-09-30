@@ -273,3 +273,165 @@ package:android uid:1000
 package:com.synthetic.alpha uid:10101
 paket-rusak-tanpa-uid
 ```
+
+---
+
+# Tambahan v0.45–v1.00
+
+Seksi di bawah dipakai kartu `v0.45`–`v1.00` (status **draf**, disegarkan per milestone lewat
+`/plan-milestone`). Seksi di atas tidak berubah.
+
+## §OPS2 — perintah 6 operasi sisa (kandidat; difinalkan Tier-2 di milestone yang sama)
+
+Satu operasi boleh menjalankan beberapa perintah berurutan → satu berkas bukti per perintah (`sequence`) `[plan]`.
+`<pkg>` = `parameters.package_name` (regex `^[A-Za-z0-9_.]{1,200}$`). Argumen sesudah `-s <serial>`.
+
+| ID | seq | Argumen | `raw_source` | Lahir |
+|---|---|---|---|---|
+| `collect_package_detail` | 1 | `shell dumpsys package <pkg>` | `dumpsys package` | v0.45 |
+| `collect_accessibility_state` | 1 | `shell settings get secure enabled_accessibility_services` | `settings secure a11y` | v0.45 |
+| | 2 | `shell settings get secure enabled_notification_listeners` | `settings secure nls` | |
+| | 3 | `shell appops get <pkg> SYSTEM_ALERT_WINDOW` | `appops overlay` | |
+| `collect_usage_state` | 1 | `shell dumpsys usagestats` | `dumpsys usagestats` | v0.45 |
+| | 2 | `shell dumpsys activity activities` | `dumpsys activity` | |
+| | 3 | `shell ps -A -o PID,UID,USER,NAME` | `ps` | |
+| `pull_subject_apk` | 1 | `shell pm path <pkg>` | `pm path` | v0.45 |
+| | 2 | `pull <path> <berkas lokal agen>` — `<path>` dari keluaran seq 1 milik agen sendiri, regex `^/(data/app\|system\|product\|system_ext)/[^\s]+\.apk$`; ⛔ path dari backend | `apk file` | |
+| | 3..n | ekstraktor §STATIC atas APK hasil seq 2 (dijalankan agen) | `static:<nama berkas>` | |
+| `collect_sensitive_provider_data` | 1 | `shell content query --uri content://sms` | `content sms` | v0.70 |
+| | 2 | `shell content query --uri content://contacts/phones` | `content contacts` | |
+| | 3 | `shell content query --uri content://call_log/calls` | `content call_log` | |
+| `collect_network_stats` | 1 | `shell dumpsys netstats detail` | `dumpsys netstats` | v0.70 |
+
+`source_group`: `collect_sensitive_provider_data` → `SENSITIVE_COMMUNICATION`; `collect_network_stats` →
+`NETWORK_ACTIVITY`; sisanya `APP_SYSTEM_STATE`. ⛔ APK malware nyata (S-C) tidak pernah lewat `pull_subject_apk`.
+
+## §STATIC — ekstraktor APK statis `[plan]` (K2 di MAP)
+
+`scripts/static/extract_apk.py <apk> <folder_keluar>` — Python stdlib + alat SDK, ⛔ tanpa menjalankan APK.
+Build-tools dicari dari `ANDROID_SDK_ROOT` → `ANDROID_HOME` → `%LOCALAPPDATA%/Android/Sdk`, versi 36.x.
+
+| Berkas bundel | Isi |
+|---|---|
+| `apk.sha256` | SHA-256 APK (hex) |
+| `badging.txt` | `aapt2 dump badging <apk>` |
+| `permissions.txt` | `aapt2 dump permissions <apk>` |
+| `manifest.txt` | `aapt2 dump xmltree --file AndroidManifest.xml <apk>` |
+| `certs.txt` | `apksigner verify --print-certs <apk>` (gagal verifikasi tetap dicatat) |
+| `strings_urls.txt` | URL/domain/IP dari `classes*.dex` + `res/`, regex, urut unik, maks 5000 baris |
+| `bundle.json` | `{apk_sha256, extractor_version, tool_versions, created_at, files:{nama: sha256}}` |
+
+- S-A/S-B: dijalankan agen setelah `pull_subject_apk` (keluaran jadi bukti seq 3..n).
+- S-C: dijalankan **di VM terisolasi** oleh user; hanya folder bundel (tanpa APK) yang diimpor lewat
+  `POST /api/static-bundles` (v0.90). Keluaran `evidence_mode = apk_static`.
+
+## §TIER2 — protokol Tier-2 lewat agen (§11.1) `[plan]`
+
+- Runner host: `scripts/experiments/tier2_run.py --env <label> --profile <tier2_g1|tier2_g2g3> --reps 3`.
+  Per ulangan: reset lingkungan (`scripts/adb/tier2_reset.sh <label>`) → `POST /api/acquisitions`
+  (lewat agen, operasi allowlist) → tunggu sesi selesai → catat. ⛔ Reset bukan operasi agen dan tidak
+  dipicu backend.
+- Reset: AVD → `adb -s <serial> emu avd snapshot load clean` (snapshot `clean` dibuat sekali oleh user);
+  Galaxy A10 → `adb -s <serial> reboot` + tunggu `sys.boot_completed=1`.
+- Label lingkungan: `avd1-api36`, `avd2-api<N>` (N dari v0.05.5), `a10-api<N>`.
+- CSV `experiments/feasibility_tier2/results/<profile>_<env>.csv`, kolom:
+  `artifact_id,env,rep,android_version,api,build,device_or_emulator,operation_id,command,privilege_state,test_action,expected_evidence,actual_result,availability_status,availability_reason,raw_output_ref,temporal_semantics,git_commit,adb_version,acquired_at`.
+- Status per artefak per lingkungan: 3/3 = konsisten · 1–2/3 = `CONDITIONAL` · 0/3 = status non-acquired
+  dominan + alasan (⛔ tidak diciutkan). Ringkasan di `docs/tier2_<profile>.md`.
+- Pemetaan artefak Tier-1 → operasi: G1-A1/A2 `collect_package_inventory`/`pull_subject_apk` · G1-A3 `pull_subject_apk` ·
+  G1-A4..A9, G1-B7 `collect_package_detail` · G1-A10, A11, B8 `collect_usage_state` · G1-B1..B3 `collect_accessibility_state` ·
+  G2-C1, C3, C4 `collect_sensitive_provider_data` · G3-D1 `collect_network_stats`.
+
+## §ENUM2 — himpunan tertutup v0.45+ (tambahkan ke `backend/app/core/constants.py`)
+
+| Enum | Nilai |
+|---|---|
+| `ConditionState` | `TRUE` · `FALSE` · `UNKNOWN` (UI: terpenuhi · tidak terpenuhi · tidak diketahui) |
+| `Outcome` | `matched` · `not_matched` · `insufficient_evidence` (UI: terpenuhi · tidak terpenuhi · bukti tidak memadai) |
+| `EvaluationStatus` | `evaluated` · `skipped_not_applicable` |
+| `ConditionRole` | `required` · `optional` · `contextual` · `exclusionary` |
+| `ClaimLevel` | `identity` · `capability` · `observed_activity` · `contextual_cooccurrence` |
+| `EvidenceMode` | `installed_runtime` · `apk_static` |
+| `RunPurpose` | `authoring` · `holdout` · `benign_control` · `production` |
+| `RuleStatus` | `design_baseline` · `authoring_candidate` · `frozen_for_holdout` |
+| `InterpretationStatus` `[plan]` | `normal` · `constrained` |
+| `ReferenceRole` | `artifact_semantics` · `behavior_relevance` · `interpretation_limit` · `technique_mapping` |
+| `VerificationStatus` | `verified_design` · `verified` |
+| `TimeBinding` | `current` · `not_applicable` · `case_window` · `observation_time` · `bucket_overlap` |
+| `Operator` | `exists` · `equals` · `in` · `greater_than` · `delta_greater_than` · `overlaps_window` |
+| `UnknownReason` `[plan]` | `availability_unavailable` · `availability_denied` · `availability_unsupported` · `availability_failed` · `not_acquired` · `parse_incomplete` · `coverage_incomplete` · `conflicting_evidence` · `no_applicable_profile` |
+| `ReconstructionStatus` `[plan]` | `built` · `gate_not_met` |
+
+## §VOCAB — kosakata `object_value` yang dibaca YAML (§14.2)
+
+| event_type | `object_value` |
+|---|---|
+| `sensitive_communication_capability_observed_granted` / `_declared` | `android.permission.READ_SMS`, `RECEIVE_SMS`, `SEND_SMS`, `READ_CONTACTS`, `READ_CALL_LOG` (nama lengkap) |
+| `permission_observed_requested` | nama permission lengkap (termasuk `android.permission.SYSTEM_ALERT_WINDOW`) |
+| `special_access_capability_observed_enabled` / `_declared` | `accessibility_service` · `draw_over_other_apps` · `notification_listener` |
+| `event_trigger_capability_observed_declared` | `android.intent.action.BOOT_COMPLETED`, `LOCKED_BOOT_COMPLETED`, `PACKAGE_ADDED`, `PACKAGE_REPLACED` (nama lengkap) |
+| `uid_network_activity_observed` | UID sebagai teks; `context_json.total_bytes` (int) dipakai operator numerik |
+| `accessibility_service_observed_declared`, `service_observed_declared` | nama komponen `pkg/.Kelas` |
+
+Fakta negatif (`predicate_value=false`, `evidence_state=observed_false`) hanya untuk predikat tertutup di tabel ini,
+dan hanya bila sumbernya `acquired` + terurai penuh untuk subjek itu (v0.45.6).
+
+## §ENT2 — entitas v0.45+ (tabel jamak; kolom inti §AA.2; tambahan `[plan]` ditandai *)
+
+| Tabel | Kolom | Lahir |
+|---|---|---|
+| `kb_sources` | id (teks `KB-…`), title, publisher, url, accessed_at, extracted_claim, version_scope, reference_role, quality_note, verification_status, active | v0.50 |
+| `rule_metadata` | id, family_id, profile_id NULL (baris keluarga), version, status, applicability JSONB, claim_level NULL, incident_scope, content_hash, source_path*, loaded_at* | v0.50 |
+| `rule_references` | rule_metadata_id, source_id (PK gabungan) | v0.50 |
+| `rule_element_references` | id, rule_metadata_id, rule_element_key, source_id, reference_role, extracted_claim, version_scope, verification_status | v0.50 |
+| `correlation_runs`* | id, case_id, evidence_mode, run_purpose, window_start NULL, window_end NULL, subjects JSONB, rule_set_hash, kb_hash, code_commit, created_at | v0.60 |
+| `rule_family_evaluations` | id, correlation_run_id, family_id, rule_metadata_id*, subject_package*, subject_uid*, evidence_mode, run_purpose, outcome, matched_profile_ids JSONB, interpretation_status, reason NULL | v0.60 |
+| `rule_profile_evaluations` | id, correlation_run_id, family_evaluation_id*, rule_id (→ rule_metadata), profile_id, subject_package*, subject_uid*, evidence_mode, run_purpose, evaluation_status, outcome NULL, interpretation_status, reason NULL, evaluated_at | v0.60 |
+| `rule_condition_results` | id, profile_evaluation_id, condition_key (`profile_id.condition_id`), role, operator, selector_json, state, reason NULL, conflict_reason NULL | v0.60 |
+| `rule_condition_facts` | condition_result_id, normalized_event_id (PK gabungan) | v0.60 |
+| `correlation_findings` | id, family_evaluation_id, profile_evaluation_id UNIQUE, claim_level, interpretation_status, blocked_from_reconstruction, subject_package, subject_uid, window_start, window_end, summary | v0.60 |
+| `reconstruction_runs` | id, correlation_run_id, subject_package, subject_uid, window_start, window_end, status | v0.70 |
+| `reconstruction_findings` | reconstruction_run_id, finding_id, sequence_order, relation_type | v0.70 |
+| `investigation_hypotheses` | id, reconstruction_run_id UNIQUE, statement, support_scope, missing_evidence JSONB, created_at — ⛔ tanpa UPDATE | v0.70 |
+| `reports` | id, case_id, correlation_run_id, generated_at, content_hash, format | v1.00 |
+
+`correlation_runs.subjects` = daftar package yang dievaluasi; default = package yang punya bukti
+`collect_package_detail` (runtime) atau bundel statis (apk_static) di kasus itu.
+
+## §YAML — lokasi & salinan aturan
+
+- `backend/app/research/knowledge_base/data/sources.yaml` — 11 entri `01_BREAKDOWN` §12.1.
+- `backend/app/research/rules/data/apk_fraud/APKF-K0N/family.yaml` — **salin apa adanya** blok YAML
+  `01_BREAKDOWN` §14.2.N (buka hanya seksi itu: `grep -n "^### 14.2" context/01_BREAKDOWN_*.md`).
+- Batas perubahan & commit: `.claude/rules/rules-kb-yaml.md` + skill `/rule-change`.
+
+## §API2 — rute v0.45+
+
+| Rute | Auth | Lahir |
+|---|---|---|
+| `GET /api/cases/{case_id}/coverage` (cakupan per sumber/subjek) | JWT | v0.45 |
+| `GET /api/rules` · `GET /api/rules/{family_id}` · `GET /api/kb/sources` | JWT | v0.50 |
+| `POST /api/cases/{case_id}/analyze` `{evidence_mode, run_purpose, window_start?, window_end?, subjects?}` | JWT | v0.60 |
+| `GET /api/correlation-runs/{run_id}` · `GET /api/cases/{case_id}/evaluations?run=` · `GET /api/cases/{case_id}/findings?run=` | JWT | v0.60 |
+| `GET /api/cases/{case_id}/reconstructions?run=` · `GET /api/trace/profile-evaluations/{id}` · `GET /api/trace/findings/{id}` | JWT | v0.70 |
+| `POST /api/static-bundles` (multipart: `bundle.zip` + `case_id`) | JWT | v0.90 |
+| `GET /api/cases/{case_id}/report?run=` (HTML) | JWT | v1.00 |
+
+## §SIM — simulator & skenario `[plan]` (nilai final = data OPEN, diisi v0.80)
+
+- Proyek `android-test-apps/safe-evidence-simulator/`; applicationId dasar `org.forplat.safesim`
+  + suffix flavor `.authoring` · `.holdout` · `.control`. Keystore holdout lokal, ⛔ tidak di-commit.
+- ID skenario: authoring `SA-K0N-<kelas>-NN` (kelas A/B/C/D1/D2/E/F), holdout `HO-NN`, benign `SB-<nama>-NN`.
+- `ground_truth.json` = kontrak `02_ARSITEKTUR` §N.6 + `run_purpose`, `evidence_mode`, `rule_versions`,
+  `expected_conditions` (`{condition_key: state}`), `expected_profiles`, `expected_families`.
+- Endpoint lokal: `android-test-apps/local-endpoint/server.py` (stdlib `http.server`), dengar di `0.0.0.0:8765`,
+  diakses emulator via `10.0.2.2:8765`; log JSON-lines per request → fakta `local_endpoint_request_observed`.
+- Seed sintetis: `scripts/adb/seed_synthetic.sh <serial> <data.json>` (`adb emu sms send`, `content insert`).
+
+## §UI2 — halaman & komponen v0.60+ (§AC)
+
+v0.60: `/cases/:id/evaluations` · `EvaluationTable`, `FamilyProfilePanel`, `ConditionResultTable`, `ClaimLevelBadge`,
+`MissingEvidenceBadge`, `ConflictEvidenceBadge`. · v0.70: `/cases/:id/findings`, `/cases/:id/reconstruction` ·
+`FindingCard`, `EvidenceTracePanel` (tiga basis), `RuleReferencePanel`, `ReferenceRolePanel`, `ReconstructionTimeline`.
+· v1.00: `/cases`, `/cases/:id`, `/cases/:id/device`, `/cases/:id/acquisition`, `/cases/:id/evidence`,
+`/cases/:id/report` · `CaseTable`, `CaseSummary`, `AcquisitionPanel`, `AcquisitionProgress`, `EvidenceTable`, `ReportPreview`.
