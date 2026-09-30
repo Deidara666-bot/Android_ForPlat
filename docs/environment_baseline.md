@@ -31,8 +31,23 @@ Tanggal pencatatan: 2026-09-30.
 
 ## AVD #1
 
-Belum dibuat — dikerjakan di `v0.05.4`. AVD `Pixel_10` (API 36.1, Google Play) yang ada di mesin ini
-bukan `avd1-api36` yang diminta kartu (Pixel 6, Google APIs, tanpa akun) dan tidak dipakai.
+Dicatat dari `/card v0.05.4` (2026-09-30).
+
+| Butir | Nilai |
+|---|---|
+| Nama AVD | `avd1-api36` (serial `emulator-5554`) |
+| Profil | Pixel 6 |
+| Android / API | 16 / 36 |
+| System image | Google APIs Intel x86_64 Atom (bukan Google Play, bukan AOSP) |
+| `ro.product.name` | `sdk_gphone64_x86_64` (tanda Google APIs) |
+| ABI | `x86_64` |
+| Fingerprint | `google/sdk_gphone64_x86_64/emu64xa:16/BE2A.250530.026.F3/13894323:userdebug/dev-keys` |
+| Versi Platform-Tools (`adb`) | 37.0.1 (`[lebih tinggi]` dari 37.0.0, dibiarkan) |
+| `ADB_PATH` | `adb` (ada di PATH; `agent/.env` tidak diubah) |
+
+Catatan: build image bertipe `userdebug`. Secara teknis emulator ini mengizinkan `adb root`; proyek tetap
+melarangnya (tanpa akses akar). Uji gagal kartu (`adb shell su -c id`) tidak dijalankan Claude — dibatalkan
+oleh classifier izin sesi; lihat `docs/progress.md`.
 
 ## Galaxy A10
 
