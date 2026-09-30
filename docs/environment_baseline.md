@@ -55,4 +55,5 @@ izin sesi) dan tidak mencoba varian `su` lain.
 
 ## Galaxy A10
 
-Belum dicatat — dikerjakan di `v0.05.5`.
+Belum dicatat — dikerjakan di `v0.90.7` bersama pembuatan AVD #2 (dipindah dari `v0.05.5`, keputusan user
+2026-09-30: Galaxy A10 hanya dipakai pada Tier-2 konfirmatif).

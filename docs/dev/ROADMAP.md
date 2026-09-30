@@ -7,17 +7,17 @@ Status berjalan ada di `docs/progress.md`; berkas ini tidak berubah saat kartu s
 
 | Tag | Isi | Inc | Kartu | Berkas |
 |---|---|---|---|---|
-| `v0.05` | toolchain, scaffold, AVD #1, Galaxy A10 dibaca, PostgreSQL naik | 1 | 6 | `v0.05.md` |
+| `v0.05` | toolchain, scaffold, AVD #1, PostgreSQL naik (A10 → `v0.90.7`) | 1 | 5 | `v0.05.md` |
 | `v0.10` | backend core + DB + migrasi + auth + React shell | 1 | 5 | `v0.10.md` |
 | `v0.20` | agen: config, registrasi, allowlist, WS heartbeat, deteksi perangkat, dashboard | 1 | 7 | `v0.20.md` |
 | `v0.30` | sesi akuisisi, 2 operasi allowlist, rantai SHA-256, bukti imutabel, audit | 1 | 8 | `v0.30.md` |
 | `v0.40` | parser → Artifact → NormalizedEvent → tampil di UI (irisan tegak selesai) | 1 | 9 | `v0.40.md` |
-| `v0.45` | seluruh artefak inti G1, Tier-2 formatif, 5 status → `evidence_state`, fakta negatif, AVD #2 | 2 | 9 | `v0.45.md` (draf) |
+| `v0.45` | seluruh artefak inti G1, Tier-2 formatif (AVD #1), 5 status → `evidence_state`, fakta negatif | 2 | 9 | `v0.45.md` (draf) |
 | `v0.50` | Knowledge Base loader + validasi YAML | 3 | 5 | `v0.50.md` (draf) |
 | `v0.60` | mesin aturan 3-keadaan, 5 keluarga APKF / 16 profil | 3 | 9 | `v0.60.md` (draf) |
 | `v0.70` | G2 + G3, korelasi lintas sumber, rekonstruksi, UI keterlacakan | 4 | 9 | `v0.70.md` (draf) |
 | `v0.80` | simulator aman + 20 kasus authoring | 5 | 10 | `v0.80.md` (draf) |
-| `v0.90` | freeze + 8 holdout + kandidat statis + baseline manual + hasil | 5 | 8 | `v0.90.md` (draf) |
+| `v0.90` | freeze + 8 holdout + kandidat statis + baseline manual + Tier-2 konfirmatif (AVD #1, AVD #2, A10) + hasil | 5 | 10 | `v0.90.md` (draf) |
 | `v1.00` | prototipe terpadu, laporan, dokumentasi | — | 6 | `v1.00.md` (draf) |
 
 Setelah `v0.10` pengembangan lokal sudah penuh (backend, DB, frontend jalan di laptop).

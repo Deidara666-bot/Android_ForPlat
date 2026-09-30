@@ -327,13 +327,16 @@ Build-tools dicari dari `ANDROID_SDK_ROOT` → `ANDROID_HOME` → `%LOCALAPPDATA
 
 ## §TIER2 — protokol Tier-2 lewat agen (§11.1) `[plan]`
 
-- Runner host: `scripts/experiments/tier2_run.py --env <label> --profile <tier2_g1|tier2_g2g3> --reps 3`.
+- Runner host: `scripts/experiments/tier2_run.py --env <label> --profile <tier2_g1|tier2_g2g3|tier2_confirm> --reps 3`.
+- Fase (§AJ.2): **formatif** `tier2_g1` (v0.45.9) & `tier2_g2g3` (v0.70.3) hanya `avd1-api36`; **konfirmatif**
+  `tier2_confirm` (= operasi `tier2_g1` ∪ `tier2_g2g3`, subjek simulator `authoring`) di ketiga label (v0.90.8). Keputusan user 2026-09-30.
   Per ulangan: reset lingkungan (`scripts/adb/tier2_reset.sh <label>`) → `POST /api/acquisitions`
   (lewat agen, operasi allowlist) → tunggu sesi selesai → catat. ⛔ Reset bukan operasi agen dan tidak
   dipicu backend.
 - Reset: AVD → `adb -s <serial> emu avd snapshot load clean` (snapshot `clean` dibuat sekali oleh user);
   Galaxy A10 → `adb -s <serial> reboot` + tunggu `sys.boot_completed=1`.
-- Label lingkungan: `avd1-api36`, `avd2-api<N>` (N dari v0.05.5), `a10-api<N>`.
+- Label lingkungan: `avd1-api36`, `avd2-api<N>`, `a10-api<N>` (N = `ro.build.version.sdk` Galaxy A10, dibaca di v0.90.7).
+  Runner memverifikasi `api` label = sdk perangkat yang tersambung; beda atau perangkat tidak ada → berhenti sebelum reset.
 - CSV `experiments/feasibility_tier2/results/<profile>_<env>.csv`, kolom:
   `artifact_id,env,rep,android_version,api,build,device_or_emulator,operation_id,command,privilege_state,test_action,expected_evidence,actual_result,availability_status,availability_reason,raw_output_ref,temporal_semantics,git_commit,adb_version,acquired_at`.
 - Status per artefak per lingkungan: 3/3 = konsisten · 1–2/3 = `CONDITIONAL` · 0/3 = status non-acquired

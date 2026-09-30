@@ -13,7 +13,7 @@
 | *Increment* aktif | **1 — Irisan tegak minimum** |
 | Milestone aktif | **`v0.05`** (`docs/dev/v0.05.md`), branch `feature/v0.05` |
 | Kartu terakhir | **`v0.05.4`** (2026-09-30) |
-| Kartu berikutnya | **`/card v0.05.5`** (Galaxy A10, baca versi — butuh USER: USB debugging) |
+| Kartu berikutnya | **`/card v0.05.6`** (PostgreSQL, smoke test, tag — butuh Docker Desktop jalan). `v0.05.5` dipindah ke `v0.90.7` |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
@@ -49,14 +49,20 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
   lokal). Direncanakan sebagai milestone terpisah lewat `/plan-milestone` setelah tag `v1.00`.
 - 2026-09-26 — Mirror GitHub → GitLab aktif: secret terpasang, workflow `mirror-gitlab` sukses (main `6c094de`);
   force push di GitLab `main` dimatikan kembali.
+- 2026-09-30 — **Galaxy A10 dilepas dari jalur pengembangan** (MAP K6). Tier-2 formatif (`v0.45.9`, `v0.70.3`) hanya
+  AVD #1; A10 + AVD #2 hanya di Tier-2 konfirmatif `v0.90.7`–`.8` (pembedaan formatif/konfirmatif `02_ARSITEKTUR` §AJ.2).
+  `v0.05.5` dipindah ke `v0.90.7`; `v0.05.6` jalan tanpa itu; tag `v0.05` dibuat tanpa A10. Tambahan `[plan]`: parser
+  ketat (struktur tak dikenali → `failed`). Tanpa amandemen core. Alasan: A10 belum tersedia dalam waktu dekat,
+  dan pengembangan dikerjakan dulu sampai software jadi baru pengujian penelitian.
 
 ## Keputusan / aksi user yang tertunda
 
-- (kosong)
+- Galaxy A10 harus tersedia paling lambat `v0.90.7`, dan versinya dibutuhkan sebelum BAB III 3.3 final. Bila tidak ada
+  → keputusan amandemen `G-05` (ganti perangkat / lepas AVD #2 dari A10 / emulator saja dengan batasan dinyatakan).
 
 ## Data OPEN (jangan ditebak — isi hanya dari hasil nyata)
 
-- [ ] Versi Android/API aktual Samsung Galaxy A10 → API AVD kedua (kartu v0.05.5)
+- [ ] Versi Android/API aktual Samsung Galaxy A10 → API AVD kedua (kartu v0.90.7, dipindah dari v0.05.5)
 - [x] Perangkat lunak virtualisasi desktop yang dipakai → **WHPX** (Windows 11 Home, tanpa Hyper-V), diverifikasi
       `emulator -accel-check` 2026-09-30.
 - [ ] Perintah ADB final per versi Android untuk tiap operasi allowlist (2 pertama di v0.30.3)
