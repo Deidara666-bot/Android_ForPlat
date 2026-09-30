@@ -1,0 +1,8 @@
+httpx
+websockets
+pydantic==2.13.4
+pydantic-settings==2.15.0
+tenacity
+psutil
+pytest==9.1.1
+pytest-asyncio
