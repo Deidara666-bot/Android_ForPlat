@@ -45,9 +45,13 @@ Dicatat dari `/card v0.05.4` (2026-09-30).
 | Versi Platform-Tools (`adb`) | 37.0.1 (`[lebih tinggi]` dari 37.0.0, dibiarkan) |
 | `ADB_PATH` | `adb` (ada di PATH; `agent/.env` tidak diubah) |
 
-Catatan: build image bertipe `userdebug`. Secara teknis emulator ini mengizinkan `adb root`; proyek tetap
-melarangnya (tanpa akses akar). Uji gagal kartu (`adb shell su -c id`) tidak dijalankan Claude — dibatalkan
-oleh classifier izin sesi; lihat `docs/progress.md`.
+Catatan: build image bertipe `userdebug`. Biner `su` ada di image ini dan secara teknis akses akar mungkin;
+proyek tetap melarangnya (tanpa akses akar). Larangan ditegakkan oleh allowlist operasi ADB di kode agen,
+bukan oleh emulator.
+
+Uji gagal kartu, dijalankan user di PowerShell 2026-09-30: `adb shell su -c id` →
+`su: invalid uid/gid '-c'` (gagal, bukan `uid=0`; lulus). Claude tidak menjalankannya (ditolak classifier
+izin sesi) dan tidak mencoba varian `su` lain.
 
 ## Galaxy A10
 

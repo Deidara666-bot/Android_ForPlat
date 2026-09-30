@@ -39,7 +39,8 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
   frontend Vite react-ts (react 19.2.8, react-router 8.3.0, vite 8.2.2 eksak), `.env` tiga komponen dibuat lokal.
   Vite scaffold jalan non-interaktif tanpa perlu input user.
 - 2026-09-30 — `v0.05.4`: AVD `avd1-api36` (API 36, Google APIs, x86_64, `userdebug`) terbaca `adb`; baseline dicatat.
-  Uji gagal `su -c id` belum dijalankan (ditolak classifier izin) — TODO: user jalankan manual atau setujui.
+  Uji gagal `su -c id` dijalankan user manual: `su: invalid uid/gid '-c'` (gagal, bukan uid=0; lulus). Image `userdebug`
+  punya biner `su` — larangan akar ditegakkan allowlist agen, bukan emulator.
 
 ## Keputusan user (tercatat)
 
