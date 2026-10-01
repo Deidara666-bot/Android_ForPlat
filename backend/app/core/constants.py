@@ -95,3 +95,6 @@ LABEL_ID: dict[type[StrEnum], dict[str, str]] = {
         "data_present": "keberadaan data",
     },
 }
+
+
+APP_VERSION = "0.10.0"
