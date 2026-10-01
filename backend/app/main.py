@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, cases, health
+from app.api.routes import agents, auth, cases, health
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 
@@ -22,6 +22,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api")
     app.include_router(auth.router, prefix="/api")
     app.include_router(cases.router, prefix="/api")
+    app.include_router(agents.router, prefix="/api")
     return app
 
 
