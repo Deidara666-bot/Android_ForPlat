@@ -28,11 +28,24 @@ export function setToken(token: string | null): void {
   }
 }
 
-export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+/**
+ * `auth: false` skips the Bearer header and the expired-session handling (used by login itself,
+ * where a 401 means "wrong credentials", not "session expired").
+ */
+export async function apiFetch(
+  path: string,
+  init: RequestInit = {},
+  { auth = true }: { auth?: boolean } = {},
+): Promise<Response> {
   const headers = new Headers(init.headers)
-  const token = getToken()
+  const token = auth ? getToken() : null
   if (token !== null) headers.set('Authorization', `Bearer ${token}`)
-  return fetch(`${API_BASE_URL}${path}`, { ...init, headers })
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers })
+  if (token !== null && response.status === 401) {
+    setToken(null)
+    window.location.assign('/login')
+  }
+  return response
 }
 
 export async function apiJson<T>(path: string, init: RequestInit = {}): Promise<T> {
