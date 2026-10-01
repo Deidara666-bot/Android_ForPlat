@@ -12,8 +12,8 @@
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
 | Milestone aktif | **`v0.20`** (`docs/dev/v0.20.md`), branch `feature/v0.20` |
-| Kartu terakhir | **`v0.20.6`** (2026-10-01) |
-| Kartu berikutnya | **`/card v0.20.7`** (state machine agen, dashboard langsung, tag; butuh backend + agen + `npm run dev`; setelah itu `/finish-branch` + reviewer) |
+| Kartu terakhir | **`v0.20.7`** (2026-10-02) — milestone `v0.20` selesai; tinggal `/finish-branch` + `/milestone v0.20` |
+| Kartu berikutnya | **`/card v0.30.1`** setelah tag `v0.20` (`docs/dev/v0.30.md`) |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01)
@@ -80,6 +80,11 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
   metadata aman (5 prop whitelist + privilege), `DeviceService.apply_report` (upsert by serial, hilang → `disconnected`, tak dihapus),
   `GET /api/devices`. Live: `emulator-5554` android 16/api 36 `connected`; `adb emu kill` → `disconnected`, baris tetap. 42 test backend lulus.
   `privilege_state` dikirim agen tapi tidak disimpan (tabel `devices` REF §ENT tak punya kolomnya). **User perlu boot ulang AVD.**
+- 2026-10-02 — `v0.20.7`: `AgentStateMachine` (transisi sah saja), `/ws/dashboard?token=<JWT>` (siaran `agent_status`/`devices_changed`),
+  dasbor `AgentStatus` + `DeviceCard` + `useDashboardSocket`. Bug yang ditemukan saat uji langsung: daftar hanya dimuat saat WS terbuka
+  (token kedaluwarsa → WS ditolak terus) → kini dimuat saat halaman dibuka, dan socket yang ditolak memicu cek sesi (401 → login).
+  Pemeriksa memverifikasi: agen berubah terhubung → terputus tanpa refresh. Smoke: `docs/smoke/v0.20.md`. Agen masih skrip Python.
+  Catatan: uvicorn mencatat query string `/ws/dashboard?token=` (JWT) di log akses — masalah lokal/dev, catat untuk deployment.
 
 ## Keputusan user (tercatat)
 

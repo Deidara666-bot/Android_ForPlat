@@ -10,7 +10,7 @@ from app.models.agent import Agent
 from app.schemas.device import DeviceReportItem
 from app.services.agent_service import AgentService
 from app.services.device_service import DeviceService
-from app.ws.manager import manager
+from app.ws.manager import dashboard_manager, manager
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -37,6 +37,9 @@ async def agent_ws(websocket: WebSocket, db: Annotated[Session, Depends(get_db)]
     manager.register(agent_id, websocket)
     service.touch(agent)
     log.info("agent connected: %s", agent_id)
+    await dashboard_manager.broadcast(
+        {"type": "agent_status", "agent_id": agent_id, "connected": True}
+    )
     try:
         while True:
             message = await websocket.receive_json()
@@ -51,8 +54,12 @@ async def agent_ws(websocket: WebSocket, db: Annotated[Session, Depends(get_db)]
                     log.warning("invalid device_report from %s ignored", agent_id)
                     continue
                 DeviceService(db).apply_report(agent, items)
+                await dashboard_manager.broadcast({"type": "devices_changed"})
     except WebSocketDisconnect:
         pass
     finally:
         manager.disconnect(agent_id, websocket)
         log.info("agent disconnected: %s", agent_id)
+        await dashboard_manager.broadcast(
+            {"type": "agent_status", "agent_id": agent_id, "connected": False}
+        )

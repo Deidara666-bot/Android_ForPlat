@@ -18,8 +18,9 @@ async def send_heartbeats(
     websocket: _Sender,
     interval_seconds: float,
     device_count: Callable[[], int] = lambda: 0,
+    state: Callable[[], AgentState] = lambda: AgentState.connected,
 ) -> None:
     """Send a heartbeat every `interval_seconds` until cancelled or the socket fails."""
     while True:
-        await websocket.send(heartbeat_message(AgentState.connected, device_count()))
+        await websocket.send(heartbeat_message(state(), device_count()))
         await asyncio.sleep(interval_seconds)

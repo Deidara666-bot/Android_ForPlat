@@ -32,4 +32,25 @@ class WebSocketConnectionManager:
             await self.send(agent_id, message)
 
 
+class DashboardConnectionManager:
+    """Examiner dashboards listening for live changes. Messages are small JSON notifications."""
+
+    def __init__(self) -> None:
+        self._sockets: set[WebSocket] = set()
+
+    def register(self, websocket: WebSocket) -> None:
+        self._sockets.add(websocket)
+
+    def disconnect(self, websocket: WebSocket) -> None:
+        self._sockets.discard(websocket)
+
+    async def broadcast(self, message: dict[str, Any]) -> None:
+        for websocket in list(self._sockets):
+            try:
+                await websocket.send_json(message)
+            except Exception:  # noqa: BLE001 - a dead dashboard must not break the broadcaster
+                self._sockets.discard(websocket)
+
+
 manager = WebSocketConnectionManager()
+dashboard_manager = DashboardConnectionManager()

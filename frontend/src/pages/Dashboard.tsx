@@ -1,18 +1,63 @@
 import { useCallback, useEffect, useState } from 'react'
+import { listAgents } from '../api/agents'
+import { listDevices } from '../api/devices'
 import { getHealth } from '../api/health'
+import AgentStatus from '../components/AgentStatus'
+import DeviceCard from '../components/DeviceCard'
+import { useDashboardSocket } from '../hooks/useDashboardSocket'
+import type { Agent } from '../types/agent'
+import type { DashboardEvent, Device } from '../types/device'
 import type { HealthResult } from '../types/health'
 
 export default function Dashboard() {
   const [result, setResult] = useState<HealthResult | null>(null)
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [devices, setDevices] = useState<Device[]>([])
 
   const refresh = useCallback(() => {
     setResult(null)
     void getHealth().then(setResult)
   }, [])
+  const loadAgents = useCallback(() => {
+    void listAgents()
+      .then(setAgents)
+      .catch(() => undefined)
+  }, [])
+  const loadDevices = useCallback(() => {
+    void listDevices()
+      .then(setDevices)
+      .catch(() => undefined)
+  }, [])
+
+  const handleEvent = useCallback(
+    (event: DashboardEvent) => {
+      if (event.type === 'devices_changed') {
+        loadDevices()
+        return
+      }
+      setAgents((current) => {
+        if (!current.some((agent) => agent.agent_id === event.agent_id)) {
+          loadAgents() // an agent that is not listed yet
+          return current
+        }
+        return current.map((agent) =>
+          agent.agent_id === event.agent_id ? { ...agent, connected: event.connected } : agent,
+        )
+      })
+    },
+    [loadAgents, loadDevices],
+  )
+  const handleOpen = useCallback(() => {
+    loadAgents()
+    loadDevices()
+  }, [loadAgents, loadDevices])
+  useDashboardSocket(handleEvent, handleOpen)
 
   useEffect(() => {
     refresh()
-  }, [refresh])
+    loadAgents()
+    loadDevices()
+  }, [refresh, loadAgents, loadDevices])
 
   return (
     <>
@@ -46,6 +91,12 @@ export default function Dashboard() {
           </button>
         </p>
       </section>
+      <h2 style={{ marginTop: 24 }}>Agen dan perangkat</h2>
+      <AgentStatus agents={agents} />
+      {devices.length === 0 && <p>Belum ada perangkat terdeteksi.</p>}
+      {devices.map((device) => (
+        <DeviceCard device={device} key={device.id} />
+      ))}
     </>
   )
 }
