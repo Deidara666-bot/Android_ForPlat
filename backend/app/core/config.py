@@ -7,12 +7,13 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 _PLACEHOLDER_SECRET = "change-me"
+_MIN_SECRET_LENGTH = 32
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
-    app_env: str = "development"
+    app_env: str
     database_url: str
     evidence_root: str = "./var/evidence"
     jwt_secret: str
@@ -29,6 +30,8 @@ class Settings(BaseSettings):
     def _reject_placeholder_secret(self) -> "Settings":
         if self.jwt_secret == _PLACEHOLDER_SECRET and self.app_env != "test":
             raise ValueError("JWT_SECRET must not be the placeholder value outside APP_ENV=test")
+        if self.app_env != "test" and len(self.jwt_secret) < _MIN_SECRET_LENGTH:
+            raise ValueError(f"JWT_SECRET must be at least {_MIN_SECRET_LENGTH} characters")
         if "*" in self.cors_origins:
             raise ValueError("CORS_ORIGINS must list explicit origins, not '*'")
         return self
