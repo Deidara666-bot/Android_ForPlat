@@ -13,7 +13,7 @@
 | *Increment* aktif | **1 — Irisan tegak minimum** |
 | Milestone aktif | **`v0.10`** (`docs/dev/v0.10.md`), branch `feature/v0.10` (tag `v0.05` belum dibuat; butir §AK ditutup di `v0.10.5`) |
 | Kartu terakhir | **`v0.10.5`** (2026-10-01) — milestone `v0.10` selesai, tag `v0.10` terbit |
-| Kartu berikutnya | **`/card v0.20.1`** setelah tag `v0.05` dan `v0.10` (`docs/dev/v0.20.md`) |
+| Kartu berikutnya | **`/card v0.20.1`** (fondasi paket agen; `v0.10` sudah ditag) |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01)
@@ -59,6 +59,9 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - 2026-10-01 — `v0.10.5`: React shell (`/login`, `/dashboard`, `AppShell`), dasbor health diverifikasi user di browser (login
   berhasil, status/lingkungan/basis data/revisi Alembic tampil). `docs/smoke/v0.10.md` menutup 4 butir §AK yang ditunda dari
   `v0.05`. Verifikasi visual oleh user karena browser pane diblokir mode auto.
+- 2026-10-01 — `fix/v0.10-hardening`: `APP_ENV` wajib, `JWT_SECRET` ≥32 karakter di luar test, batas panjang login, Postgres hanya
+  `127.0.0.1` (DEV-06), 401 terpusat di frontend. 23 test lulus. `devices.last_seen_at` tetap NOT NULL (keputusan user, opsi A).
+  Sisa dari review: `LABEL_ID` `ConnectionState` (v0.20.6/.7), dasbor `ok`/`development` mentah, `/api/health` tanpa auth membuka `app_env`.
 
 ## Keputusan user (tercatat)
 
