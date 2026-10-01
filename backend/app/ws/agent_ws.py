@@ -2,11 +2,14 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.models.agent import Agent
+from app.schemas.device import DeviceReportItem
 from app.services.agent_service import AgentService
+from app.services.device_service import DeviceService
 from app.ws.manager import manager
 
 log = logging.getLogger(__name__)
@@ -37,8 +40,17 @@ async def agent_ws(websocket: WebSocket, db: Annotated[Session, Depends(get_db)]
     try:
         while True:
             message = await websocket.receive_json()
-            if isinstance(message, dict) and message.get("type") == "heartbeat":
+            if not isinstance(message, dict):
+                continue
+            if message.get("type") == "heartbeat":
                 service.touch(agent)
+            elif message.get("type") == "device_report":
+                try:
+                    items = [DeviceReportItem(**raw) for raw in message.get("devices", [])]
+                except (ValidationError, TypeError):
+                    log.warning("invalid device_report from %s ignored", agent_id)
+                    continue
+                DeviceService(db).apply_report(agent, items)
     except WebSocketDisconnect:
         pass
     finally:

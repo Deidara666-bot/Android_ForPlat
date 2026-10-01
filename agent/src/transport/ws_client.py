@@ -7,6 +7,7 @@ from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import ConnectionClosed, InvalidHandshake, InvalidStatus
 
 from src.config import Settings
+from src.device.device_detection import DeviceMonitor
 from src.exceptions import AgentError
 from src.state.audit_logger import audit
 from src.transport.heartbeat import send_heartbeats
@@ -63,20 +64,28 @@ async def _drain(websocket: ClientConnection) -> None:
 async def run_forever(settings: Settings, *, wait: wait_base | None = None) -> None:
     """Connect, heartbeat until the socket drops, then reconnect. Ends only on AgentError/cancel."""
     reconnect = False
+    monitor = DeviceMonitor(adb_path=settings.adb_path)
     while True:
         websocket = await connect_with_retry(
             settings.backend_ws_url, settings.agent_token, wait=wait
         )
         audit("ws_reconnected" if reconnect else "ws_connected", agent_id=settings.agent_id)
         log.info("websocket %s", "reconnected" if reconnect else "connected")
-        heartbeat = asyncio.create_task(send_heartbeats(websocket, settings.poll_interval_seconds))
-        drain = asyncio.create_task(_drain(websocket))
+        monitor.reset_reporting()  # a fresh connection must be told the full device list
+        interval = settings.poll_interval_seconds
+        tasks = {
+            asyncio.create_task(
+                send_heartbeats(websocket, interval, lambda: monitor.connected_count)
+            ),
+            asyncio.create_task(monitor.run(websocket, interval)),
+            asyncio.create_task(_drain(websocket)),
+        }
         try:
-            await asyncio.wait({heartbeat, drain}, return_when=asyncio.FIRST_COMPLETED)
+            await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         finally:
-            for task in (heartbeat, drain):
+            for task in tasks:
                 task.cancel()
-            await asyncio.gather(heartbeat, drain, return_exceptions=True)
+            await asyncio.gather(*tasks, return_exceptions=True)
             await websocket.close()
         audit("ws_disconnected", agent_id=settings.agent_id)
         log.warning("websocket closed; reconnecting")

@@ -12,8 +12,8 @@
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
 | Milestone aktif | **`v0.20`** (`docs/dev/v0.20.md`), branch `feature/v0.20` |
-| Kartu terakhir | **`v0.20.5`** (2026-10-01) |
-| Kartu berikutnya | **`/card v0.20.6`** (deteksi perangkat + metadata aman; butuh backend + agen + **AVD #1 hidup**) |
+| Kartu terakhir | **`v0.20.6`** (2026-10-01) |
+| Kartu berikutnya | **`/card v0.20.7`** (state machine agen, dashboard langsung, tag; butuh backend + agen + `npm run dev`; setelah itu `/finish-branch` + reviewer) |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01)
@@ -76,6 +76,10 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - 2026-10-01 — `v0.20.5`: `/ws/agent` (auth Bearer sebelum accept, tutup 1008), `WebSocketConnectionManager`, heartbeat → `touch`; agen
   `ws_client` (reconnect tenacity maks 12 percobaan ≈70 s, di-audit) + `heartbeat`. Live: `connected: true`, `last_seen_at` bergerak;
   backend mati 36 s → sunyi >30 s; nyala lagi → agen tersambung ulang otomatis (audit `ws_reconnected`). `check.sh all` OK.
+- 2026-10-01 — `v0.20.6`: deteksi perangkat (polling `adb devices -l`, lapor via WS `device_report` hanya saat berubah / tiap koneksi baru),
+  metadata aman (5 prop whitelist + privilege), `DeviceService.apply_report` (upsert by serial, hilang → `disconnected`, tak dihapus),
+  `GET /api/devices`. Live: `emulator-5554` android 16/api 36 `connected`; `adb emu kill` → `disconnected`, baris tetap. 42 test backend lulus.
+  `privilege_state` dikirim agen tapi tidak disimpan (tabel `devices` REF §ENT tak punya kolomnya). **User perlu boot ulang AVD.**
 
 ## Keputusan user (tercatat)
 
