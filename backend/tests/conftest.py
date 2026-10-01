@@ -8,7 +8,7 @@ os.environ.setdefault(
     "DATABASE_URL",
     "postgresql+psycopg://forensic_app:local-dev-only@localhost:5432/android_forensic",
 )
-os.environ.setdefault("JWT_SECRET", "change-me")
+os.environ["JWT_SECRET"] = "test-only-secret-that-is-at-least-32-bytes-long"
 
 import pytest  # noqa: E402
 from alembic.config import Config  # noqa: E402

@@ -52,3 +52,9 @@ def test_placeholder_secret_allowed_in_test_env(monkeypatch: pytest.MonkeyPatch)
 def test_cors_origins_split_on_comma(monkeypatch: pytest.MonkeyPatch) -> None:
     _valid(monkeypatch, CORS_ORIGINS="http://a:1, http://b:2 ,")
     assert Settings(_env_file=None).cors_origins == ["http://a:1", "http://b:2"]
+
+
+def test_cors_wildcard_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    _valid(monkeypatch, CORS_ORIGINS="*")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)

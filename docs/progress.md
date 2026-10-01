@@ -12,8 +12,8 @@
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
 | Milestone aktif | **`v0.10`** (`docs/dev/v0.10.md`), branch `feature/v0.10` (tag `v0.05` belum dibuat; butir §AK ditutup di `v0.10.5`) |
-| Kartu terakhir | **`v0.10.3`** (2026-10-01) |
-| Kartu berikutnya | **`/card v0.10.4`** (auth JWT, CORS terbatas, rute `cases`; butuh PostgreSQL hidup) |
+| Kartu terakhir | **`v0.10.4`** (2026-10-01) |
+| Kartu berikutnya | **`/card v0.10.5`** (React shell + dashboard health, smoke v0.10, tag; butuh PostgreSQL + backend hidup) |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
@@ -53,6 +53,9 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
   timeout membuat health menggantung saat PostgreSQL mati (uji gagal awal: tanpa respons); diperbaiki dengan
   `connect_timeout=3` di `app/db/session.py`. Dua butir §AK (`/api/health`, `/docs`, backend↔DB, Alembic) kini terbukti; smoke
   resmi di `docs/smoke/v0.10.md` (`v0.10.5`).
+- 2026-10-01 — `v0.10.4`: login JWT, `/api/auth/me`, rute `cases` (201/409), CORS terbatas, `dev_token`, `init_db`; akun dev
+  `pemeriksa@lab.local` dibuat user sendiri (password tidak lewat Claude). 19 test lulus. Tambahan: `Settings` menolak
+  `CORS_ORIGINS=*`.
 
 ## Keputusan user (tercatat)
 

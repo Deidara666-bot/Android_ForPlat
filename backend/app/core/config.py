@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     def _reject_placeholder_secret(self) -> "Settings":
         if self.jwt_secret == _PLACEHOLDER_SECRET and self.app_env != "test":
             raise ValueError("JWT_SECRET must not be the placeholder value outside APP_ENV=test")
+        if "*" in self.cors_origins:
+            raise ValueError("CORS_ORIGINS must list explicit origins, not '*'")
         return self
 
 
