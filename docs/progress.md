@@ -12,11 +12,11 @@
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
 | Milestone aktif | **`v0.10`** (`docs/dev/v0.10.md`), branch `feature/v0.10` (tag `v0.05` belum dibuat; butir §AK ditutup di `v0.10.5`) |
-| Kartu terakhir | **`v0.10.5`** (2026-10-01) — milestone `v0.10` selesai, menunggu `/milestone v0.10` |
+| Kartu terakhir | **`v0.10.5`** (2026-10-01) — milestone `v0.10` selesai, tag `v0.10` terbit |
 | Kartu berikutnya | **`/card v0.20.1`** setelah tag `v0.05` dan `v0.10` (`docs/dev/v0.20.md`) |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
-Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05` (2026-10-01)
+Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01)
 
 ## Selesai
 
@@ -77,7 +77,7 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05` (2
 
 ## Keputusan / aksi user yang tertunda
 
-- Jalankan `/milestone v0.10` (skill dikunci untuk user). Tag `v0.05` sudah terbit.
+- Putuskan hapus branch `feature/v0.05` dan `feature/v0.10` (lokal + GitHub). Tag `v0.05`, `v0.10` sudah terbit.
 - Galaxy A10 harus tersedia paling lambat `v0.90.7`, dan versinya dibutuhkan sebelum BAB III 3.3 final. Bila tidak ada
   → keputusan amandemen `G-05` (ganti perangkat / lepas AVD #2 dari A10 / emulator saja dengan batasan dinyatakan).
 
