@@ -2,6 +2,19 @@
 
 Satu entri per tag milestone. Rincian kartu: `docs/progress.md`; bukti: `docs/smoke/`.
 
+## v0.20 — 2026-10-02
+
+Agen: registrasi, allowlist, WebSocket, deteksi perangkat, dasbor langsung. Increment 1.
+
+- Registrasi agen: token acak, hanya SHA-256 tersimpan; `POST/GET /api/agents`, `GET /api/agents/me` (token agen), skrip `register-agent.sh`.
+- Gerbang allowlist (kontrak): 8 ID operasi, `OperationNotAllowedError` ≠ `OperationNotMappedError`, `AcquisitionJob` `extra=forbid`,
+  string ADB hanya di `adb_commands.py`, `shell=False`, privilege detector hanya membaca.
+- `/ws/agent` (Bearer sebelum accept) + heartbeat + reconnect berbatas (audit); deteksi perangkat dengan metadata aman (bukan bukti),
+  `GET /api/devices`; `AgentStateMachine`; `/ws/dashboard` dan dasbor `AgentStatus`/`DeviceCard` berubah tanpa refresh.
+- Agen masih skrip Python (`python -m src.main`), belum dibungkus. 42 test backend + 31+ test agen lulus; `check.sh all` OK.
+- Review `claim-auditor` + `forensic-integrity-reviewer`: 0 blocking; 10 catatan non-blocking di `docs/progress.md`.
+- Bukti: `docs/smoke/v0.20.md` (dasbor diverifikasi pemeriksa).
+
 ## v0.10 — 2026-10-01
 
 Backend core, DB, migrasi, auth, React shell. Increment 1.

@@ -12,11 +12,11 @@
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
 | Milestone aktif | **`v0.20`** (`docs/dev/v0.20.md`), branch `feature/v0.20` |
-| Kartu terakhir | **`v0.20.7`** (2026-10-02) — milestone `v0.20` selesai; tinggal `/finish-branch` + `/milestone v0.20` |
-| Kartu berikutnya | **`/card v0.30.1`** setelah tag `v0.20` (`docs/dev/v0.30.md`) |
+| Kartu terakhir | **`v0.20.7`** (2026-10-02) — milestone `v0.20` selesai, tag `v0.20` terbit |
+| Kartu berikutnya | **`/card v0.30.1`** (`docs/dev/v0.30.md`; disarankan sesi baru) |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
-Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01)
+Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20` (2026-10-02)
 
 ## Selesai
 
@@ -141,7 +141,7 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 ## Sinkronisasi remote
 
 - 2026-10-02 — `/finish-branch v0.20`: `feature/v0.20` digabung `--no-ff` ke `main` (`fa17bf0`), push GitHub sukses. Branch `feature/v0.05`,
-  `feature/v0.10`, `feature/v0.20`, `fix/*` belum dihapus (menunggu persetujuan user). Tag `v0.20` menunggu `/milestone` oleh user.
+  `feature/v0.10`, `feature/v0.20`, `fix/*` belum dihapus (menunggu persetujuan user). Tag `v0.20` sudah terbit.
 
 - 2026-10-01 — `/finish-branch v0.10`: `feature/v0.10` digabung `--no-ff` ke `main` (`f8b9e2d`), push GitHub sukses. Branch
   `feature/v0.05` dan `feature/v0.10` belum dihapus (menunggu persetujuan user). Tag `v0.05`/`v0.10` menunggu `/milestone` oleh user.
