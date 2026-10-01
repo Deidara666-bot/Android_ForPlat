@@ -115,6 +115,14 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
   `devices.last_seen_at` NOT NULL (usul nullable lewat migrasi baru) · `LABEL_ID` belum memuat `ConnectionState` (butuh di v0.20.6) ·
   dasbor menampilkan `ok`/`development` mentah (usul padanan Indonesia).
 
+- Catatan non-blocking review `v0.20` (claim-auditor + integrity-reviewer, 0 blocking), TIDAK dikerjakan; bahas sebelum/di awal `v0.30`:
+  (1) perangkat tetap `connected` bila WS agen putus atau adb gagal (usul `unknown`/`disconnected` saat WS putus; `ConnectionState.unknown`
+  belum dipakai) · (2) `getprop` gagal → string kosong tersimpan & di-cache (usul `None`, jangan cache hasil tak lengkap) ·
+  (3) `agents/me` membuat agen tampak `connected` 30 s tanpa WS (sesuai kartu v0.20.2; ingat untuk v0.30 bila dipakai menjadi syarat akuisisi) ·
+  (4) `register` merotasi token tanpa audit · (5) `run_adb` belum validasi `serial` (awalan `-`), `parameters` perlu regex di v0.30.3 ·
+  (6) `AGENT_TOKEN` jadi `SecretStr` · (7) JWT di query `/ws/dashboard` tercatat di log akses · (8) transport `ws://`/`http://` (dev) ·
+  (9) serial agen A bisa menimpa baris perangkat agen B (upsert by serial) · (10) label `ConnectionState` belum di `LABEL_ID`/REF.
+
 ## Data OPEN (jangan ditebak — isi hanya dari hasil nyata)
 
 - [ ] Versi Android/API aktual Samsung Galaxy A10 → API AVD kedua (kartu v0.90.7, dipindah dari v0.05.5)
@@ -131,6 +139,9 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - [ ] Bentuk deployment final (VPS) dan distribusi agen
 
 ## Sinkronisasi remote
+
+- 2026-10-02 — `/finish-branch v0.20`: `feature/v0.20` digabung `--no-ff` ke `main` (`fa17bf0`), push GitHub sukses. Branch `feature/v0.05`,
+  `feature/v0.10`, `feature/v0.20`, `fix/*` belum dihapus (menunggu persetujuan user). Tag `v0.20` menunggu `/milestone` oleh user.
 
 - 2026-10-01 — `/finish-branch v0.10`: `feature/v0.10` digabung `--no-ff` ke `main` (`f8b9e2d`), push GitHub sukses. Branch
   `feature/v0.05` dan `feature/v0.10` belum dihapus (menunggu persetujuan user). Tag `v0.05`/`v0.10` menunggu `/milestone` oleh user.
