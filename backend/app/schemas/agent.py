@@ -24,3 +24,10 @@ class AgentOut(BaseModel):
     version: str
     last_seen_at: datetime | None
     connected: bool
+
+
+class AgentMeOut(BaseModel):
+    id: uuid.UUID
+    agent_id: str
+    version: str
+    last_seen_at: datetime | None

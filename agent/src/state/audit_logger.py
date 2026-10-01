@@ -6,10 +6,10 @@ AUDIT_LOG = Path(__file__).resolve().parents[2] / "var" / "audit.log"
 
 
 def audit(
-    event: str, reason: str | None = None, *, path: Path | None = None, **fields: object
+    event: str, reason: str | None = None, *, log_file: Path | None = None, **fields: object
 ) -> None:
     """Append one JSON line (UTC time, event, reason, extra fields). Never pass secrets."""
-    target = path or AUDIT_LOG
+    target = log_file or AUDIT_LOG
     target.parent.mkdir(parents=True, exist_ok=True)
     record = {"time": datetime.now(UTC).isoformat(), "event": event, "reason": reason, **fields}
     with target.open("a", encoding="utf-8") as handle:

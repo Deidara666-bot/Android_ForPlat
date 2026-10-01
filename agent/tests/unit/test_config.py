@@ -50,7 +50,7 @@ def test_placeholder_token_fails(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_audit_writes_json_line(tmp_path: Path) -> None:
     log = tmp_path / "var" / "audit.log"
-    audit("operation_rejected", "not allowlisted", path=log, operation_id="adb_shell")
+    audit("operation_rejected", "not allowlisted", log_file=log, operation_id="adb_shell")
     record = json.loads(log.read_text(encoding="utf-8").splitlines()[0])
     assert record["event"] == "operation_rejected"
     assert record["reason"] == "not allowlisted"
