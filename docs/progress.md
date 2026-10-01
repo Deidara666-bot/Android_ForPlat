@@ -12,8 +12,8 @@
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
 | Milestone aktif | **`v0.20`** (`docs/dev/v0.20.md`), branch `feature/v0.20` |
-| Kartu terakhir | **`v0.20.3`** (2026-10-01) |
-| Kartu berikutnya | **`/card v0.20.4`** (gerbang allowlist + privilege detector — KONTRAK, ada reviewer; lokal/cloud) |
+| Kartu terakhir | **`v0.20.4`** (2026-10-01) |
+| Kartu berikutnya | **`/card v0.20.5`** (WebSocket agen + heartbeat; butuh backend hidup) |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01)
@@ -70,6 +70,9 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - 2026-10-01 — `v0.20.3`: agen `--once` berhasil (config · adb version · authenticated · ready); `GET /api/agents/me` (token agen;
   JWT pemeriksa ditolak); `BearerAuth` + `ApiClient` (retry 5×, tiap kegagalan di-audit). Backend mati → berhenti jelas setelah ~29 s.
   `agent/src/adb_controller.py` dipindah ke `agent/src/device/` sesuai kartu. `check.sh all` OK.
+- 2026-10-01 — `v0.20.4` (kontrak): `ALLOWED_OPERATIONS` (8 ID), `resolve_operation` (NotAllowed ≠ NotMapped, tiap penolakan di-audit),
+  `AcquisitionJob` `extra=forbid`, `adb_commands.py` satu-satunya lokasi string ADB, `run_adb` (list, `shell=False`), `privilege_detector`
+  (baca saja). 31 test agen lulus; dua grep larangan kosong. Reviewer (claim-auditor + integrity) dijalankan di `/finish-branch` v0.20.
 
 ## Keputusan user (tercatat)
 
