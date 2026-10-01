@@ -6,7 +6,7 @@ from pathlib import Path
 os.environ["APP_ENV"] = "test"
 os.environ.setdefault(
     "DATABASE_URL",
-    "postgresql+psycopg://forensic_app:local-dev-only@127.0.0.1:5432/android_forensic",
+    "postgresql+psycopg://forensic_app:local-dev-only@localhost:5432/android_forensic",
 )
 os.environ["JWT_SECRET"] = "test-only-secret-that-is-at-least-32-bytes-long"
 
