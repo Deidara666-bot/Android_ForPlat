@@ -11,9 +11,9 @@
 |---|---|
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
-| Milestone aktif | **`v0.10`** (`docs/dev/v0.10.md`), branch `feature/v0.10` (tag `v0.05` belum dibuat; butir §AK ditutup di `v0.10.5`) |
-| Kartu terakhir | **`v0.10.5`** (2026-10-01) — milestone `v0.10` selesai, tag `v0.10` terbit |
-| Kartu berikutnya | **`/card v0.20.1`** (fondasi paket agen; `v0.10` sudah ditag) |
+| Milestone aktif | **`v0.20`** (`docs/dev/v0.20.md`), branch `feature/v0.20` |
+| Kartu terakhir | **`v0.20.1`** (2026-10-01) |
+| Kartu berikutnya | **`/card v0.20.2`** (registrasi agen, token hash, skrip token; butuh PostgreSQL hidup) |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01)
@@ -62,6 +62,8 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - 2026-10-01 — `fix/v0.10-hardening`: `APP_ENV` wajib, `JWT_SECRET` ≥32 karakter di luar test, batas panjang login, Postgres hanya
   `127.0.0.1` (DEV-06), 401 terpusat di frontend. 23 test lulus. `devices.last_seen_at` tetap NOT NULL (keputusan user, opsi A).
   Sisa dari review: `LABEL_ID` `ConnectionState` (v0.20.6/.7), dasbor `ok`/`development` mentah, `/api/health` tanpa auth membuka `app_env`.
+- 2026-10-01 — `v0.20.1`: paket agen (`config`, `exceptions`, `logging_config`, `state/audit_logger`), dependensi + lock, `pyproject.toml`,
+  5 test lulus, `check.sh agent` OK. `AGENT_TOKEN` wajib dan menolak `change-me`.
 
 ## Keputusan user (tercatat)
 
@@ -75,6 +77,8 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
   `v0.05.5` dipindah ke `v0.90.7`; `v0.05.6` jalan tanpa itu; tag `v0.05` dibuat tanpa A10. Tambahan `[plan]`: parser
   ketat (struktur tak dikenali → `failed`). Tanpa amandemen core. Alasan: A10 belum tersedia dalam waktu dekat,
   dan pengembangan dikerjakan dulu sampai software jadi baru pengujian penelitian.
+- 2026-10-01 — Entri `core_deviations.md` hanya bila kartu tidak bisa jalan tanpanya; saran reviewer non-blocking dicatat saja, tidak dikerjakan
+  kecuali user minta. DEV-06/07 (bind localhost) dibatalkan. Mulai kartu hanya setelah user bilang "mulai".
 - 2026-10-01 — Core tidak diamandemen untuk beda tingkat implementasi; dicatat di `docs/core_deviations.md`
   (DEV-01..05, termasuk mount PostgreSQL). Substansi penelitian tetap lewat amandemen berkelompok. CLAUDE.md §1/§10 disesuaikan.
 
