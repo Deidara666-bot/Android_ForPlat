@@ -1,36 +1,8 @@
-from collections.abc import Iterator
-
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
-from app.core.security import create_access_token, hash_password
-from app.main import app
 from app.models.user import User
 
-_PASSWORD = "correct-horse"
-
-
-@pytest.fixture
-def client(session: Session) -> Iterator[TestClient]:
-    app.dependency_overrides[get_db] = lambda: session
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
-
-
-@pytest.fixture
-def user(session: Session) -> User:
-    examiner = User(email="pemeriksa@lab.local", password_hash=hash_password(_PASSWORD))
-    session.add(examiner)
-    session.flush()
-    return examiner
-
-
-@pytest.fixture
-def auth_headers(user: User) -> dict[str, str]:
-    return {"Authorization": f"Bearer {create_access_token(str(user.id))}"}
+_PASSWORD = "correct-horse"  # same value the `user` fixture in conftest.py hashes
 
 
 def test_login_ok_returns_bearer_token(client: TestClient, user: User) -> None:

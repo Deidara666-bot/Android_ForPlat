@@ -11,9 +11,9 @@
 |---|---|
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
-| Milestone aktif | **`v0.10`** (`docs/dev/v0.10.md`), branch `feature/v0.10` (tag `v0.05` belum dibuat; butir §AK ditutup di `v0.10.5`) |
-| Kartu terakhir | **`v0.10.5`** (2026-10-01) — milestone `v0.10` selesai, tag `v0.10` terbit |
-| Kartu berikutnya | **`/card v0.20.1`** (fondasi paket agen; `v0.10` sudah ditag) |
+| Milestone aktif | **`v0.20`** (`docs/dev/v0.20.md`), branch `feature/v0.20` |
+| Kartu terakhir | **`v0.20.7`** (2026-10-02) — milestone `v0.20` selesai; tinggal `/finish-branch` + `/milestone v0.20` |
+| Kartu berikutnya | **`/card v0.30.1`** setelah tag `v0.20` (`docs/dev/v0.30.md`) |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01)
@@ -62,6 +62,29 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - 2026-10-01 — `fix/v0.10-hardening`: `APP_ENV` wajib, `JWT_SECRET` ≥32 karakter di luar test, batas panjang login, Postgres hanya
   `127.0.0.1` (DEV-06), 401 terpusat di frontend. 23 test lulus. `devices.last_seen_at` tetap NOT NULL (keputusan user, opsi A).
   Sisa dari review: `LABEL_ID` `ConnectionState` (v0.20.6/.7), dasbor `ok`/`development` mentah, `/api/health` tanpa auth membuka `app_env`.
+- 2026-10-01 — `v0.20.1`: paket agen (`config`, `exceptions`, `logging_config`, `state/audit_logger`), dependensi + lock, `pyproject.toml`,
+  5 test lulus, `check.sh agent` OK. `AGENT_TOKEN` wajib dan menolak `change-me`.
+- 2026-10-01 — `v0.20.2`: `AgentService` (token `token_urlsafe(32)`, hanya SHA-256 tersimpan), `POST/GET /api/agents`, `register_agent` CLI +
+  `scripts/dev/register-agent.sh`; `agent/.env` kini berisi token terdaftar (tidak dicetak). 27 test lulus. Fixture `client`/`user`/
+  `auth_headers` dipindah ke `conftest.py`.
+- 2026-10-01 — `v0.20.3`: agen `--once` berhasil (config · adb version · authenticated · ready); `GET /api/agents/me` (token agen;
+  JWT pemeriksa ditolak); `BearerAuth` + `ApiClient` (retry 5×, tiap kegagalan di-audit). Backend mati → berhenti jelas setelah ~29 s.
+  `agent/src/adb_controller.py` dipindah ke `agent/src/device/` sesuai kartu. `check.sh all` OK.
+- 2026-10-01 — `v0.20.4` (kontrak): `ALLOWED_OPERATIONS` (8 ID), `resolve_operation` (NotAllowed ≠ NotMapped, tiap penolakan di-audit),
+  `AcquisitionJob` `extra=forbid`, `adb_commands.py` satu-satunya lokasi string ADB, `run_adb` (list, `shell=False`), `privilege_detector`
+  (baca saja). 31 test agen lulus; dua grep larangan kosong. Reviewer (claim-auditor + integrity) dijalankan di `/finish-branch` v0.20.
+- 2026-10-01 — `v0.20.5`: `/ws/agent` (auth Bearer sebelum accept, tutup 1008), `WebSocketConnectionManager`, heartbeat → `touch`; agen
+  `ws_client` (reconnect tenacity maks 12 percobaan ≈70 s, di-audit) + `heartbeat`. Live: `connected: true`, `last_seen_at` bergerak;
+  backend mati 36 s → sunyi >30 s; nyala lagi → agen tersambung ulang otomatis (audit `ws_reconnected`). `check.sh all` OK.
+- 2026-10-01 — `v0.20.6`: deteksi perangkat (polling `adb devices -l`, lapor via WS `device_report` hanya saat berubah / tiap koneksi baru),
+  metadata aman (5 prop whitelist + privilege), `DeviceService.apply_report` (upsert by serial, hilang → `disconnected`, tak dihapus),
+  `GET /api/devices`. Live: `emulator-5554` android 16/api 36 `connected`; `adb emu kill` → `disconnected`, baris tetap. 42 test backend lulus.
+  `privilege_state` dikirim agen tapi tidak disimpan (tabel `devices` REF §ENT tak punya kolomnya). **User perlu boot ulang AVD.**
+- 2026-10-02 — `v0.20.7`: `AgentStateMachine` (transisi sah saja), `/ws/dashboard?token=<JWT>` (siaran `agent_status`/`devices_changed`),
+  dasbor `AgentStatus` + `DeviceCard` + `useDashboardSocket`. Bug yang ditemukan saat uji langsung: daftar hanya dimuat saat WS terbuka
+  (token kedaluwarsa → WS ditolak terus) → kini dimuat saat halaman dibuka, dan socket yang ditolak memicu cek sesi (401 → login).
+  Pemeriksa memverifikasi: agen berubah terhubung → terputus tanpa refresh. Smoke: `docs/smoke/v0.20.md`. Agen masih skrip Python.
+  Catatan: uvicorn mencatat query string `/ws/dashboard?token=` (JWT) di log akses — masalah lokal/dev, catat untuk deployment.
 
 ## Keputusan user (tercatat)
 
@@ -75,6 +98,8 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
   `v0.05.5` dipindah ke `v0.90.7`; `v0.05.6` jalan tanpa itu; tag `v0.05` dibuat tanpa A10. Tambahan `[plan]`: parser
   ketat (struktur tak dikenali → `failed`). Tanpa amandemen core. Alasan: A10 belum tersedia dalam waktu dekat,
   dan pengembangan dikerjakan dulu sampai software jadi baru pengujian penelitian.
+- 2026-10-01 — Entri `core_deviations.md` hanya bila kartu tidak bisa jalan tanpanya; saran reviewer non-blocking dicatat saja, tidak dikerjakan
+  kecuali user minta. DEV-06/07 (bind localhost) dibatalkan. Mulai kartu hanya setelah user bilang "mulai".
 - 2026-10-01 — Core tidak diamandemen untuk beda tingkat implementasi; dicatat di `docs/core_deviations.md`
   (DEV-01..05, termasuk mount PostgreSQL). Substansi penelitian tetap lewat amandemen berkelompok. CLAUDE.md §1/§10 disesuaikan.
 

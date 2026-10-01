@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.db.session import SessionLocal
+from app.models.agent import Agent
 from app.models.user import User
+from app.services.agent_service import AgentService
 from app.services.auth_service import AuthService
 
 _bearer = HTTPBearer(auto_error=False)
@@ -44,3 +46,15 @@ def get_current_user(
     if user is None:
         raise _unauthorized()
     return user
+
+
+def get_current_agent(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    db: Annotated[Session, Depends(get_db)],
+) -> Agent:
+    if credentials is None:
+        raise _unauthorized()
+    agent = AgentService(db).find_by_token(credentials.credentials)
+    if agent is None:
+        raise _unauthorized()
+    return agent
