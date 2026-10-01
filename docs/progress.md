@@ -12,8 +12,8 @@
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
 | Milestone aktif | **`v0.10`** (`docs/dev/v0.10.md`), branch `feature/v0.10` (tag `v0.05` belum dibuat; butir §AK ditutup di `v0.10.5`) |
-| Kartu terakhir | **`v0.10.4`** (2026-10-01) |
-| Kartu berikutnya | **`/card v0.10.5`** (React shell + dashboard health, smoke v0.10, tag; butuh PostgreSQL + backend hidup) |
+| Kartu terakhir | **`v0.10.5`** (2026-10-01) — milestone `v0.10` selesai, menunggu `/milestone v0.05` dan `/milestone v0.10` |
+| Kartu berikutnya | **`/card v0.20.1`** setelah tag `v0.05` dan `v0.10` (`docs/dev/v0.20.md`) |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
@@ -56,6 +56,9 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
 - 2026-10-01 — `v0.10.4`: login JWT, `/api/auth/me`, rute `cases` (201/409), CORS terbatas, `dev_token`, `init_db`; akun dev
   `pemeriksa@lab.local` dibuat user sendiri (password tidak lewat Claude). 19 test lulus. Tambahan: `Settings` menolak
   `CORS_ORIGINS=*`.
+- 2026-10-01 — `v0.10.5`: React shell (`/login`, `/dashboard`, `AppShell`), dasbor health diverifikasi user di browser (login
+  berhasil, status/lingkungan/basis data/revisi Alembic tampil). `docs/smoke/v0.10.md` menutup 4 butir §AK yang ditunda dari
+  `v0.05`. Verifikasi visual oleh user karena browser pane diblokir mode auto.
 
 ## Keputusan user (tercatat)
 
@@ -74,7 +77,7 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
 
 ## Keputusan / aksi user yang tertunda
 
-- Setujui tag `v0.05` (`/milestone v0.05`).
+- Jalankan `/milestone v0.05` lalu `/milestone v0.10` (skill dikunci untuk user; butir §AK `v0.05` sudah tertutup di `docs/smoke/v0.10.md`).
 - Galaxy A10 harus tersedia paling lambat `v0.90.7`, dan versinya dibutuhkan sebelum BAB III 3.3 final. Bila tidak ada
   → keputusan amandemen `G-05` (ganti perangkat / lepas AVD #2 dari A10 / emulator saja dengan batasan dinyatakan).
 
