@@ -81,6 +81,12 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
 - Galaxy A10 harus tersedia paling lambat `v0.90.7`, dan versinya dibutuhkan sebelum BAB III 3.3 final. Bila tidak ada
   → keputusan amandemen `G-05` (ganti perangkat / lepas AVD #2 dari A10 / emulator saja dengan batasan dinyatakan).
 
+- Catatan non-blocking review `v0.10` (claim-auditor + integrity-reviewer, 0 blocking), bahas sebelum/di awal `v0.20`:
+  `APP_ENV` default `development` (fail-open) · `JWT_SECRET` tanpa batas panjang · `LoginIn` tanpa max_length ·
+  frontend belum tangani 401 kedaluwarsa · port Postgres `5432` terbuka ke semua interface (usul `127.0.0.1:5432`) ·
+  `devices.last_seen_at` NOT NULL (usul nullable lewat migrasi baru) · `LABEL_ID` belum memuat `ConnectionState` (butuh di v0.20.6) ·
+  dasbor menampilkan `ok`/`development` mentah (usul padanan Indonesia).
+
 ## Data OPEN (jangan ditebak — isi hanya dari hasil nyata)
 
 - [ ] Versi Android/API aktual Samsung Galaxy A10 → API AVD kedua (kartu v0.90.7, dipindah dari v0.05.5)
@@ -97,6 +103,9 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: —
 - [ ] Bentuk deployment final (VPS) dan distribusi agen
 
 ## Sinkronisasi remote
+
+- 2026-10-01 — `/finish-branch v0.10`: `feature/v0.10` digabung `--no-ff` ke `main` (`f8b9e2d`), push GitHub sukses. Branch
+  `feature/v0.05` dan `feature/v0.10` belum dihapus (menunggu persetujuan user). Tag `v0.05`/`v0.10` menunggu `/milestone` oleh user.
 
 - 2026-09-30 — `/integrate`: `origin/claude/confident-knuth-ceknlx` (`b85f0ff`) digabung ke `main`, push ke
   GitHub sukses (`main` = `f29eb81`). Tidak ada branch `claude/*` lain yang menunggu.
