@@ -51,6 +51,11 @@ def test_login_unknown_email_is_401(client: TestClient) -> None:
     assert response.status_code == 401
 
 
+def test_login_oversized_password_is_422(client: TestClient) -> None:
+    response = client.post("/api/auth/login", json={"email": "x@y.z", "password": "p" * 129})
+    assert response.status_code == 422
+
+
 def test_me_requires_token_and_returns_user(
     client: TestClient, user: User, auth_headers: dict[str, str]
 ) -> None:
