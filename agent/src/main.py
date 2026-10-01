@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import logging
 import sys
 
@@ -8,6 +9,7 @@ from src.exceptions import AgentError
 from src.logging_config import configure_logging
 from src.state.audit_logger import audit
 from src.transport.api_client import ApiClient
+from src.transport.ws_client import run_forever
 
 log = logging.getLogger("agent")
 
@@ -47,7 +49,15 @@ def main(argv: list[str] | None = None) -> int:
     audit("ready")
     if args.once:
         return 0
-    log.info("main loop arrives in v0.20.5; exiting")
+    try:
+        asyncio.run(run_forever(settings))
+    except KeyboardInterrupt:
+        log.info("stopped by user")
+        audit("stopped", "keyboard interrupt")
+    except AgentError as exc:
+        log.error("agent stopped: %s", exc)
+        audit("agent_stopped", str(exc))
+        return 1
     return 0
 
 

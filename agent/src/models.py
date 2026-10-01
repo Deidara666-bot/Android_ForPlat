@@ -10,6 +10,16 @@ class PrivilegeState(StrEnum):
     unknown = "unknown"
 
 
+class AgentState(StrEnum):
+    starting = "starting"
+    config_loaded = "config_loaded"
+    adb_validated = "adb_validated"
+    registered = "registered"
+    connected = "connected"
+    disconnected = "disconnected"
+    stopped = "stopped"
+
+
 class AcquisitionJob(BaseModel):
     """Backend -> agent job. Only an operation ID and string parameters; no command fields."""
 
