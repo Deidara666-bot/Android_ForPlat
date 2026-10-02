@@ -2,6 +2,18 @@
 
 Satu entri per tag milestone. Rincian kartu: `docs/progress.md`; bukti: `docs/smoke/`.
 
+## v0.30 — 2026-10-02
+
+Sesi akuisisi, 2 operasi allowlist, rantai SHA-256, bukti imutabel. Increment 1.
+
+- Model `acquisition_sessions`, `acquisition_operations`, `evidence` (tepat 19 kolom; `sha256_agent` dan `sha256_server` terpisah); CHECK status/sumber/alasan-wajib diuji dengan nama constraint; migrasi `7d73dea04b57`.
+- Dua operasi dipetakan (`collect_device_metadata`, `collect_package_inventory`); enam ID sah lain tetap `OperationNotMappedError`. Job ke agen 8 field (`sequence`, `serial`), serial divalidasi (tolak awalan `-`); agen tidak memilih perangkat atau menghitung urutan.
+- Rantai integritas (kontrak §W): agen tulis byte-exact (`xb`) → SHA-256 agen → unggah multipart → server hash ulang sendiri → banding → simpan read-only. Mismatch ditolak, baris `failed` menyimpan dua hash, tanpa berkas; unggah kedua tidak menimpa (409); nama berkas disusun server.
+- `AuditService` + `audit_logs` (migrasi `50735e96c7aa`); 5 kejadian akuisisi/unggah, ditambah penolakan 401/422 pada rute akuisisi dan bukti (satu baris per kejadian per path per 60 detik, tanpa token/nilai). Klasifikasi ketersediaan `unsupported → denied → unavailable → failed`; hasil non-acquired menjadi baris `evidence` tanpa berkas dengan alasan.
+- `GET /api/evidence/{id}` dan `GET /api/acquisitions/{id}`: rantai asal-usul dua arah (bukti ↔ sesi ↔ operasi ↔ perangkat ↔ kasus) dengan jumlah query tetap; tanpa `stored_path`, tanpa rute unduh.
+- 138 test backend + 127 test agen; `check.sh all` OK. Review `claim-auditor` + `forensic-integrity-reviewer`: 0 blocking; 10 catatan non-blocking di `docs/progress.md`.
+- Rencana direvisi saat berjalan (`1ef5ec5`): `sequence`/`serial` dibawa job. Bukti: `docs/smoke/v0.30.md`.
+
 ## v0.20 — 2026-10-02
 
 Agen: registrasi, allowlist, WebSocket, deteksi perangkat, dasbor langsung. Increment 1.

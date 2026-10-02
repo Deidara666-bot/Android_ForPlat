@@ -11,12 +11,12 @@
 |---|---|
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
-| Milestone aktif | **`v0.30`** selesai & digabung ke `main`; menunggu tag oleh user (`/milestone v0.30`). Berikutnya `v0.40` |
-| Kartu terakhir | **`v0.30.8`** (2026-10-02) — milestone `v0.30` selesai, belum bertag |
-| Kartu berikutnya | **`/milestone v0.30`** (user menyetujui tag), lalu **`/card v0.40.1`** (`docs/dev/v0.40.md`; disarankan sesi baru). Satu kartu per "mulai" |
+| Milestone aktif | **`v0.30`** tercapai (tag `v0.30`). Berikutnya **`v0.40`** (`docs/dev/v0.40.md`) |
+| Kartu terakhir | **`v0.30.8`** (2026-10-02) — milestone `v0.30` tercapai, tag `v0.30` terbit |
+| Kartu berikutnya | **`/card v0.40.1`** (`docs/dev/v0.40.md`; disarankan sesi baru). Satu kartu per "mulai" |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
-Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20` (2026-10-02); `v0.30` menunggu `/milestone`
+Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30` (2026-10-02)
 
 ## Selesai
 
@@ -155,7 +155,7 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 
 ## Sinkronisasi remote
 
-- 2026-10-02 — `/finish-branch v0.30`: `feature/v0.30` digabung `--no-ff` ke `main` (`38b688d`), pemeriksaan di `main` `CHECK OK`. Branch `feature/v0.05`, `v0.10`, `v0.20`, `v0.30`, `fix/*` belum dihapus (menunggu persetujuan user). Tag `v0.30` menunggu `/milestone` oleh user.
+- 2026-10-02 — `/finish-branch v0.30`: `feature/v0.30` digabung `--no-ff` ke `main` (`38b688d`), pemeriksaan di `main` `CHECK OK`. Branch `feature/v0.05`, `v0.10`, `v0.20`, `v0.30`, `fix/*` belum dihapus (menunggu persetujuan user). Tag `v0.30` terbit lewat `/milestone` (2026-10-02).
 
 - 2026-10-02 — `/finish-branch v0.20`: `feature/v0.20` digabung `--no-ff` ke `main` (`fa17bf0`), push GitHub sukses. Branch `feature/v0.05`,
   `feature/v0.10`, `feature/v0.20`, `fix/*` belum dihapus (menunggu persetujuan user). Tag `v0.20` sudah terbit.
