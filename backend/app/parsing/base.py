@@ -28,8 +28,8 @@ class ParsedArtifact(BaseModel):
     def _status_rules(self) -> Self:
         if self.parse_status != ParseStatus.parsed and not self.parse_note.strip():
             raise ValueError("parse_note is required when parse_status is not parsed")
-        if self.raw_value == "" and self.parse_status != ParseStatus.empty:
-            raise ValueError("raw_value may be empty only when parse_status is empty")
+        if self.raw_value == "" and self.parse_status == ParseStatus.parsed:
+            raise ValueError("raw_value is required when parse_status is parsed")
         return self
 
 

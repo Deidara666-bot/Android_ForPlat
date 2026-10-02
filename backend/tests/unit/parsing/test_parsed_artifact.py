@@ -45,11 +45,15 @@ def test_failed_with_note_accepted() -> None:
     assert _build(parse_status=ParseStatus.failed, parse_note="baris rusak").parse_note
 
 
-def test_empty_raw_value_only_for_empty_status() -> None:
+def test_parsed_requires_raw_value() -> None:
     with pytest.raises(ValidationError) as raised:
-        _build(raw_value="")
+        _build(raw_value="", parse_status=ParseStatus.parsed)
     assert "raw_value" in str(raised.value)
-    assert _build(raw_value="", parse_status=ParseStatus.empty, parse_note="kosong")
+
+
+@pytest.mark.parametrize("status", [ParseStatus.failed, ParseStatus.empty])
+def test_empty_raw_value_allowed_for_failed_and_empty(status: ParseStatus) -> None:
+    assert _build(raw_value="", parse_status=status, parse_note="alasan").raw_value == ""
 
 
 def test_extra_field_and_mutation_rejected() -> None:
