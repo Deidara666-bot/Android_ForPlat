@@ -2,6 +2,19 @@
 
 Satu entri per tag milestone. Rincian kartu: `docs/progress.md`; bukti: `docs/smoke/`.
 
+## v0.40 — 2026-10-02
+
+Parser → Artifact → NormalizedEvent → UI. Akhir Increment 1 (irisan tegak minimum).
+
+- Protokol `Parser` + registri eksplisit per operation ID (tanpa default/scan); parser `package_state.inventory` dan `package_state.device_metadata` (v1): baris rusak tetap `failed` dengan baris aslinya, decode gagal → 1 artefak `failed` dengan offset byte, kunci metadata hilang → `empty`.
+- `artifacts` (tepat 10 kolom, `parse_note` wajib bila tidak `parsed`, migrasi `11d773cc1fb3`); `normalized_events` (tepat 17 kolom) + katalog tertutup 25 `event_type` (migrasi `0fc9d155262e`) + CHECK pasangan kelas–tipe (migrasi `a7c41d9e5b02`).
+- Penormalisasi deterministik: `epistemic_class` dari katalog, satu klaim = satu fakta, keadaan saat ini → `event_time` null, bukti non-`acquired` / artefak `failed` → tanpa fakta (tidak pernah FALSE).
+- `NormalizationService` dipicu setelah bukti `acquired` di-commit (galat → audit, bukti tetap); timezone sesi dari `persist.sys.timezone`, tidak menebak. CLI `python -m app.services.normalization_service`.
+- `GET /api/cases/{id}`, `/artifacts`, `/events?event_type=` dengan asal-usul sampai SHA-256 bukti; tanpa `stored_path`, tanpa rute tulis. UI `/cases/:id/events` (`EventTimeline`, `ArtifactTable`).
+- Irisan tegak di AVD #1: 252 artefak `parsed`, 496 fakta (248 + 248), 0 `failed`; panel asal-usul di browser menampilkan SHA-256 server yang sama dengan berkas bukti (diverifikasi pemeriksa dan dihitung ulang). Bukti: `docs/irisan_tegak_v0.40.md`.
+- 235 test backend + 127 test agen; `check.sh all` OK. Review `claim-auditor` + `forensic-integrity-reviewer`: 0 blocking; 11 catatan non-blocking di `docs/progress.md`.
+- Rencana direvisi saat berjalan (`68c3428`): `raw_value` wajib hanya untuk `parsed`.
+
 ## v0.30 — 2026-10-02
 
 Sesi akuisisi, 2 operasi allowlist, rantai SHA-256, bukti imutabel. Increment 1.
