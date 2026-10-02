@@ -12,8 +12,8 @@
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
 | Milestone aktif | **`v0.40`** (`docs/dev/v0.40.md`), branch `feature/v0.40` |
-| Kartu terakhir | **`v0.40.1`** (2026-10-02) |
-| Kartu berikutnya | **`/card v0.40.2`** (`docs/dev/v0.40.md`; kontrak §Y.2, butuh PostgreSQL). Satu kartu per "mulai" |
+| Kartu terakhir | **`v0.40.2`** (2026-10-02) |
+| Kartu berikutnya | **`/card v0.40.3`** (`docs/dev/v0.40.md`; parser `package_state`, tanpa DB). Satu kartu per "mulai" |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30` (2026-10-02)
@@ -95,6 +95,7 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - 2026-10-02 — `v0.30.7`: `GET /api/evidence/{id}` (JWT; 18 field bukti tanpa `stored_path` + `session`, `operation`, `device`, `case`) dan `GET /api/acquisitions/{id}` kini memuat `evidence` (arah sesi → bukti). Satu query join (tanpa `relationship()` di model, jadi `selectinload` tak dipakai); jumlah query tetap 1 vs 9 bukti (diukur lewat `before_cursor_execute`). Live: tanpa token 401; keluaran tanpa `stored_path`, `/var/`, atau backslash-var; sha agen = server; rantai kasus/perangkat/operasi/sesi utuh. **Catatan:** bukti tak punya kolom `sequence`, jadi `operation` dicocokkan lewat (sesi, `operation_id`) dan diambil yang `sequence` terkecil; aman untuk v0.30 (satu baris per ID per sesi), perlu ditinjau bila satu sesi punya ID operasi yang sama dua kali. Skema gabungan di `schemas/provenance.py` (menghindari impor melingkar).
 - 2026-10-02 — `v0.30.8`: smoke ujung ke ujung (`docs/smoke/v0.30.md`): kasus `SMOKE-V030`, profil `baseline_v030` pada AVD #1, sesi `completed`, dua bukti `acquired` (metadata `source_group` NULL, inventaris `APP_SYSTEM_STATE`), `sha256_agent = sha256_server`, `sha256sum` agen = server, berkas server read-only, audit `job_issued`×2 + `upload_accepted`×2. Pembersihan: kasus `UJI-V0304` + 5 sesi + 6 bukti + folder berkas uji dihapus (satu transaksi, nama UUID eksplisit); `audit_logs` utuh (14 baris). Uji gagal: `git log --all --name-only | grep var/(evidence|raw)` kosong. `check.sh all` OK.
 - 2026-10-02 — `v0.40.1`: `ParsedArtifact` + protokol `Parser`, registri eksplisit (`register`/`get_parser`/`registered_operations`, tanpa default atau scan), 3 fixture REF §FIX, 4 test registri; `check.sh backend` OK. Uji gagal: `get_parser('collect_network_stats')` → `UnknownOperationError`. Tambahan di luar daftar File: `tests/unit/parsing/__init__.py`.
+- 2026-10-02 — `v0.40.2` (kontrak §Y.2): `Artifact` 10 kolom + CHECK `ck_artifacts_parse_status` + indeks `evidence_id`, migrasi `11d773cc1fb3` (upgrade/downgrade/upgrade sukses, `alembic check` bersih), validator `ParsedArtifact`, `ArtifactService` (`read_evidence_bytes`, `store_artifacts` flush tanpa commit). 155 test backend lulus. **Temuan kartu:** validator `.2` (`raw_value` kosong hanya bila `empty`) bertabrakan dengan `.3` (gagal decode → `failed` dengan `raw_value=""`); `.2` dikerjakan sesuai teks, keputusan untuk `.3` dibawa ke user.
 
 ## Keputusan user (tercatat)
 

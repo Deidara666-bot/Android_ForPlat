@@ -1,6 +1,6 @@
-from typing import Protocol
+from typing import Protocol, Self
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from app.core.constants import ParseStatus
 
@@ -16,6 +16,21 @@ class ParsedArtifact(BaseModel):
     parsed_value_json: dict[str, object]
     parse_status: ParseStatus
     parse_note: str
+
+    @field_validator("parser_name", "parser_version")
+    @classmethod
+    def _provenance_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("parser_name and parser_version must not be blank")
+        return value
+
+    @model_validator(mode="after")
+    def _status_rules(self) -> Self:
+        if self.parse_status != ParseStatus.parsed and not self.parse_note.strip():
+            raise ValueError("parse_note is required when parse_status is not parsed")
+        if self.raw_value == "" and self.parse_status != ParseStatus.empty:
+            raise ValueError("raw_value may be empty only when parse_status is empty")
+        return self
 
 
 class Parser(Protocol):
