@@ -82,9 +82,10 @@ async def create_acquisition(
             status.HTTP_409_CONFLICT, detail="agent for this device is not connected"
         )
 
-    session, _ = service.create_session(body.case_id, device, agent, operations, body.profile)
-    for operation in operations:
-        if not await manager.send(agent.agent_id, service.build_job(session, operation, {})):
+    session, rows = service.create_session(body.case_id, device, agent, operations, body.profile)
+    for row in rows:
+        job = service.build_job(session, row, device.serial, {})
+        if not await manager.send(agent.agent_id, job):
             service.mark_failed(session, "agent disconnected before the job was delivered")
             raise HTTPException(status.HTTP_409_CONFLICT, detail="agent disconnected")
     return _detail(session, service)

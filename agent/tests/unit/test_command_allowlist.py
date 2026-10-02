@@ -64,9 +64,11 @@ def test_job_with_extra_field_is_rejected() -> None:
     fields = {
         "type": "job",
         "session_id": "s",
+        "sequence": 1,
         "operation": "collect_package_inventory",
         "case_id": "c",
         "device_id": "d",
+        "serial": "emulator-5554",
         "parameters": {},
     }
     AcquisitionJob(**fields)  # type: ignore[arg-type]
@@ -118,3 +120,42 @@ def test_adb_is_run_with_an_argument_list_and_no_shell(monkeypatch: pytest.Monke
     call = fake.calls[0]  # type: ignore[attr-defined]
     assert call["command"] == ["adb", "-s", "emulator-5554", "shell", "id"]
     assert call["shell"] is False
+
+
+def _job_fields(**overrides: object) -> dict[str, object]:
+    return {
+        "type": "job",
+        "session_id": "s",
+        "sequence": 1,
+        "operation": "collect_package_inventory",
+        "case_id": "c",
+        "device_id": "d",
+        "serial": "emulator-5554",
+        "parameters": {},
+        **overrides,
+    }
+
+
+@pytest.mark.parametrize("serial", ["-d", "-e", "a b", "x;y", "", "a" * 65, "$(id)", "a\nb"])
+def test_job_serial_that_could_be_an_adb_option_or_shell_text_is_rejected(serial: str) -> None:
+    with pytest.raises(ValidationError):
+        AcquisitionJob(**_job_fields(serial=serial))  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("serial", ["emulator-5554", "192.168.1.5:5555", "R58M12ABCDE", "a_b.c"])
+def test_job_serial_of_a_real_device_is_accepted(serial: str) -> None:
+    assert AcquisitionJob(**_job_fields(serial=serial)).serial == serial  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("sequence", [0, -1])
+def test_job_sequence_below_one_is_rejected(sequence: int) -> None:
+    with pytest.raises(ValidationError):
+        AcquisitionJob(**_job_fields(sequence=sequence))  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("missing", ["sequence", "serial"])
+def test_job_without_sequence_or_serial_is_rejected(missing: str) -> None:
+    fields = _job_fields()
+    del fields[missing]
+    with pytest.raises(ValidationError):
+        AcquisitionJob(**fields)  # type: ignore[arg-type]

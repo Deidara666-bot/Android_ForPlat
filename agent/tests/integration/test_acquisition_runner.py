@@ -18,9 +18,11 @@ def _job(operation: str, **extra: Any) -> dict[str, Any]:
     return {
         "type": "job",
         "session_id": _SESSION,
+        "sequence": 1,
         "operation": operation,
         "case_id": "c",
         "device_id": "d",
+        "serial": "emulator-5554",
         "parameters": {},
         **extra,
     }

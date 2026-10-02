@@ -11,7 +11,16 @@ from app.models.user import User
 from app.services.agent_service import AgentService
 
 _SERIAL = "emulator-5554"
-_SIX_KEYS = {"type", "session_id", "operation", "case_id", "device_id", "parameters"}
+_EIGHT_KEYS = {
+    "type",
+    "session_id",
+    "sequence",
+    "operation",
+    "case_id",
+    "device_id",
+    "serial",
+    "parameters",
+}
 
 
 @pytest.fixture
@@ -166,12 +175,14 @@ def test_profile_sends_two_exact_jobs_and_reaches_completed(
         ]
 
         jobs = [ws.receive_json(), ws.receive_json()]
-        assert all(set(job) == _SIX_KEYS for job in jobs)
+        assert all(set(job) == _EIGHT_KEYS for job in jobs)
         assert [job["operation"] for job in jobs] == [
             "collect_device_metadata",
             "collect_package_inventory",
         ]
         assert all(job["session_id"] == created["id"] for job in jobs)
+        assert [job["sequence"] for job in jobs] == [1, 2]
+        assert all(job["serial"] == _SERIAL for job in jobs)
 
         for job in jobs:
             ws.send_json(

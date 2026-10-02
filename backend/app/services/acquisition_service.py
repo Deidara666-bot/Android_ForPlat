@@ -61,15 +61,24 @@ class AcquisitionService:
             AcquisitionService.validate_operation(item)
         return operations
 
-    def build_job(self, session: Any, operation: str, parameters: dict[str, str]) -> dict[str, Any]:
-        """Job payload for the agent: an operation ID and parameters, never a command string."""
-        self.validate_operation(operation)
+    def build_job(
+        self,
+        session: Any,
+        operation_row: Any,
+        serial: str,
+        parameters: dict[str, str],
+    ) -> dict[str, Any]:
+        """Job payload for the agent (REF §API, 8 fields): identities and an operation ID,
+        never a command string. `sequence` and `serial` come from the DB rows, not the client."""
+        self.validate_operation(operation_row.operation_id)
         return {
             "type": "job",
             "session_id": str(session.id),
-            "operation": operation,
+            "sequence": operation_row.sequence,
+            "operation": operation_row.operation_id,
             "case_id": str(session.case_id),
             "device_id": str(session.device_id),
+            "serial": serial,
             "parameters": dict(parameters),
         }
 
