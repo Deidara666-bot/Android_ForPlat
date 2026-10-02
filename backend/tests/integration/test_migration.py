@@ -3,7 +3,16 @@ from sqlalchemy import create_engine, inspect
 
 from alembic import command
 
-_TABLES = {"agents", "case_devices", "cases", "devices", "users"}
+_TABLES = {
+    "acquisition_operations",
+    "acquisition_sessions",
+    "agents",
+    "case_devices",
+    "cases",
+    "devices",
+    "evidence",
+    "users",
+}
 
 
 def _tables(url: str) -> set[str]:

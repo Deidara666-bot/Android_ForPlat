@@ -3,7 +3,7 @@
 > Papan status hidup. **Satu-satunya file kendali yang diperbarui tiap sesi** (lewat `/card` dan `/wrap-up`).
 > Aturan tetap di `CLAUDE.md` dan `.claude/`; rencana di `docs/dev/`. Tanggal format `YYYY-MM-DD`.
 
-**Terakhir diperbarui:** 2026-10-01
+**Terakhir diperbarui:** 2026-10-02
 
 ## Posisi saat ini
 
@@ -11,9 +11,9 @@
 |---|---|
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
-| Milestone aktif | **`v0.20`** (`docs/dev/v0.20.md`), branch `feature/v0.20` |
-| Kartu terakhir | **`v0.20.7`** (2026-10-02) — milestone `v0.20` selesai, tag `v0.20` terbit |
-| Kartu berikutnya | **`/card v0.30.1`** (`docs/dev/v0.30.md`; disarankan sesi baru) |
+| Milestone aktif | **`v0.30`** (`docs/dev/v0.30.md`), branch `feature/v0.30` |
+| Kartu terakhir | **`v0.30.1`** (2026-10-02) |
+| Kartu berikutnya | **`/card v0.30.2`** (`docs/dev/v0.30.md`) |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20` (2026-10-02)
@@ -85,6 +85,7 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
   (token kedaluwarsa → WS ditolak terus) → kini dimuat saat halaman dibuka, dan socket yang ditolak memicu cek sesi (401 → login).
   Pemeriksa memverifikasi: agen berubah terhubung → terputus tanpa refresh. Smoke: `docs/smoke/v0.20.md`. Agen masih skrip Python.
   Catatan: uvicorn mencatat query string `/ws/dashboard?token=` (JWT) di log akses — masalah lokal/dev, catat untuk deployment.
+- 2026-10-02 — `v0.30.1`: model `acquisition_sessions`, `acquisition_operations`, `evidence` (19 kolom), migrasi `7d73dea04b57`, 4 CHECK diuji dengan nama constraint, 9 test lulus, `alembic check` bersih. Asumsi (REF §ENT diam): `ended_at`, `profile` (sesi operasi tunggal), `platform_tools_version` nullable; `acquisition_operations.status` string bebas (default `pending`) + UNIQUE `(session_id, sequence)`. `test_migration.py` diperbarui (daftar tabel).
 
 ## Keputusan user (tercatat)
 
