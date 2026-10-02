@@ -13,7 +13,7 @@
 | *Increment* aktif | **1 — Irisan tegak minimum** |
 | Milestone aktif | **`v0.40`** (`docs/dev/v0.40.md`), branch `feature/v0.40` |
 | Kartu terakhir | **`v0.40.2`** (2026-10-02) |
-| Kartu berikutnya | **`/card v0.40.3`** (`docs/dev/v0.40.md`; parser `package_state`, tanpa DB). Satu kartu per "mulai" |
+| Kartu berikutnya | **Revisi `v0.40.2`** (validator `raw_value`), lalu `/card v0.40.3`. Satu kartu per "mulai" |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30` (2026-10-02)
@@ -116,6 +116,8 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - 2026-10-02 — Job membawa `sequence` + `serial` (REF §API 8 field); berkas bukti `<sequence>-<operation_id>-<part>.bin`;
   timezone sesi dari `persist.sys.timezone` (v0.40.6). Kartu `v0.30.3`/`.4` dikerjakan ulang (commit revisi), tanpa kartu baru.
   Teks `v0.30.5`, `.6`, `v0.40.3`, `.6`, `.9`, `v0.45.3`, `.4` disesuaikan. Bukan beda core → tanpa entri register.
+- 2026-10-02 — `raw_value` wajib hanya untuk `parsed`; boleh kosong untuk `empty`/`failed` (opsi 1 temuan `v0.40.2`). `v0.40.2`
+  direvisi (commit revisi); `v0.40.3`: baris `failed` membawa baris asli, decode gagal → 1 artefak `failed` + offset byte (kedua parser).
 
 ## Keputusan / aksi user yang tertunda
 
