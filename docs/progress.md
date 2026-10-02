@@ -12,8 +12,8 @@
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
 | Milestone aktif | **`v0.30`** (`docs/dev/v0.30.md`), branch `feature/v0.30` |
-| Kartu terakhir | **`v0.30.3`** (2026-10-02) |
-| Kartu berikutnya | **`/card v0.30.4`** (`docs/dev/v0.30.md`; butuh semua hidup + AVD #1). Satu kartu per "mulai" |
+| Kartu terakhir | **`v0.30.4`** (2026-10-02) |
+| Kartu berikutnya | **`/card v0.30.5`** (`docs/dev/v0.30.md`; kontrak §W, butuh semua hidup + AVD #1). Satu kartu per "mulai" |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20` (2026-10-02)
@@ -88,6 +88,7 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - 2026-10-02 — `v0.30.1`: model `acquisition_sessions`, `acquisition_operations`, `evidence` (19 kolom), migrasi `7d73dea04b57`, 4 CHECK diuji dengan nama constraint, 9 test lulus, `alembic check` bersih. Asumsi (REF §ENT diam): `ended_at`, `profile` (sesi operasi tunggal), `platform_tools_version` nullable; `acquisition_operations.status` string bebas (default `pending`) + UNIQUE `(session_id, sequence)`. `test_migration.py` diperbarui (daftar tabel).
 - 2026-10-02 — `v0.30.2`: `sha256_file` (blok 1 MiB), `write_evidence` (mode `xb`), `IntegrityService`; 11 test baru lulus, `check.sh all` OK. Uji gagal: tulis kedua → `FileExistsError`, isi lama `satu` utuh.
 - 2026-10-02 — `v0.30.3`: `OPERATION_ARGS` memetakan 2 ID, `resolve_operation` menolak parameter apa pun (`ValueError`, diaudit), `PROFILES[baseline_v030]`, backend `ALLOWED_OPERATIONS`/`MAPPED_OPERATIONS` + `AcquisitionService.build_job` (galat berbeda tipe). Sanity manual user: sdk `36`, inventaris diterima (`experiments/feasibility_tier2/manual/v0.30.3.txt`, di-commit). Grep larangan kosong setelah `getprop_args` diganti nama `safe_prop_args` (nama fungsi v0.20.6, bukan string perintah). Test lama `test_command_allowlist` dikecualikan dari 2 ID yang kini terpetakan. Validasi `serial` (`run_adb`) dan regex `parameters` belum dikerjakan (parameter ditolak total, jadi tak ada jalur masuk).
+- 2026-10-02 — `v0.30.4`: `POST/GET /api/acquisitions` (401/404/409/422), `AcquisitionService` (profil, sesi, `apply_job_status`), `AcquisitionRunner` agen (job → `resolve_operation` → `run_adb` → `write_evidence` → `sha256_file` → `job_status`). Live di AVD #1: sesi `completed`, 2 berkas mentah byte-exact di `agent/var/raw/<session>/`, `.gitignore` menangkap `var/`; uji gagal `collect_usage_state` → 422 "belum dipetakan". **Celah kartu & keputusan sementara:** job tidak membawa serial maupun nomor urut. Agen bertindak hanya bila tepat satu perangkat `device` terhubung (selain itu job gagal), memberi nomor urut per sesi menurut urutan kedatangan, dan menambah `serial` + `error` pada `job_status`; backend menandai operasi `failed` bila serial ≠ `devices.serial`. `acquisition_sessions.timezone` diisi `unknown` (timezone perangkat belum dikumpulkan). Hash dari `job_status` belum disimpan (baris `evidence` baru lahir di v0.30.5). Sisa uji: kasus `UJI-V0304` di DB dev dibersihkan di v0.30.8.
 
 ## Keputusan user (tercatat)
 

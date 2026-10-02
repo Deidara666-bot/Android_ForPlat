@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class AcquisitionOperationOut(BaseModel):
@@ -30,3 +30,36 @@ class AcquisitionSessionOut(BaseModel):
     status: str
     availability_status: str | None
     error: str | None
+
+
+class AcquisitionDetailOut(AcquisitionSessionOut):
+    operations: list[AcquisitionOperationOut]
+
+
+class AcquisitionCreate(BaseModel):
+    """Request a session by `profile` or by a single `operation` (exactly one of them)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: uuid.UUID
+    device_id: uuid.UUID
+    profile: str | None = None
+    operation: str | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one_selector(self) -> "AcquisitionCreate":
+        if (self.profile is None) == (self.operation is None):
+            raise ValueError("provide exactly one of `profile` or `operation`")
+        return self
+
+
+class JobStatusIn(BaseModel):
+    """Agent -> backend outcome of one operation. Hashes are re-verified at upload (v0.30.5)."""
+
+    session_id: uuid.UUID
+    operation: str
+    sha256_agent: str | None = None
+    size_bytes: int | None = None
+    returncode: int
+    serial: str | None = None
+    error: str | None = None

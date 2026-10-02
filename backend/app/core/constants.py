@@ -88,6 +88,11 @@ MAPPED_OPERATIONS: frozenset[str] = frozenset(
     {"collect_device_metadata", "collect_package_inventory"}
 )
 
+# Named operation sequences a session may request (the agent keeps the same profile table).
+ACQUISITION_PROFILES: dict[str, tuple[str, ...]] = {
+    "baseline_v030": ("collect_device_metadata", "collect_package_inventory"),
+}
+
 # Order in which a failed acquisition is classified (first match wins, remainder is `failed`).
 AVAILABILITY_CHECK_ORDER = (
     AvailabilityStatus.unsupported,
