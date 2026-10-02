@@ -82,6 +82,8 @@ class AuditEventType(StrEnum):
     upload_accepted = "upload_accepted"
     upload_rejected_mismatch = "upload_rejected_mismatch"
     upload_validation_failed = "upload_validation_failed"
+    authentication_failed = "authentication_failed"
+    request_validation_failed = "request_validation_failed"
 
 
 # Allowlisted operation IDs (REF §OPS); the agent keeps its own copy and maps the command.

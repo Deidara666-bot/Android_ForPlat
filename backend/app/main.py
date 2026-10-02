@@ -1,6 +1,9 @@
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api.audit_handlers import audit_http_exception, audit_validation_error
 from app.api.routes import acquisitions, agents, auth, cases, devices, evidence, health
 from app.core.config import get_settings
 from app.core.logging import configure_logging
@@ -20,6 +23,8 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )
+    app.add_exception_handler(StarletteHTTPException, audit_http_exception)  # type: ignore[arg-type]
+    app.add_exception_handler(RequestValidationError, audit_validation_error)  # type: ignore[arg-type]
     app.include_router(health.router, prefix="/api")
     app.include_router(auth.router, prefix="/api")
     app.include_router(cases.router, prefix="/api")
