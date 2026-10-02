@@ -70,6 +70,24 @@ class PrivilegeState(StrEnum):
     unknown = "unknown"
 
 
+# Allowlisted operation IDs (REF §OPS); the agent keeps its own copy and maps the command.
+ALLOWED_OPERATIONS: frozenset[str] = frozenset(
+    {
+        "collect_device_metadata",
+        "collect_package_inventory",
+        "collect_package_detail",
+        "collect_usage_state",
+        "collect_accessibility_state",
+        "collect_sensitive_provider_data",
+        "collect_network_stats",
+        "pull_subject_apk",
+    }
+)
+# Operations the agent can run today; the other six are rejected as not mapped yet.
+MAPPED_OPERATIONS: frozenset[str] = frozenset(
+    {"collect_device_metadata", "collect_package_inventory"}
+)
+
 # Order in which a failed acquisition is classified (first match wins, remainder is `failed`).
 AVAILABILITY_CHECK_ORDER = (
     AvailabilityStatus.unsupported,

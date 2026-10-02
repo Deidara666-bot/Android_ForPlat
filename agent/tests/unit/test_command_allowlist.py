@@ -41,7 +41,10 @@ def test_unknown_operation_is_not_allowed_and_audited(operation: str, audit_file
     assert records[0]["error_class"] == "OperationNotAllowedError"
 
 
-@pytest.mark.parametrize("operation", sorted(ALLOWED_OPERATIONS))
+@pytest.mark.parametrize(
+    "operation",
+    sorted(ALLOWED_OPERATIONS - {"collect_device_metadata", "collect_package_inventory"}),
+)
 def test_allowed_but_unmapped_operation_is_not_mapped_and_audited(
     operation: str, audit_file: Path
 ) -> None:

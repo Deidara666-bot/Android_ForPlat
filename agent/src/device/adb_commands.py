@@ -5,8 +5,11 @@ DEVICE_LIST: list[str] = ["devices", "-l"]
 VERSION: list[str] = ["version"]
 PRIVILEGE_PROBE: list[str] = ["shell", "id"]
 
-# Operation ID -> adb arguments (after `-s <serial>`). Empty until v0.30.3 maps the first two.
-OPERATION_ARGS: dict[str, list[str]] = {}
+# Operation ID -> adb arguments (after `-s <serial>`). Only the first two are mapped (v0.30.3).
+OPERATION_ARGS: dict[str, list[str]] = {
+    "collect_device_metadata": ["shell", "getprop"],
+    "collect_package_inventory": ["shell", "pm", "list", "packages", "-U"],
+}
 
 # Read-only build properties reported with a device. Not evidence: no hash, no file.
 SAFE_METADATA_PROPS: tuple[str, ...] = (
@@ -18,7 +21,7 @@ SAFE_METADATA_PROPS: tuple[str, ...] = (
 )
 
 
-def getprop_args(prop: str) -> list[str]:
+def safe_prop_args(prop: str) -> list[str]:
     """Argument list for reading one allowed property; anything else is refused."""
     if prop not in SAFE_METADATA_PROPS:
         raise ValueError(f"property {prop!r} is not in SAFE_METADATA_PROPS")

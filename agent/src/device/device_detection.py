@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from src.device.adb_commands import DEVICE_LIST, SAFE_METADATA_PROPS, getprop_args
+from src.device.adb_commands import DEVICE_LIST, SAFE_METADATA_PROPS, safe_prop_args
 from src.device.adb_controller import run_adb
 from src.device.privilege_detector import detect_privilege
 from src.exceptions import AdbError
@@ -46,7 +46,7 @@ def collect_safe_metadata(serial: str, adb_path: str | None = None) -> dict[str,
     """Read the whitelisted properties plus the privilege state. Not evidence."""
     values: dict[str, str] = {}
     for prop in SAFE_METADATA_PROPS:
-        result = run_adb(getprop_args(prop), serial, adb_path=adb_path)
+        result = run_adb(safe_prop_args(prop), serial, adb_path=adb_path)
         values[prop] = result.stdout.decode("utf-8", errors="replace").strip()
     sdk = values["ro.build.version.sdk"]
     return {
