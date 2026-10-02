@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 
 from tenacity import AsyncRetrying, RetryCallState, retry_if_exception_type, stop_after_attempt
@@ -6,6 +7,7 @@ from tenacity.wait import wait_base, wait_exponential
 from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import ConnectionClosed, InvalidHandshake, InvalidStatus
 
+from src.acquisition.acquisition_runner import AcquisitionRunner
 from src.config import Settings
 from src.device.device_detection import DeviceMonitor
 from src.exceptions import AgentError
@@ -13,6 +15,7 @@ from src.models import AgentState
 from src.state.audit_logger import audit
 from src.state.state_machine import AgentStateMachine
 from src.transport.heartbeat import send_heartbeats
+from src.transport.uploader import EvidenceUploader
 
 log = logging.getLogger("agent.ws")
 
@@ -58,9 +61,18 @@ async def connect_with_retry(
         ) from exc
 
 
-async def _drain(websocket: ClientConnection) -> None:
-    async for _ in websocket:  # server -> agent messages (jobs) are handled from v0.30
-        pass
+async def _handle_messages(websocket: ClientConnection, runner: AcquisitionRunner) -> None:
+    """Server -> agent messages. Only `job` is acted on; each is run to completion in order."""
+    async for raw in websocket:
+        try:
+            message = json.loads(raw)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(message, dict) or message.get("type") != "job":
+            continue
+        status = await runner.handle_job(message)
+        if status is not None:
+            await websocket.send(json.dumps(status))
 
 
 async def run_forever(
@@ -69,6 +81,10 @@ async def run_forever(
     """Connect, heartbeat until the socket drops, then reconnect. Ends only on AgentError/cancel."""
     reconnect = False
     monitor = DeviceMonitor(adb_path=settings.adb_path)
+    runner = AcquisitionRunner(
+        EvidenceUploader(settings.backend_base_url, settings.agent_token),
+        adb_path=settings.adb_path,
+    )
     while True:
         websocket = await connect_with_retry(
             settings.backend_ws_url, settings.agent_token, wait=wait
@@ -85,7 +101,7 @@ async def run_forever(
                 )
             ),
             asyncio.create_task(monitor.run(websocket, interval)),
-            asyncio.create_task(_drain(websocket)),
+            asyncio.create_task(_handle_messages(websocket, runner)),
         }
         try:
             await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)

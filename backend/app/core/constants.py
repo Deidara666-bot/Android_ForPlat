@@ -70,6 +70,54 @@ class PrivilegeState(StrEnum):
     unknown = "unknown"
 
 
+class ActorType(StrEnum):
+    user = "user"
+    agent = "agent"
+    system = "system"
+
+
+class AuditEventType(StrEnum):
+    job_issued = "job_issued"
+    operation_rejected = "operation_rejected"
+    upload_accepted = "upload_accepted"
+    upload_rejected_mismatch = "upload_rejected_mismatch"
+    upload_validation_failed = "upload_validation_failed"
+    authentication_failed = "authentication_failed"
+    request_validation_failed = "request_validation_failed"
+
+
+# Allowlisted operation IDs (REF §OPS); the agent keeps its own copy and maps the command.
+ALLOWED_OPERATIONS: frozenset[str] = frozenset(
+    {
+        "collect_device_metadata",
+        "collect_package_inventory",
+        "collect_package_detail",
+        "collect_usage_state",
+        "collect_accessibility_state",
+        "collect_sensitive_provider_data",
+        "collect_network_stats",
+        "pull_subject_apk",
+    }
+)
+# Operations the agent can run today; the other six are rejected as not mapped yet.
+MAPPED_OPERATIONS: frozenset[str] = frozenset(
+    {"collect_device_metadata", "collect_package_inventory"}
+)
+
+# Source group per operation (REF §OPS). NULL = context evidence that belongs to no group.
+OPERATION_SOURCE_GROUP: dict[str, str | None] = {
+    "collect_device_metadata": None,
+    "collect_package_inventory": SourceGroup.APP_SYSTEM_STATE.value,
+}
+
+# Largest evidence file the upload endpoint accepts.
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+
+# Named operation sequences a session may request (the agent keeps the same profile table).
+ACQUISITION_PROFILES: dict[str, tuple[str, ...]] = {
+    "baseline_v030": ("collect_device_metadata", "collect_package_inventory"),
+}
+
 # Order in which a failed acquisition is classified (first match wins, remainder is `failed`).
 AVAILABILITY_CHECK_ORDER = (
     AvailabilityStatus.unsupported,

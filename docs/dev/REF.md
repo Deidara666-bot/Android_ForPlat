@@ -232,7 +232,12 @@ Semua `id` = UUID (`server_default gen_random_uuid()`); semua waktu `timestamptz
 | `GET /api/cases/{case_id}` · `/artifacts` · `/events` | JWT | v0.40.7 |
 
 Pesan WebSocket (JSON, field `type`): agent→backend `heartbeat`, `device_report`, `job_status`;
-backend→agent `job` = `{type, session_id, operation, case_id, device_id, parameters}` — ⛔ tanpa field lain.
+backend→agent `job` = `{type, session_id, sequence, operation, case_id, device_id, serial, parameters}` — ⛔ tanpa field lain.
+- `sequence` = `acquisition_operations.sequence`; `serial` = `devices.serial`, pola `^[A-Za-z0-9._:-]{1,64}$`, ⛔ awalan `-`.
+  Agen menjalankan hanya bila `serial` ada di daftar perangkat `device`; ⛔ agen memilih perangkat atau menghitung urutan sendiri.
+- `job_status` = `{type, session_id, sequence, part, parts_total, operation, serial, sha256_agent, size_bytes, returncode, error}`
+  (+ `availability_status`, `availability_reason` mulai v0.30.6). Backend mencocokkan lewat `(session_id, sequence)`.
+- `part` = urutan perintah dalam satu operasi (REF §OPS2), mulai 1; v0.30: `part = parts_total = 1`.
 Bita bukti **selalu** lewat `POST /api/evidence/upload`, tidak pernah WebSocket.
 
 ## §SVC — nama layanan (§X)
@@ -252,7 +257,7 @@ Bita bukti **selalu** lewat `POST /api/evidence/upload`, tidak pernah WebSocket.
 ## §PATH — lokasi runtime (semua di-ignore Git)
 
 `backend/var/evidence/` (EVIDENCE_ROOT) · `agent/var/raw/` (bukti mentah sisi agen sebelum unggah).
-Nama berkas bukti disusun server/agen dari `<session_id>/<sequence>-<operation_id>.bin`, ⛔ bukan dari input.
+Nama berkas bukti disusun server/agen dari `<session_id>/<sequence>-<operation_id>-<part>.bin`, ⛔ bukan dari input.
 
 ## §FIX — fixture sintetis (dipakai test; aman di-commit)
 
@@ -268,6 +273,7 @@ package:android uid:1000
 [ro.build.version.sdk]: [36]
 [ro.build.fingerprint]: [synthetic/sdk_gphone64_x86_64/emu64x:16/SYN.000000/1:userdebug/dev-keys]
 [ro.product.model]: [sdk_gphone64_x86_64]
+[persist.sys.timezone]: [Etc/UTC]
 ```
 `backend/tests/fixtures/parsing/package_inventory_malformed_synthetic.txt`:
 ```text
@@ -284,10 +290,10 @@ Seksi di bawah dipakai kartu `v0.45`–`v1.00` (status **draf**, disegarkan per 
 
 ## §OPS2 — perintah 6 operasi sisa (kandidat; difinalkan Tier-2 di milestone yang sama)
 
-Satu operasi boleh menjalankan beberapa perintah berurutan → satu berkas bukti per perintah (`sequence`) `[plan]`.
+Satu operasi boleh menjalankan beberapa perintah berurutan → satu berkas bukti per perintah (`part`, REF §API) `[plan]`.
 `<pkg>` = `parameters.package_name` (regex `^[A-Za-z0-9_.]{1,200}$`). Argumen sesudah `-s <serial>`.
 
-| ID | seq | Argumen | `raw_source` | Lahir |
+| ID | part | Argumen | `raw_source` | Lahir |
 |---|---|---|---|---|
 | `collect_package_detail` | 1 | `shell dumpsys package <pkg>` | `dumpsys package` | v0.45 |
 | `collect_accessibility_state` | 1 | `shell settings get secure enabled_accessibility_services` | `settings secure a11y` | v0.45 |
@@ -297,8 +303,8 @@ Satu operasi boleh menjalankan beberapa perintah berurutan → satu berkas bukti
 | | 2 | `shell dumpsys activity activities` | `dumpsys activity` | |
 | | 3 | `shell ps -A -o PID,UID,USER,NAME` | `ps` | |
 | `pull_subject_apk` | 1 | `shell pm path <pkg>` | `pm path` | v0.45 |
-| | 2 | `pull <path> <berkas lokal agen>` — `<path>` dari keluaran seq 1 milik agen sendiri, regex `^/(data/app\|system\|product\|system_ext)/[^\s]+\.apk$`; ⛔ path dari backend | `apk file` | |
-| | 3..n | ekstraktor §STATIC atas APK hasil seq 2 (dijalankan agen) | `static:<nama berkas>` | |
+| | 2 | `pull <path> <berkas lokal agen>` — `<path>` dari keluaran part 1 milik agen sendiri, regex `^/(data/app\|system\|product\|system_ext)/[^\s]+\.apk$`; ⛔ path dari backend | `apk file` | |
+| | 3..n | ekstraktor §STATIC atas APK hasil part 2 (dijalankan agen) | `static:<nama berkas>` | |
 | `collect_sensitive_provider_data` | 1 | `shell content query --uri content://sms` | `content sms` | v0.70 |
 | | 2 | `shell content query --uri content://contacts/phones` | `content contacts` | |
 | | 3 | `shell content query --uri content://call_log/calls` | `content call_log` | |
@@ -322,7 +328,7 @@ Build-tools dicari dari `ANDROID_SDK_ROOT` → `ANDROID_HOME` → `%LOCALAPPDATA
 | `strings_urls.txt` | URL/domain/IP dari `classes*.dex` + `res/`, regex, urut unik, maks 5000 baris |
 | `bundle.json` | `{apk_sha256, extractor_version, tool_versions, created_at, files:{nama: sha256}}` |
 
-- S-A/S-B: dijalankan agen setelah `pull_subject_apk` (keluaran jadi bukti seq 3..n).
+- S-A/S-B: dijalankan agen setelah `pull_subject_apk` (keluaran jadi bukti part 3..n).
 - S-C: dijalankan **di VM terisolasi** oleh user; hanya folder bundel (tanpa APK) yang diimpor lewat
   `POST /api/static-bundles` (v0.90). Keluaran `evidence_mode = apk_static`.
 

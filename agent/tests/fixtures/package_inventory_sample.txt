@@ -1,0 +1,5 @@
+package:com.android.companiondevicemanager.auto_generated_characteristics_rro uid:10037
+package:com.android.systemui.auto_generated_rro_vendor__ uid:10089
+package:com.google.android.providers.media.module uid:10200
+package:com.google.android.overlay.permissioncontroller uid:10073
+package:com.google.android.overlay.googlewebview uid:10069

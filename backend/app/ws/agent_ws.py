@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.models.agent import Agent
+from app.schemas.acquisition import JobStatusIn
 from app.schemas.device import DeviceReportItem
+from app.services.acquisition_service import AcquisitionService
 from app.services.agent_service import AgentService
 from app.services.device_service import DeviceService
 from app.ws.manager import dashboard_manager, manager
@@ -55,6 +57,13 @@ async def agent_ws(websocket: WebSocket, db: Annotated[Session, Depends(get_db)]
                     continue
                 DeviceService(db).apply_report(agent, items)
                 await dashboard_manager.broadcast({"type": "devices_changed"})
+            elif message.get("type") == "job_status":
+                try:
+                    status_in = JobStatusIn(**{k: v for k, v in message.items() if k != "type"})
+                except (ValidationError, TypeError):
+                    log.warning("invalid job_status from %s ignored", agent_id)
+                    continue
+                AcquisitionService(db).apply_job_status(agent, status_in)
     except WebSocketDisconnect:
         pass
     finally:

@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from src.device import device_detection
-from src.device.adb_commands import SAFE_METADATA_PROPS, getprop_args
+from src.device.adb_commands import SAFE_METADATA_PROPS, safe_prop_args
 from src.device.adb_controller import AdbResult
 from src.device.device_detection import DetectedDevice, DeviceMonitor, parse_devices
 
@@ -33,12 +33,12 @@ def test_unauthorized_and_offline_are_reported_with_status() -> None:
 
 
 def test_only_whitelisted_properties_can_be_read() -> None:
-    assert getprop_args("ro.build.version.sdk") == ["shell", "getprop", "ro.build.version.sdk"]
+    assert safe_prop_args("ro.build.version.sdk") == ["shell", "getprop", "ro.build.version.sdk"]
     assert len(SAFE_METADATA_PROPS) == 5
     with pytest.raises(ValueError):
-        getprop_args("ro.serialno")
+        safe_prop_args("ro.serialno")
     with pytest.raises(ValueError):
-        getprop_args("")
+        safe_prop_args("")
 
 
 class _FakeSocket:

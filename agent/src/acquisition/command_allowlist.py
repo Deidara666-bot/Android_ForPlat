@@ -34,4 +34,13 @@ def resolve_operation(operation: str, parameters: dict[str, str]) -> list[str]:
             error_class=OperationNotMappedError.__name__,
         )
         raise OperationNotMappedError(f"operation {operation!r} has no adb mapping yet")
+    if parameters:
+        # No mapped operation takes parameters yet; they must never reach an adb argument.
+        audit(
+            "operation_rejected",
+            "operation does not accept parameters",
+            operation=operation,
+            error_class=ValueError.__name__,
+        )
+        raise ValueError(f"operation {operation!r} does not accept parameters")
     return list(OPERATION_ARGS[operation])
