@@ -15,6 +15,7 @@ from src.models import AgentState
 from src.state.audit_logger import audit
 from src.state.state_machine import AgentStateMachine
 from src.transport.heartbeat import send_heartbeats
+from src.transport.uploader import EvidenceUploader
 
 log = logging.getLogger("agent.ws")
 
@@ -80,7 +81,10 @@ async def run_forever(
     """Connect, heartbeat until the socket drops, then reconnect. Ends only on AgentError/cancel."""
     reconnect = False
     monitor = DeviceMonitor(adb_path=settings.adb_path)
-    runner = AcquisitionRunner(adb_path=settings.adb_path)
+    runner = AcquisitionRunner(
+        EvidenceUploader(settings.backend_base_url, settings.agent_token),
+        adb_path=settings.adb_path,
+    )
     while True:
         websocket = await connect_with_retry(
             settings.backend_ws_url, settings.agent_token, wait=wait

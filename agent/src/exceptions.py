@@ -12,3 +12,7 @@ class OperationNotMappedError(AgentError):
 
 class AdbError(AgentError):
     """An ADB invocation failed."""
+
+
+class UploadError(AgentError):
+    """The backend did not accept an evidence upload (or could not be reached)."""

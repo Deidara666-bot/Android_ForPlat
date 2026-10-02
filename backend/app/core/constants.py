@@ -88,6 +88,15 @@ MAPPED_OPERATIONS: frozenset[str] = frozenset(
     {"collect_device_metadata", "collect_package_inventory"}
 )
 
+# Source group per operation (REF §OPS). NULL = context evidence that belongs to no group.
+OPERATION_SOURCE_GROUP: dict[str, str | None] = {
+    "collect_device_metadata": None,
+    "collect_package_inventory": SourceGroup.APP_SYSTEM_STATE.value,
+}
+
+# Largest evidence file the upload endpoint accepts.
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+
 # Named operation sequences a session may request (the agent keeps the same profile table).
 ACQUISITION_PROFILES: dict[str, tuple[str, ...]] = {
     "baseline_v030": ("collect_device_metadata", "collect_package_inventory"),

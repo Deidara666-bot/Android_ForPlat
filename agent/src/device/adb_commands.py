@@ -11,6 +11,12 @@ OPERATION_ARGS: dict[str, list[str]] = {
     "collect_package_inventory": ["shell", "pm", "list", "packages", "-U"],
 }
 
+# Human-readable evidence source per operation, sent with the upload (a label, not a command).
+RAW_SOURCE_LABEL: dict[str, str] = {
+    "collect_device_metadata": "getprop",
+    "collect_package_inventory": "pm list packages -U",
+}
+
 # Read-only build properties reported with a device. Not evidence: no hash, no file.
 SAFE_METADATA_PROPS: tuple[str, ...] = (
     "ro.build.version.release",
