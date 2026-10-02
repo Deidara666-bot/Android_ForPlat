@@ -11,7 +11,7 @@
 |---|---|
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
-| Milestone aktif | **`v0.40`** (`docs/dev/v0.40.md`), branch `feature/v0.40` |
+| Milestone aktif | **`v0.40`** selesai di branch, sudah di `main`; **menunggu verifikasi browser user + `/milestone v0.40`** (tag belum terbit). Berikutnya `v0.45` (`docs/dev/v0.45.md`, draf) |
 | Kartu terakhir | **`v0.40.9`** (2026-10-02) — kartu terakhir milestone `v0.40` |
 | Kartu berikutnya | USER: cek `/cases/<id>/events` di browser + setujui `/milestone v0.40`; lalu `/plan-milestone`/`/card v0.45.1` |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
@@ -170,6 +170,8 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - [ ] Bentuk deployment final (VPS) dan distribusi agen
 
 ## Sinkronisasi remote
+
+- 2026-10-02 — `/finish-branch v0.40`: `feature/v0.40` digabung `--no-ff` ke `main`, `check.sh all` OK di `main`, push GitHub. Branch lama (`feature/v0.05`..`v0.40`, `fix/*`) belum dihapus (menunggu persetujuan user). Tag `v0.40` belum terbit.
 
 - 2026-10-02 — `/finish-branch v0.30`: `feature/v0.30` digabung `--no-ff` ke `main` (`38b688d`), pemeriksaan di `main` `CHECK OK`. Branch `feature/v0.05`, `v0.10`, `v0.20`, `v0.30`, `fix/*` belum dihapus (menunggu persetujuan user). Tag `v0.30` terbit lewat `/milestone` (2026-10-02).
 
