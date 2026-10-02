@@ -11,12 +11,12 @@
 |---|---|
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
-| Milestone aktif | **`v0.30`** (`docs/dev/v0.30.md`), branch `feature/v0.30` |
-| Kartu terakhir | **`v0.30.8`** (2026-10-02) — langkah kartu selesai; tinggal verifikasi user + `/finish-branch` + `/milestone v0.30` |
-| Kartu berikutnya | **`/finish-branch`** untuk `v0.30` (setelah user membuka satu berkas bukti), lalu user menyetujui `/milestone v0.30`; sesudahnya `/card v0.40.1` (disarankan sesi baru) |
+| Milestone aktif | **`v0.30`** selesai & digabung ke `main`; menunggu tag oleh user (`/milestone v0.30`). Berikutnya `v0.40` |
+| Kartu terakhir | **`v0.30.8`** (2026-10-02) — milestone `v0.30` selesai, belum bertag |
+| Kartu berikutnya | **`/milestone v0.30`** (user menyetujui tag), lalu **`/card v0.40.1`** (`docs/dev/v0.40.md`; disarankan sesi baru). Satu kartu per "mulai" |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
-Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20` (2026-10-02)
+Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20` (2026-10-02); `v0.30` menunggu `/milestone`
 
 ## Selesai
 
@@ -127,6 +127,9 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
   `devices.last_seen_at` NOT NULL (usul nullable lewat migrasi baru) · `LABEL_ID` belum memuat `ConnectionState` (butuh di v0.20.6) ·
   dasbor menampilkan `ok`/`development` mentah (usul padanan Indonesia).
 
+- Catatan non-blocking review `v0.30` (claim-auditor + forensic-integrity-reviewer, 0 blocking), TIDAK dikerjakan; bahas sebelum/di awal `v0.40`:
+  (1) `acquired` berarti "ada byte" (rc 0 + stdout tidak kosong), bukan cakupan lengkap; syarat FALSE harus ditegakkan di v0.40/v0.45 (parse sukses + cakupan) · (2) `acquired_at` baris non-acquired = waktu backend menerima status, bukan waktu kejadian; normalizer jangan memakainya sebagai `event_time` · (3) `run_adb` belum memvalidasi `serial` sendiri (pertahanan hanya di `AcquisitionJob` + `_require_ready`) · (4) berkas mentah di agen tidak di-`chmod` read-only (server sudah) · (5) Starlette men-spool multipart sebelum cek 50 MiB (tak ada batas dini via `Content-Length`) · (6) berkas ditulis sebelum `commit` DB; bila commit gagal, berkas yatim + unggah ulang 409 butuh rekonsiliasi · (7) `apply_job_status` menandai `completed` tanpa memeriksa ada baris `evidence` `acquired` untuk operasi itu · (8) `timezone` sesi masih `unknown` (diisi v0.40.6) · (9) audit 401/422 tanpa IP klien · (10) judul smoke "terbukti" sebaiknya "terverifikasi".
+
 - Catatan non-blocking review `v0.20` (claim-auditor + integrity-reviewer, 0 blocking), TIDAK dikerjakan; bahas sebelum/di awal `v0.30`:
   (1) perangkat tetap `connected` bila WS agen putus atau adb gagal (usul `unknown`/`disconnected` saat WS putus; `ConnectionState.unknown`
   belum dipakai) · (2) `getprop` gagal → string kosong tersimpan & di-cache (usul `None`, jangan cache hasil tak lengkap) ·
@@ -151,6 +154,8 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - [ ] Bentuk deployment final (VPS) dan distribusi agen
 
 ## Sinkronisasi remote
+
+- 2026-10-02 — `/finish-branch v0.30`: `feature/v0.30` digabung `--no-ff` ke `main` (`38b688d`), pemeriksaan di `main` `CHECK OK`. Branch `feature/v0.05`, `v0.10`, `v0.20`, `v0.30`, `fix/*` belum dihapus (menunggu persetujuan user). Tag `v0.30` menunggu `/milestone` oleh user.
 
 - 2026-10-02 — `/finish-branch v0.20`: `feature/v0.20` digabung `--no-ff` ke `main` (`fa17bf0`), push GitHub sukses. Branch `feature/v0.05`,
   `feature/v0.10`, `feature/v0.20`, `fix/*` belum dihapus (menunggu persetujuan user). Tag `v0.20` sudah terbit.
