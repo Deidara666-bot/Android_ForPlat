@@ -111,6 +111,8 @@ def test_job_runs_adb_writes_bytes_exactly_and_reports_hash(
         "size_bytes": len(expected),
         "returncode": 0,
         "error": None,
+        "availability_status": "acquired",
+        "availability_reason": None,
     }
 
 
@@ -295,3 +297,53 @@ def test_failed_adb_command_is_not_uploaded_as_evidence(
     )
     assert _UPLOADER.calls == []
     assert status is not None and status["returncode"] == 1
+
+
+def _patch_adb(monkeypatch: pytest.MonkeyPatch, result: AdbResult) -> None:
+    monkeypatch.setattr(acquisition_runner, "run_adb", lambda *_a, **_k: result)
+    monkeypatch.setattr(
+        acquisition_runner,
+        "detect_devices",
+        lambda _adb=None: [DetectedDevice("emulator-5554", "device")],
+    )
+
+
+@pytest.mark.parametrize(
+    ("result", "expected"),
+    [
+        (AdbResult(b"", b"/system/bin/sh: foo: inaccessible or not found", 127), "unsupported"),
+        (AdbResult(b"", b"java.lang.SecurityException: Permission Denial: x", 255), "denied"),
+        (AdbResult(b"", b"", 0), "unavailable"),
+        (AdbResult(b"", b"error: device offline", 1), "failed"),
+    ],
+)
+def test_unusable_result_is_reported_with_status_and_reason_and_never_uploaded(
+    tmp_path: Path,
+    audit_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    result: AdbResult,
+    expected: str,
+) -> None:
+    _patch_adb(monkeypatch, result)
+    status = AcquisitionRunner(_UPLOADER, raw_root=tmp_path).run_job(
+        _job("collect_device_metadata")
+    )
+    assert _UPLOADER.calls == []
+    assert status is not None
+    assert status["availability_status"] == expected
+    assert status["availability_reason"]
+    assert status["returncode"] == result.returncode
+
+
+def test_exception_is_reported_as_failed_with_a_reason(
+    tmp_path: Path, audit_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        acquisition_runner, "detect_devices", lambda _adb=None: [DetectedDevice("other", "device")]
+    )
+    status = AcquisitionRunner(_UPLOADER, raw_root=tmp_path).run_job(
+        _job("collect_device_metadata")
+    )
+    assert status is not None
+    assert status["availability_status"] == "failed"
+    assert status["availability_reason"] == "serial is not a ready device"

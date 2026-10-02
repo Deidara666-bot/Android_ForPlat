@@ -70,6 +70,20 @@ class PrivilegeState(StrEnum):
     unknown = "unknown"
 
 
+class ActorType(StrEnum):
+    user = "user"
+    agent = "agent"
+    system = "system"
+
+
+class AuditEventType(StrEnum):
+    job_issued = "job_issued"
+    operation_rejected = "operation_rejected"
+    upload_accepted = "upload_accepted"
+    upload_rejected_mismatch = "upload_rejected_mismatch"
+    upload_validation_failed = "upload_validation_failed"
+
+
 # Allowlisted operation IDs (REF §OPS); the agent keeps its own copy and maps the command.
 ALLOWED_OPERATIONS: frozenset[str] = frozenset(
     {

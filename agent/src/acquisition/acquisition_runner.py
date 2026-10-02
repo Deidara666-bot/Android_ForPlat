@@ -8,14 +8,15 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from src.acquisition.availability import classify_failure, is_acquired
 from src.acquisition.command_allowlist import resolve_operation
 from src.acquisition.evidence_writer import write_evidence
 from src.device.adb_commands import RAW_SOURCE_LABEL
 from src.device.adb_controller import adb_version, run_adb
 from src.device.device_detection import collect_safe_metadata, detect_devices
-from src.exceptions import AgentError, UploadError
+from src.exceptions import AgentError
 from src.integrity.hashing import sha256_file
-from src.models import AcquisitionJob
+from src.models import AcquisitionJob, AvailabilityStatus
 from src.state.audit_logger import audit
 from src.transport.uploader import EvidenceUploader
 
@@ -23,6 +24,12 @@ RAW_ROOT = Path(__file__).resolve().parents[2] / "var" / "raw"
 # v0.30 operations run one command each; multi-command operations arrive in v0.45.
 _PART = 1
 _PARTS_TOTAL = 1
+
+
+def _failure_reason(exc: Exception) -> str:
+    """Reason text for a job that could not run. Agent errors carry our own message; anything
+    else (OS/parse errors) is reduced to its class name so no path or content leaks."""
+    return str(exc)[:200] if isinstance(exc, AgentError) else type(exc).__name__
 
 
 class AcquisitionRunner:
@@ -65,7 +72,8 @@ class AcquisitionRunner:
             path = self._raw_root / job.session_id / f"{job.sequence}-{job.operation}-{_PART}.bin"
             size = write_evidence(path, result.stdout)
             digest = sha256_file(path)
-            if result.returncode == 0:  # a failed command is never uploaded as acquired evidence
+            availability, reason = AvailabilityStatus.acquired, None
+            if is_acquired(result):
                 context = self._context_for(job.serial)
                 self._uploader.upload(
                     path,
@@ -82,6 +90,8 @@ class AcquisitionRunner:
                     device_build=context.get("device_build"),
                     privilege_state=context.get("privilege_state"),
                 )
+            else:  # nothing usable to upload: report why (unsupported/denied/unavailable/failed)
+                availability, reason = classify_failure(result)
         except (AgentError, ValueError, OSError, KeyError) as exc:
             audit(
                 "job_failed",
@@ -89,7 +99,6 @@ class AcquisitionRunner:
                 session_id=job.session_id,
                 sequence=job.sequence,
                 operation=job.operation,
-                uploaded=not isinstance(exc, UploadError) and digest is not None,
             )
             # Keep the digest and size when the file exists locally but the upload failed.
             return self._status(
@@ -100,6 +109,8 @@ class AcquisitionRunner:
                 sha256_agent=digest,
                 size_bytes=size,
                 error=type(exc).__name__,
+                availability=AvailabilityStatus.failed,
+                reason=_failure_reason(exc),
             )
 
         audit(
@@ -109,6 +120,7 @@ class AcquisitionRunner:
             operation=job.operation,
             returncode=result.returncode,
             size_bytes=size,
+            availability_status=availability.value,
         )
         return self._status(
             job.session_id,
@@ -118,6 +130,8 @@ class AcquisitionRunner:
             sha256_agent=digest,
             size_bytes=size,
             returncode=result.returncode,
+            availability=availability,
+            reason=reason,
         )
 
     def _context_for(self, serial: str) -> dict[str, Any]:
@@ -147,6 +161,8 @@ class AcquisitionRunner:
             operation,
             serial if isinstance(serial, str) else None,
             error=error,
+            availability=AvailabilityStatus.failed,
+            reason=error,
         )
 
     @staticmethod
@@ -160,6 +176,8 @@ class AcquisitionRunner:
         size_bytes: int | None = None,
         returncode: int = -1,
         error: str | None = None,
+        availability: AvailabilityStatus = AvailabilityStatus.failed,
+        reason: str | None = None,
     ) -> dict[str, Any]:
         return {
             "type": "job_status",
@@ -173,4 +191,6 @@ class AcquisitionRunner:
             "size_bytes": size_bytes,
             "returncode": returncode,
             "error": error,
+            "availability_status": availability.value,
+            "availability_reason": reason,
         }

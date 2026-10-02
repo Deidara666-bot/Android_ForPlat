@@ -7,6 +7,7 @@ _TABLES = {
     "acquisition_operations",
     "acquisition_sessions",
     "agents",
+    "audit_logs",
     "case_devices",
     "cases",
     "devices",

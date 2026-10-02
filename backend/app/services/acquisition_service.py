@@ -10,12 +10,15 @@ from app.core.constants import (
     ACQUISITION_PROFILES,
     ALLOWED_OPERATIONS,
     MAPPED_OPERATIONS,
+    OPERATION_SOURCE_GROUP,
+    AvailabilityStatus,
     SessionStatus,
 )
 from app.models.acquisition_operation import AcquisitionOperation
 from app.models.acquisition_session import AcquisitionSession
 from app.models.agent import Agent
 from app.models.device import Device
+from app.models.evidence import Evidence
 from app.schemas.acquisition import JobStatusIn
 
 log = logging.getLogger(__name__)
@@ -162,10 +165,14 @@ class AcquisitionService:
 
         device = self._db.get(Device, session.device_id)
         serial_ok = device is not None and status.serial == device.serial
-        if status.returncode != 0 or not serial_ok:
+        not_acquired = status.availability_status not in (None, AvailabilityStatus.acquired)
+        if status.returncode != 0 or not_acquired or not serial_ok:
             operation.status = _FAILED
         elif status.part >= status.parts_total:
             operation.status = _COMPLETED  # only the last part completes a multi-part operation
+
+        if operation.status == _FAILED:
+            self._record_unavailable_evidence(session, operation, status)
 
         operations = self.list_operations(session.id)
         if all(item.status != _PENDING for item in operations):
@@ -178,3 +185,44 @@ class AcquisitionService:
                 session.status = SessionStatus.completed.value
         self._db.commit()
         return True
+
+    def _record_unavailable_evidence(
+        self, session: AcquisitionSession, operation: AcquisitionOperation, status: JobStatusIn
+    ) -> None:
+        """A non-acquired outcome is evidence too: a row without a file, with status and reason.
+
+        Unknown or missing agent status falls back to `failed`; the reason is never invented
+        beyond saying that the agent gave none. A row for the same operation and status
+        (e.g. the SHA-256 mismatch row made by the upload) is not duplicated."""
+        assert self._db is not None
+        reported = status.availability_status
+        availability = (
+            reported
+            if reported is not None and reported != AvailabilityStatus.acquired
+            else AvailabilityStatus.failed
+        )
+        existing = self._db.scalar(
+            select(Evidence.id).where(
+                Evidence.acquisition_session_id == session.id,
+                Evidence.operation_id == operation.operation_id,
+                Evidence.availability_status == availability.value,
+            )
+        )
+        if existing is not None:
+            return
+        self._db.add(
+            Evidence(
+                case_id=session.case_id,
+                device_id=session.device_id,
+                acquisition_session_id=session.id,
+                operation_id=operation.operation_id,
+                source_group=OPERATION_SOURCE_GROUP.get(operation.operation_id),
+                source_name=operation.operation_id,
+                raw_source=operation.operation_id,
+                acquired_at=datetime.now(UTC),  # when the backend learned of the outcome
+                availability_status=availability.value,
+                availability_reason=status.availability_reason or "reason not reported by agent",
+                android_version=session.android_version,
+                device_build=session.device_build,
+            )
+        )

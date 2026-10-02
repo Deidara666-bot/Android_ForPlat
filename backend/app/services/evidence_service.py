@@ -1,14 +1,22 @@
 import logging
+from typing import NoReturn
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.constants import OPERATION_SOURCE_GROUP, AvailabilityStatus, SessionStatus
+from app.core.constants import (
+    OPERATION_SOURCE_GROUP,
+    ActorType,
+    AuditEventType,
+    AvailabilityStatus,
+    SessionStatus,
+)
 from app.models.acquisition_operation import AcquisitionOperation
 from app.models.acquisition_session import AcquisitionSession
 from app.models.agent import Agent
 from app.models.evidence import Evidence
 from app.schemas.evidence import EvidenceUploadForm
+from app.services.audit_service import AuditService
 from app.services.evidence_storage_service import EvidenceStorageService
 from app.services.integrity_service import IntegrityService
 
@@ -31,6 +39,27 @@ class EvidenceService:
         self._db = db
         self._storage = storage
         self._integrity = IntegrityService()
+        self._audit = AuditService(db)
+
+    def reject(
+        self, agent: Agent, form: EvidenceUploadForm | None, status_code: int, detail: str
+    ) -> NoReturn:
+        """Audit a failed upload validation, then raise the rejection."""
+        self._audit.record(
+            AuditEventType.upload_validation_failed,
+            ActorType.agent,
+            actor_id=agent.id,
+            object_type="acquisition_session",
+            object_id=form.session_id if form is not None else None,
+            reason=detail,
+            details={
+                "http_status": status_code,
+                "operation": form.operation_id if form is not None else None,
+                "sequence": form.sequence if form is not None else None,
+                "part": form.part if form is not None else None,
+            },
+        )
+        raise UploadRejectedError(status_code, detail)
 
     def ingest(self, agent: Agent, form: EvidenceUploadForm, data: bytes) -> tuple[Evidence, bool]:
         """Order (§W): validate -> server SHA-256 -> compare -> store immutable -> record.
@@ -44,7 +73,7 @@ class EvidenceService:
             or session.agent_id != agent.id
             or session.status != SessionStatus.running.value
         ):
-            raise UploadRejectedError(404, "acquisition session not found")
+            self.reject(agent, form, 404, "acquisition session not found")
         operation = self._db.scalar(
             select(AcquisitionOperation).where(
                 AcquisitionOperation.session_id == session.id,
@@ -52,9 +81,9 @@ class EvidenceService:
             )
         )
         if operation is None or operation.operation_id != form.operation_id:
-            raise UploadRejectedError(422, "sequence and operation_id do not match the session")
+            self.reject(agent, form, 422, "sequence and operation_id do not match the session")
         if form.size_bytes != len(data):
-            raise UploadRejectedError(422, "size_bytes does not match the uploaded length")
+            self.reject(agent, form, 422, "size_bytes does not match the uploaded length")
 
         server_digest = self._integrity.sha256_bytes(data)  # computed here, never copied
         agent_digest = form.sha256_agent.lower()
@@ -67,9 +96,9 @@ class EvidenceService:
                     session.id, form.sequence, form.operation_id, form.part, data
                 )
             except FileExistsError:
-                raise UploadRejectedError(
-                    409, "evidence already stored for this session, sequence and part"
-                ) from None
+                self.reject(
+                    agent, form, 409, "evidence already stored for this session, sequence and part"
+                )
 
         evidence = Evidence(
             case_id=session.case_id,
@@ -95,6 +124,25 @@ class EvidenceService:
         )
         self._db.add(evidence)
         self._db.commit()
-        if not matches:
+        details = {"operation": form.operation_id, "sequence": form.sequence, "part": form.part}
+        if matches:
+            self._audit.record(
+                AuditEventType.upload_accepted,
+                ActorType.agent,
+                actor_id=agent.id,
+                object_type="evidence",
+                object_id=evidence.id,
+                details={**details, "size_bytes": len(data)},
+            )
+        else:
             log.warning("evidence upload rejected: sha256 mismatch (session %s)", session.id)
+            self._audit.record(
+                AuditEventType.upload_rejected_mismatch,
+                ActorType.agent,
+                actor_id=agent.id,
+                object_type="evidence",
+                object_id=evidence.id,
+                reason=MISMATCH_REASON,
+                details={**details, "sha256_agent": agent_digest, "sha256_server": server_digest},
+            )
         return evidence, matches

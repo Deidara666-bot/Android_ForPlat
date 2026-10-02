@@ -7,8 +7,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_agent, get_db
 from app.core import constants
 from app.core.config import get_settings
+from app.core.constants import ActorType, AuditEventType
 from app.models.agent import Agent
 from app.schemas.evidence import EvidenceOut, EvidenceUploadForm
+from app.services.audit_service import AuditService
 from app.services.evidence_service import EvidenceService, UploadRejectedError
 from app.services.evidence_storage_service import EvidenceStorageService
 
@@ -44,6 +46,15 @@ async def upload_evidence(
     data = await request.file.read(constants.MAX_UPLOAD_BYTES + 1)
     form = EvidenceUploadForm(**request.model_dump(exclude={"file"}))
     if len(data) > constants.MAX_UPLOAD_BYTES:
+        AuditService(db).record(
+            AuditEventType.upload_validation_failed,
+            ActorType.agent,
+            actor_id=agent.id,
+            object_type="acquisition_session",
+            object_id=form.session_id,
+            reason="evidence file too large",
+            details={"http_status": 413, "operation": form.operation_id, "sequence": form.sequence},
+        )
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, detail="evidence file too large")
     try:
         evidence, matches = EvidenceService(db, storage).ingest(agent, form, data)

@@ -4,6 +4,14 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+class AvailabilityStatus(StrEnum):
+    acquired = "acquired"
+    unavailable = "unavailable"
+    denied = "denied"
+    unsupported = "unsupported"
+    failed = "failed"
+
+
 class PrivilegeState(StrEnum):
     non_root = "non_root"
     root_detected = "root_detected"

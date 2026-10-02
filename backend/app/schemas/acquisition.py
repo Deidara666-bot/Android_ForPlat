@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.constants import AvailabilityStatus
+
 
 class AcquisitionOperationOut(BaseModel):
     id: uuid.UUID
@@ -66,3 +68,5 @@ class JobStatusIn(BaseModel):
     returncode: int
     serial: str | None = None
     error: str | None = None
+    availability_status: AvailabilityStatus | None = None
+    availability_reason: str | None = Field(default=None, max_length=500)
