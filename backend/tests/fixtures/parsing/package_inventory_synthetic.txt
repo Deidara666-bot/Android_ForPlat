@@ -1,0 +1,3 @@
+package:com.synthetic.alpha uid:10101
+package:com.synthetic.beta uid:10102
+package:android uid:1000

@@ -18,6 +18,9 @@ class CaseService:
     def list(self) -> list[Case]:
         return list(self._db.scalars(select(Case).order_by(Case.created_at, Case.case_number)))
 
+    def get(self, case_id: uuid.UUID) -> Case | None:
+        return self._db.get(Case, case_id)
+
     def create(self, case_number: str, title: str, created_by: uuid.UUID) -> Case:
         case = Case(case_number=case_number, title=title, created_by=created_by)
         self._db.add(case)

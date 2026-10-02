@@ -120,3 +120,40 @@ button.secondary {
 .error {
   color: var(--danger);
 }
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.table code,
+.event code {
+  word-break: break-all;
+}
+
+.event {
+  margin-top: 12px;
+}
+
+.event summary {
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.muted {
+  color: var(--text);
+  opacity: 0.8;
+}

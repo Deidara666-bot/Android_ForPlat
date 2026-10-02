@@ -1,0 +1,5 @@
+[ro.build.version.release]: [16]
+[ro.build.version.sdk]: [36]
+[ro.build.fingerprint]: [synthetic/sdk_gphone64_x86_64/emu64x:16/SYN.000000/1:userdebug/dev-keys]
+[ro.product.model]: [sdk_gphone64_x86_64]
+[persist.sys.timezone]: [Etc/UTC]

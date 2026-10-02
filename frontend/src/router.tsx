@@ -1,6 +1,7 @@
 import { createBrowserRouter, redirect } from 'react-router'
 import { isLoggedIn } from './api/auth'
 import AppShell from './components/AppShell'
+import CaseEventsPage from './pages/CaseEventsPage'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 
@@ -15,6 +16,9 @@ export const router = createBrowserRouter([
   {
     element: <AppShell />,
     loader: requireLogin,
-    children: [{ path: '/dashboard', element: <Dashboard /> }],
+    children: [
+      { path: '/dashboard', element: <Dashboard /> },
+      { path: '/cases/:id/events', element: <CaseEventsPage /> },
+    ],
   },
 ])
