@@ -16,6 +16,7 @@ from app.schemas.acquisition import (
     AcquisitionOperationOut,
     AcquisitionSessionOut,
 )
+from app.schemas.evidence import EvidenceOut
 from app.services.acquisition_service import (
     AcquisitionService,
     OperationNotAllowedError,
@@ -36,7 +37,11 @@ def _detail(session: object, service: AcquisitionService) -> AcquisitionDetailOu
         AcquisitionOperationOut.model_validate(item, from_attributes=True)
         for item in service.list_operations(base.id)
     ]
-    return AcquisitionDetailOut(**base.model_dump(), operations=operations)
+    evidence = [
+        EvidenceOut.model_validate(item, from_attributes=True)
+        for item in service.list_evidence(base.id)
+    ]
+    return AcquisitionDetailOut(**base.model_dump(), operations=operations, evidence=evidence)
 
 
 @router.post(

@@ -131,6 +131,16 @@ class AcquisitionService:
             )
         )
 
+    def list_evidence(self, session_id: uuid.UUID) -> list[Evidence]:
+        assert self._db is not None
+        return list(
+            self._db.scalars(
+                select(Evidence)
+                .where(Evidence.acquisition_session_id == session_id)
+                .order_by(Evidence.acquired_at, Evidence.id)
+            )
+        )
+
     def mark_failed(self, session: AcquisitionSession, error: str) -> None:
         assert self._db is not None
         session.status = SessionStatus.failed.value

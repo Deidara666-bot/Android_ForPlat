@@ -1,17 +1,22 @@
+import uuid
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_agent, get_db
+from app.api.deps import get_current_agent, get_current_user, get_db
 from app.core import constants
 from app.core.config import get_settings
 from app.core.constants import ActorType, AuditEventType
 from app.models.agent import Agent
+from app.schemas.acquisition import AcquisitionOperationOut, AcquisitionSessionOut
+from app.schemas.case import CaseOut
+from app.schemas.device import DeviceOut
 from app.schemas.evidence import EvidenceOut, EvidenceUploadForm
+from app.schemas.provenance import EvidenceDetailOut
 from app.services.audit_service import AuditService
-from app.services.evidence_service import EvidenceService, UploadRejectedError
+from app.services.evidence_service import EvidenceReadService, EvidenceService, UploadRejectedError
 from app.services.evidence_storage_service import EvidenceStorageService
 
 router = APIRouter(prefix="/evidence", tags=["evidence"])
@@ -70,3 +75,29 @@ async def upload_evidence(
             },
         )
     return EvidenceOut.model_validate(evidence, from_attributes=True)
+
+
+@router.get(
+    "/{evidence_id}",
+    response_model=EvidenceDetailOut,
+    dependencies=[Depends(get_current_user)],
+    summary="Read evidence with its provenance chain (no stored path, no bytes)",
+)
+def read_evidence(
+    evidence_id: uuid.UUID, db: Annotated[Session, Depends(get_db)]
+) -> EvidenceDetailOut:
+    found = EvidenceReadService(db).get_detail(evidence_id)
+    if found is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="evidence not found")
+    evidence, session, operation, device, case = found
+    return EvidenceDetailOut(
+        **EvidenceOut.model_validate(evidence, from_attributes=True).model_dump(),
+        session=AcquisitionSessionOut.model_validate(session, from_attributes=True),
+        operation=(
+            AcquisitionOperationOut.model_validate(operation, from_attributes=True)
+            if operation is not None
+            else None
+        ),
+        device=DeviceOut.model_validate(device, from_attributes=True),
+        case=CaseOut.model_validate(case, from_attributes=True),
+    )

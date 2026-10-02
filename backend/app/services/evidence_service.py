@@ -1,7 +1,8 @@
 import logging
+import uuid
 from typing import NoReturn
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
@@ -14,6 +15,8 @@ from app.core.constants import (
 from app.models.acquisition_operation import AcquisitionOperation
 from app.models.acquisition_session import AcquisitionSession
 from app.models.agent import Agent
+from app.models.case import Case
+from app.models.device import Device
 from app.models.evidence import Evidence
 from app.schemas.evidence import EvidenceUploadForm
 from app.services.audit_service import AuditService
@@ -146,3 +149,36 @@ class EvidenceService:
                 details={**details, "sha256_agent": agent_digest, "sha256_server": server_digest},
             )
         return evidence, matches
+
+
+class EvidenceReadService:
+    """Read side of the provenance chain: evidence -> session -> operation -> device -> case."""
+
+    def __init__(self, db: Session) -> None:
+        self._db = db
+
+    def get_detail(
+        self, evidence_id: uuid.UUID
+    ) -> tuple[Evidence, AcquisitionSession, AcquisitionOperation | None, Device, Case] | None:
+        """One joined query (no per-row lookups). The operation is matched on session and
+        operation ID, since evidence rows carry no sequence; it is the first by sequence."""
+        row = self._db.execute(
+            select(Evidence, AcquisitionSession, AcquisitionOperation, Device, Case)
+            .join(AcquisitionSession, AcquisitionSession.id == Evidence.acquisition_session_id)
+            .join(Device, Device.id == Evidence.device_id)
+            .join(Case, Case.id == Evidence.case_id)
+            .outerjoin(
+                AcquisitionOperation,
+                and_(
+                    AcquisitionOperation.session_id == Evidence.acquisition_session_id,
+                    AcquisitionOperation.operation_id == Evidence.operation_id,
+                ),
+            )
+            .where(Evidence.id == evidence_id)
+            .order_by(AcquisitionOperation.sequence)
+            .limit(1)
+        ).first()
+        if row is None:
+            return None
+        evidence, session, operation, device, case = row
+        return evidence, session, operation, device, case

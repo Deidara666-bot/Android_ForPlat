@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.constants import AvailabilityStatus
+from app.schemas.evidence import EvidenceOut
 
 
 class AcquisitionOperationOut(BaseModel):
@@ -36,6 +37,7 @@ class AcquisitionSessionOut(BaseModel):
 
 class AcquisitionDetailOut(AcquisitionSessionOut):
     operations: list[AcquisitionOperationOut]
+    evidence: list[EvidenceOut]  # the session's evidence: the "session -> evidence" direction
 
 
 class AcquisitionCreate(BaseModel):
