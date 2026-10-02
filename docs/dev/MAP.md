@@ -38,7 +38,7 @@ sebelum menggeser v0.90 (hasil v0.90 = bahan BAB IV).
 
 Tidak perlu menunggu hasil apa pun untuk **merencanakannya**; perintah final tiap operasi ditutup oleh Tier-2
 di milestone yang sama (data OPEN "perintah ADB final"). Satu operasi boleh menjalankan beberapa perintah
-berurutan → beberapa berkas bukti (`sequence`) `[plan]`.
+berurutan → beberapa berkas bukti (`part`, REF §API) `[plan]`.
 
 | ID operasi | Milestone | Perintah kandidat (difinalkan Tier-2) | Kelompok | Memasok profil |
 |---|---|---|---|---|
