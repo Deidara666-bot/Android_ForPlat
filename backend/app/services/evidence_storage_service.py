@@ -12,6 +12,13 @@ class EvidenceStorageService:
     def __init__(self, root: Path) -> None:
         self._root = root.resolve()
 
+    def resolve(self, stored_path: str) -> Path:
+        """Absolute path of a stored file; never leaves EVIDENCE_ROOT."""
+        path = (self._root / stored_path).resolve()
+        if not path.is_relative_to(self._root):
+            raise ValueError("evidence path escapes EVIDENCE_ROOT")
+        return path
+
     def store(
         self, session_id: uuid.UUID, sequence: int, operation_id: str, part: int, data: bytes
     ) -> str:

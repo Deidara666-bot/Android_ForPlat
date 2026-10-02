@@ -84,6 +84,9 @@ class AuditEventType(StrEnum):
     upload_validation_failed = "upload_validation_failed"
     authentication_failed = "authentication_failed"
     request_validation_failed = "request_validation_failed"
+    normalization_skipped = "normalization_skipped"
+    normalization_failed = "normalization_failed"
+    session_timezone_set = "session_timezone_set"
 
 
 # Allowlisted operation IDs (REF §OPS); the agent keeps its own copy and maps the command.

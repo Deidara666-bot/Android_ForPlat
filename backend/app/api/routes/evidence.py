@@ -18,6 +18,7 @@ from app.schemas.provenance import EvidenceDetailOut
 from app.services.audit_service import AuditService
 from app.services.evidence_service import EvidenceReadService, EvidenceService, UploadRejectedError
 from app.services.evidence_storage_service import EvidenceStorageService
+from app.services.normalization_service import process_evidence_safely
 
 router = APIRouter(prefix="/evidence", tags=["evidence"])
 
@@ -74,7 +75,10 @@ async def upload_evidence(
                 "evidence_id": str(evidence.id),
             },
         )
-    return EvidenceOut.model_validate(evidence, from_attributes=True)
+    out = EvidenceOut.model_validate(evidence, from_attributes=True)
+    # Evidence is already committed; a normalization error is audited, never raised.
+    process_evidence_safely(db, evidence.id, storage)
+    return out
 
 
 @router.get(
