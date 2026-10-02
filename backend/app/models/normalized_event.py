@@ -25,12 +25,16 @@ def _in_list(column: str, values: list[str]) -> str:
     return f"{column} IN ({', '.join(repr(v) for v in values)})"
 
 
+_PAIRS = ", ".join(f"('{t}', '{c.value}')" for t, c in EVENT_TYPE_CATALOG.items())
+
+
 class NormalizedEvent(Base):
     """Normalized fact (17 columns). `epistemic_class` is NOT NULL; `artifact_id` is mandatory."""
 
     __tablename__ = "normalized_events"
     __table_args__ = (
         CheckConstraint(_in_list("event_type", list(EVENT_TYPE_CATALOG)), name="event_type"),
+        CheckConstraint(f"(event_type, epistemic_class) IN ({_PAIRS})", name="class_matches_type"),
         CheckConstraint(
             _in_list("epistemic_class", [c.value for c in EpistemicClass]), name="epistemic_class"
         ),

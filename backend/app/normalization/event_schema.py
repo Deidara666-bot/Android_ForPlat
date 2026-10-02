@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from datetime import datetime
 from types import MappingProxyType
-from typing import Self
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -58,6 +58,24 @@ class NormalizedFact(BaseModel):
     temporal_semantics: TemporalSemantics
     evidence_state: EvidenceState
     context_json: dict[str, object]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _class_comes_from_catalog(cls, data: Any) -> Any:
+        """Fill `epistemic_class` from the catalog; a different supplied class is an error."""
+        if not isinstance(data, dict):
+            return data
+        expected = EVENT_TYPE_CATALOG.get(data.get("event_type"))  # type: ignore[arg-type]
+        if expected is None:
+            return data  # unknown event_type is rejected by its own validator
+        given = data.get("epistemic_class")
+        if given is None:
+            return {**data, "epistemic_class": expected}
+        if given != expected:
+            raise ValueError(
+                f"epistemic_class {given!r} does not match event_type {data['event_type']!r}"
+            )
+        return data
 
     @field_validator("event_type")
     @classmethod

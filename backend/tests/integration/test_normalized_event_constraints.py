@@ -114,11 +114,53 @@ def test_valid_row_with_null_event_time_accepted(session: Session, parents: dict
     session.flush()
 
 
+def _violated_alone(session: Session, row: object) -> str:
+    """Violation name with the pairing check set aside, so single-column checks stay isolated."""
+    with pytest.raises(IntegrityError) as raised, session.begin_nested():
+        session.execute(
+            text(
+                "alter table normalized_events "
+                "drop constraint ck_normalized_events_class_matches_type"
+            )
+        )
+        session.add(row)
+        session.flush()
+    return raised.value.orig.diag.constraint_name  # type: ignore[union-attr]
+
+
 @pytest.mark.parametrize(
     ("override", "constraint"),
     [
         ({"event_type": "permission_observed_granted"}, "ck_normalized_events_event_type"),
         ({"epistemic_class": "bogus"}, "ck_normalized_events_epistemic_class"),
+    ],
+)
+def test_single_column_checks_name_their_constraint(
+    session: Session, parents: dict[str, Any], override: dict[str, str], constraint: str
+) -> None:
+    assert _violated_alone(session, _event(parents, **override)) == constraint
+
+
+def test_valid_names_with_wrong_pairing_rejected(session: Session, parents: dict[str, Any]) -> None:
+    row = _event(parents, epistemic_class="execution_observed")
+    assert _violated(session, row) == "ck_normalized_events_class_matches_type"
+
+
+def test_pair_check_lists_every_catalog_pair(session: Session) -> None:
+    definition = session.execute(
+        text(
+            "select pg_get_constraintdef(oid) from pg_constraint "
+            "where conname = 'ck_normalized_events_class_matches_type'"
+        )
+    ).scalar_one()
+    for event_type, klass in EVENT_TYPE_CATALOG.items():
+        pair = rf"= '{event_type}'::text\) AND \(\(epistemic_class\)::text = '{klass.value}'::text"
+        assert re.search(pair, definition), event_type
+
+
+@pytest.mark.parametrize(
+    ("override", "constraint"),
+    [
         ({"temporal_semantics": "bogus"}, "ck_normalized_events_temporal_semantics"),
         ({"evidence_state": "bogus"}, "ck_normalized_events_evidence_state"),
     ],
