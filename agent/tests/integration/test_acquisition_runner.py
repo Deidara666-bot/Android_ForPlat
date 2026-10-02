@@ -14,15 +14,17 @@ _SESSION = "0f8b3c9e-6a4d-4b53-9c1e-2d7a5e8b1f60"
 _FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "package_inventory_sample.txt"
 
 
-def _job(operation: str, **extra: Any) -> dict[str, Any]:
+def _job(
+    operation: str, sequence: int = 1, serial: str = "emulator-5554", **extra: Any
+) -> dict[str, Any]:
     return {
         "type": "job",
         "session_id": _SESSION,
-        "sequence": 1,
+        "sequence": sequence,
         "operation": operation,
         "case_id": "c",
         "device_id": "d",
-        "serial": "emulator-5554",
+        "serial": serial,
         "parameters": {},
         **extra,
     }
@@ -61,28 +63,33 @@ def test_job_runs_adb_writes_bytes_exactly_and_reports_hash(
     status = runner.run_job(_job("collect_package_inventory"))
 
     expected = _FIXTURE.read_bytes()
-    written = tmp_path / _SESSION / "1-collect_package_inventory.bin"
+    written = tmp_path / _SESSION / "1-collect_package_inventory-1.bin"
     assert adb_calls == [(["shell", "pm", "list", "packages", "-U"], "emulator-5554")]
     assert written.read_bytes() == expected
     assert status == {
         "type": "job_status",
         "session_id": _SESSION,
+        "sequence": 1,
+        "part": 1,
+        "parts_total": 1,
         "operation": "collect_package_inventory",
+        "serial": "emulator-5554",
         "sha256_agent": hashlib.sha256(expected).hexdigest(),
         "size_bytes": len(expected),
         "returncode": 0,
-        "serial": "emulator-5554",
+        "error": None,
     }
 
 
-def test_two_jobs_of_one_session_get_sequence_one_and_two(
+def test_file_name_uses_the_sequence_carried_by_the_job(
     tmp_path: Path, adb_calls: list[tuple[list[str], str | None]], audit_file: Path
 ) -> None:
     runner = AcquisitionRunner(raw_root=tmp_path)
-    runner.run_job(_job("collect_device_metadata"))
-    runner.run_job(_job("collect_package_inventory"))
+    # Out of order on purpose: the agent must not number jobs by arrival.
+    runner.run_job(_job("collect_package_inventory", sequence=2))
+    runner.run_job(_job("collect_device_metadata", sequence=1))
     names = sorted(path.name for path in (tmp_path / _SESSION).iterdir())
-    assert names == ["1-collect_device_metadata.bin", "2-collect_package_inventory.bin"]
+    assert names == ["1-collect_device_metadata-1.bin", "2-collect_package_inventory-1.bin"]
 
 
 def test_unmapped_operation_never_calls_adb_and_reports_failure(
@@ -128,7 +135,7 @@ def test_extra_job_field_is_rejected(
     assert status is not None and status["error"] == "ValidationError"
 
 
-def test_two_ready_devices_is_refused(
+def test_with_two_ready_devices_the_job_runs_on_its_own_serial(
     tmp_path: Path,
     adb_calls: list[tuple[list[str], str | None]],
     audit_file: Path,
@@ -137,11 +144,62 @@ def test_two_ready_devices_is_refused(
     monkeypatch.setattr(
         acquisition_runner,
         "detect_devices",
-        lambda _adb=None: [DetectedDevice("a", "device"), DetectedDevice("b", "device")],
+        lambda _adb=None: [DetectedDevice("A", "device"), DetectedDevice("B", "device")],
     )
-    status = AcquisitionRunner(raw_root=tmp_path).run_job(_job("collect_device_metadata"))
+    status = AcquisitionRunner(raw_root=tmp_path).run_job(
+        _job("collect_device_metadata", serial="B")
+    )
+    assert adb_calls == [(["shell", "getprop"], "B")]
+    assert status is not None and status["serial"] == "B" and status["returncode"] == 0
+
+
+def test_serial_that_is_not_connected_fails_without_calling_adb(
+    tmp_path: Path, adb_calls: list[tuple[list[str], str | None]], audit_file: Path
+) -> None:
+    status = AcquisitionRunner(raw_root=tmp_path).run_job(
+        _job("collect_device_metadata", serial="not-connected")
+    )
+    assert adb_calls == []
+    assert status is not None
+    assert status["returncode"] == -1
+    assert status["serial"] == "not-connected"
+    assert status["error"] == "AgentError"
+    assert not (tmp_path / _SESSION).exists()
+
+
+def test_serial_of_an_offline_device_is_not_ready(
+    tmp_path: Path,
+    adb_calls: list[tuple[list[str], str | None]],
+    audit_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        acquisition_runner, "detect_devices", lambda _adb=None: [DetectedDevice("A", "offline")]
+    )
+    status = AcquisitionRunner(raw_root=tmp_path).run_job(
+        _job("collect_device_metadata", serial="A")
+    )
     assert adb_calls == []
     assert status is not None and status["returncode"] == -1
+
+
+def test_option_like_serial_is_rejected_before_adb(
+    tmp_path: Path, adb_calls: list[tuple[list[str], str | None]], audit_file: Path
+) -> None:
+    status = AcquisitionRunner(raw_root=tmp_path).run_job(
+        _job("collect_device_metadata", serial="-d")
+    )
+    assert adb_calls == []
+    assert status is not None and status["error"] == "ValidationError"
+
+
+def test_job_without_a_usable_sequence_cannot_be_reported(
+    tmp_path: Path, adb_calls: list[tuple[list[str], str | None]], audit_file: Path
+) -> None:
+    job = _job("collect_device_metadata")
+    del job["sequence"]
+    assert AcquisitionRunner(raw_root=tmp_path).run_job(job) is None
+    assert adb_calls == []
 
 
 def test_audit_records_the_job_without_stdout(

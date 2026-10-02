@@ -2,7 +2,6 @@
 
 import asyncio
 import uuid
-from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -18,39 +17,38 @@ from src.models import AcquisitionJob
 from src.state.audit_logger import audit
 
 RAW_ROOT = Path(__file__).resolve().parents[2] / "var" / "raw"
+# v0.30 operations run one command each; multi-command operations arrive in v0.45.
+_PART = 1
+_PARTS_TOTAL = 1
 
 
 class AcquisitionRunner:
-    """Executes jobs one at a time. Evidence goes to disk byte-exact before it is hashed."""
+    """Executes jobs one at a time. Evidence goes to disk byte-exact before it is hashed.
+
+    The job names its device (`serial`) and its position (`sequence`); the agent chooses neither.
+    """
 
     def __init__(self, adb_path: str | None = None, raw_root: Path | None = None) -> None:
         self._adb_path = adb_path
         self._raw_root = raw_root or RAW_ROOT
-        # Jobs of one session arrive in order, so the Nth job of a session is sequence N.
-        self._sequence: defaultdict[str, int] = defaultdict(int)
 
     async def handle_job(self, message: dict[str, Any]) -> dict[str, Any] | None:
         """Return the `job_status` message, or None when the job is too malformed to report."""
         return await asyncio.to_thread(self.run_job, message)
 
     def run_job(self, message: dict[str, Any]) -> dict[str, Any] | None:
-        session_id, operation = message.get("session_id"), message.get("operation")
         try:
             job = AcquisitionJob(**message)
             uuid.UUID(job.session_id)  # the folder name comes from this value
         except (ValidationError, ValueError, TypeError) as exc:
             audit("job_rejected", "invalid job message", error_class=type(exc).__name__)
-            if isinstance(session_id, str) and isinstance(operation, str):
-                return self._failed(session_id, operation, type(exc).__name__)
-            return None
+            return self._failed_from_raw(message, type(exc).__name__)
 
-        self._sequence[job.session_id] += 1
-        sequence = self._sequence[job.session_id]
         try:
             args = resolve_operation(job.operation, job.parameters)
-            serial = self._only_connected_serial()
-            result = run_adb(args, serial, adb_path=self._adb_path)
-            path = self._raw_root / job.session_id / f"{sequence}-{job.operation}.bin"
+            self._require_ready(job.serial)
+            result = run_adb(args, job.serial, adb_path=self._adb_path)
+            path = self._raw_root / job.session_id / f"{job.sequence}-{job.operation}-{_PART}.bin"
             size = write_evidence(path, result.stdout)
             digest = sha256_file(path)
         except (AgentError, ValueError, OSError) as exc:
@@ -58,44 +56,74 @@ class AcquisitionRunner:
                 "job_failed",
                 type(exc).__name__,
                 session_id=job.session_id,
+                sequence=job.sequence,
                 operation=job.operation,
             )
-            return self._failed(job.session_id, job.operation, type(exc).__name__)
+            return self._status(
+                job.session_id, job.sequence, job.operation, job.serial, error=type(exc).__name__
+            )
 
         audit(
             "job_done",
             session_id=job.session_id,
+            sequence=job.sequence,
             operation=job.operation,
-            sequence=sequence,
             returncode=result.returncode,
             size_bytes=size,
         )
-        return {
-            "type": "job_status",
-            "session_id": job.session_id,
-            "operation": job.operation,
-            "sha256_agent": digest,
-            "size_bytes": size,
-            "returncode": result.returncode,
-            "serial": serial,
-        }
+        return self._status(
+            job.session_id,
+            job.sequence,
+            job.operation,
+            job.serial,
+            sha256_agent=digest,
+            size_bytes=size,
+            returncode=result.returncode,
+        )
 
-    def _only_connected_serial(self) -> str:
-        """The job carries the backend device ID, not a serial: act only if exactly one device."""
-        ready = [d.serial for d in detect_devices(self._adb_path) if d.status == "device"]
-        if len(ready) != 1:
-            raise AgentError(f"expected exactly one ready device, found {len(ready)}")
-        return ready[0]
+    def _require_ready(self, serial: str) -> None:
+        """The job's serial must be a currently ready device; nothing is guessed or substituted."""
+        ready = {d.serial for d in detect_devices(self._adb_path) if d.status == "device"}
+        if serial not in ready:
+            raise AgentError("serial is not a ready device")
+
+    def _failed_from_raw(self, message: dict[str, Any], error: str) -> dict[str, Any] | None:
+        session_id, sequence = message.get("session_id"), message.get("sequence")
+        operation, serial = message.get("operation"), message.get("serial")
+        if not (isinstance(session_id, str) and isinstance(operation, str)):
+            return None
+        if not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 1:
+            return None
+        return self._status(
+            session_id,
+            sequence,
+            operation,
+            serial if isinstance(serial, str) else None,
+            error=error,
+        )
 
     @staticmethod
-    def _failed(session_id: str, operation: str, error: str) -> dict[str, Any]:
+    def _status(
+        session_id: str,
+        sequence: int,
+        operation: str,
+        serial: str | None,
+        *,
+        sha256_agent: str | None = None,
+        size_bytes: int | None = None,
+        returncode: int = -1,
+        error: str | None = None,
+    ) -> dict[str, Any]:
         return {
             "type": "job_status",
             "session_id": session_id,
+            "sequence": sequence,
+            "part": _PART,
+            "parts_total": _PARTS_TOTAL,
             "operation": operation,
-            "sha256_agent": None,
-            "size_bytes": None,
-            "returncode": -1,
-            "serial": None,
+            "serial": serial,
+            "sha256_agent": sha256_agent,
+            "size_bytes": size_bytes,
+            "returncode": returncode,
             "error": error,
         }

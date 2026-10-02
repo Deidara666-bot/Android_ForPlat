@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class AcquisitionOperationOut(BaseModel):
@@ -57,6 +57,9 @@ class JobStatusIn(BaseModel):
     """Agent -> backend outcome of one operation. Hashes are re-verified at upload (v0.30.5)."""
 
     session_id: uuid.UUID
+    sequence: int = Field(ge=1)
+    part: int = Field(default=1, ge=1)
+    parts_total: int = Field(default=1, ge=1)
     operation: str
     sha256_agent: str | None = None
     size_bytes: int | None = None

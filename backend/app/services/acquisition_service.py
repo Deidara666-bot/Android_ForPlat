@@ -149,17 +149,23 @@ class AcquisitionService:
         operation = self._db.scalar(
             select(AcquisitionOperation).where(
                 AcquisitionOperation.session_id == session.id,
-                AcquisitionOperation.operation_id == status.operation,
+                AcquisitionOperation.sequence == status.sequence,
                 AcquisitionOperation.status == _PENDING,
             )
         )
         if operation is None:
-            log.warning("job_status for unknown or finished operation ignored")
+            log.warning("job_status for unknown or finished sequence ignored")
+            return False
+        if operation.operation_id != status.operation:
+            log.warning("job_status operation does not match the session's operation; ignored")
             return False
 
         device = self._db.get(Device, session.device_id)
         serial_ok = device is not None and status.serial == device.serial
-        operation.status = _COMPLETED if status.returncode == 0 and serial_ok else _FAILED
+        if status.returncode != 0 or not serial_ok:
+            operation.status = _FAILED
+        elif status.part >= status.parts_total:
+            operation.status = _COMPLETED  # only the last part completes a multi-part operation
 
         operations = self.list_operations(session.id)
         if all(item.status != _PENDING for item in operations):

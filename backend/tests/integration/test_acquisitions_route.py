@@ -189,6 +189,9 @@ def test_profile_sends_two_exact_jobs_and_reaches_completed(
                 {
                     "type": "job_status",
                     "session_id": job["session_id"],
+                    "sequence": job["sequence"],
+                    "part": 1,
+                    "parts_total": 1,
                     "operation": job["operation"],
                     "sha256_agent": "a" * 64,
                     "size_bytes": 10,
@@ -220,6 +223,7 @@ def test_session_stays_running_until_every_operation_reports(
             {
                 "type": "job_status",
                 "session_id": first["session_id"],
+                "sequence": first["sequence"],
                 "operation": first["operation"],
                 "returncode": 0,
                 "serial": _SERIAL,
@@ -247,6 +251,7 @@ def test_failed_or_wrong_serial_report_fails_the_session(
             {
                 "type": "job_status",
                 "session_id": first["session_id"],
+                "sequence": first["sequence"],
                 "operation": first["operation"],
                 "returncode": 1,
                 "serial": _SERIAL,
@@ -256,6 +261,7 @@ def test_failed_or_wrong_serial_report_fails_the_session(
             {
                 "type": "job_status",
                 "session_id": second["session_id"],
+                "sequence": second["sequence"],
                 "operation": second["operation"],
                 "returncode": 0,
                 "serial": "some-other-device",
@@ -265,3 +271,76 @@ def test_failed_or_wrong_serial_report_fails_the_session(
     fetched = client.get(f"/api/acquisitions/{created['id']}", headers=auth_headers).json()
     assert fetched["status"] == "failed"
     assert [op["status"] for op in fetched["operations"]] == ["failed", "failed"]
+
+
+def _report(job: dict[str, object], **overrides: object) -> dict[str, object]:
+    return {
+        "type": "job_status",
+        "session_id": job["session_id"],
+        "sequence": job["sequence"],
+        "part": 1,
+        "parts_total": 1,
+        "operation": job["operation"],
+        "returncode": 0,
+        "serial": _SERIAL,
+        **overrides,
+    }
+
+
+def test_job_status_with_unknown_sequence_is_ignored(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    case: Case,
+    device: Device,
+    agent_token: str,
+) -> None:
+    with client.websocket_connect(
+        "/ws/agent", headers={"Authorization": f"Bearer {agent_token}"}
+    ) as ws:
+        created = _start(client, auth_headers, case, device, ws)
+        first = ws.receive_json()
+        ws.receive_json()
+        ws.send_json(_report(first, sequence=99))
+
+    fetched = client.get(f"/api/acquisitions/{created['id']}", headers=auth_headers).json()
+    assert fetched["status"] == "running"
+    assert [op["status"] for op in fetched["operations"]] == ["pending", "pending"]
+
+
+def test_job_status_whose_operation_differs_from_the_row_is_ignored(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    case: Case,
+    device: Device,
+    agent_token: str,
+) -> None:
+    with client.websocket_connect(
+        "/ws/agent", headers={"Authorization": f"Bearer {agent_token}"}
+    ) as ws:
+        created = _start(client, auth_headers, case, device, ws)
+        first = ws.receive_json()
+        ws.receive_json()
+        ws.send_json(_report(first, operation="collect_package_inventory"))
+
+    fetched = client.get(f"/api/acquisitions/{created['id']}", headers=auth_headers).json()
+    assert [op["status"] for op in fetched["operations"]] == ["pending", "pending"]
+
+
+def test_operation_completes_only_on_its_last_part(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    case: Case,
+    device: Device,
+    agent_token: str,
+) -> None:
+    with client.websocket_connect(
+        "/ws/agent", headers={"Authorization": f"Bearer {agent_token}"}
+    ) as ws:
+        created = _start(client, auth_headers, case, device, ws)
+        first, second = ws.receive_json(), ws.receive_json()
+        ws.send_json(_report(first, part=1, parts_total=2))
+        ws.send_json(_report(second))
+
+    fetched = client.get(f"/api/acquisitions/{created['id']}", headers=auth_headers).json()
+    assert [op["status"] for op in fetched["operations"]] == ["pending", "completed"]
+    assert fetched["status"] == "running"
