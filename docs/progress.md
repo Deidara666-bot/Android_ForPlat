@@ -12,8 +12,8 @@
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 — Irisan tegak minimum** |
 | Milestone aktif | **`v0.40`** (`docs/dev/v0.40.md`), branch `feature/v0.40` |
-| Kartu terakhir | **`v0.40.2`** (2026-10-02) |
-| Kartu berikutnya | **`/card v0.40.3`** (teks baru: `docs/dev/v0.40.md`; parser `package_state`, tanpa DB). Satu kartu per "mulai" |
+| Kartu terakhir | **`v0.40.3`** (2026-10-02) |
+| Kartu berikutnya | **`/card v0.40.4`** (`docs/dev/v0.40.md`; kontrak §Y.3, butuh PostgreSQL). Satu kartu per "mulai" |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30` (2026-10-02)
@@ -96,6 +96,8 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - 2026-10-02 — `v0.30.8`: smoke ujung ke ujung (`docs/smoke/v0.30.md`): kasus `SMOKE-V030`, profil `baseline_v030` pada AVD #1, sesi `completed`, dua bukti `acquired` (metadata `source_group` NULL, inventaris `APP_SYSTEM_STATE`), `sha256_agent = sha256_server`, `sha256sum` agen = server, berkas server read-only, audit `job_issued`×2 + `upload_accepted`×2. Pembersihan: kasus `UJI-V0304` + 5 sesi + 6 bukti + folder berkas uji dihapus (satu transaksi, nama UUID eksplisit); `audit_logs` utuh (14 baris). Uji gagal: `git log --all --name-only | grep var/(evidence|raw)` kosong. `check.sh all` OK.
 - 2026-10-02 — `v0.40.1`: `ParsedArtifact` + protokol `Parser`, registri eksplisit (`register`/`get_parser`/`registered_operations`, tanpa default atau scan), 3 fixture REF §FIX, 4 test registri; `check.sh backend` OK. Uji gagal: `get_parser('collect_network_stats')` → `UnknownOperationError`. Tambahan di luar daftar File: `tests/unit/parsing/__init__.py`.
 - 2026-10-02 — `v0.40.2` (kontrak §Y.2): `Artifact` 10 kolom + CHECK `ck_artifacts_parse_status` + indeks `evidence_id`, migrasi `11d773cc1fb3` (upgrade/downgrade/upgrade sukses, `alembic check` bersih), validator `ParsedArtifact`, `ArtifactService` (`read_evidence_bytes`, `store_artifacts` flush tanpa commit). 155 test backend lulus. direvisi 2026-10-02: `raw_value` wajib hanya untuk `parsed`.
+- 2026-10-02 — `v0.40.3`: parser `package_state.inventory` dan `package_state.device_metadata` (versi 1) terdaftar saat paket `app.parsing` diimpor. Baris rusak tetap `failed` dengan baris aslinya; decode gagal → 1 artefak `failed` dengan offset byte (kedua parser); 4 artefak metadata selalu urut tetap. 56 test unit lulus, `check.sh backend` OK. Uji gagal: `assert len(hasil) == 1` pada fixture rusak → `AssertionError` (hasilnya 2). Asumsi (kartu diam): satu `` sebelum `
+` dianggap bagian terminator baris, selain itu tidak ada trim; hanya baris benar-benar kosong dilewati; kunci metadata ganda memakai kemunculan pertama. Berkas di luar daftar: `package_state/_text.py` (helper bersama).
 
 ## Keputusan user (tercatat)
 
