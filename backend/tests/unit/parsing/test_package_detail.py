@@ -154,6 +154,11 @@ def test_synthetic_components_carry_their_permission() -> None:
             "com.synthetic.alpha/.WatchService",
         ): "android.permission.BIND_ACCESSIBILITY_SERVICE",
         ("service", "com.synthetic.alpha/.PingService"): None,
+        ("receiver", "com.synthetic.alpha/.BootReceiver"): None,
+        (
+            "service",
+            "com.synthetic.alpha/.ListenerService",
+        ): "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE",
     }
 
 

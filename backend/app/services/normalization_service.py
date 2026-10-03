@@ -18,7 +18,7 @@ from app.models.acquisition_session import AcquisitionSession
 from app.models.artifact import Artifact
 from app.models.evidence import Evidence
 from app.models.normalized_event import NormalizedEvent
-from app.normalization.normalizer import normalize
+from app.normalization.normalizer import build_context, normalize
 from app.parsing.registry import UnknownOperationError, get_parser
 from app.services.artifact_service import ArtifactService
 from app.services.audit_service import AuditService
@@ -97,11 +97,13 @@ def process_evidence(
     with db.begin_nested():
         rows = ArtifactService().store_artifacts(db, evidence.id, parser.parse(raw))
         facts = 0
+        context = build_context(rows)
         for row in rows:
             for fact in normalize(
                 row,
                 observed_at=evidence.acquired_at,
                 availability_status=evidence.availability_status,
+                context=context,
             ):
                 values: dict[str, Any] = {
                     k: (v.value if isinstance(v, Enum) else v) for k, v in fact.model_dump().items()
