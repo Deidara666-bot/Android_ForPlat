@@ -88,7 +88,7 @@ def test_unmapped_operation_is_422_and_says_not_mapped(
 ) -> None:
     response = client.post(
         "/api/acquisitions",
-        json=_body(case, device, operation="collect_usage_state"),
+        json=_body(case, device, operation="collect_network_stats"),
         headers=auth_headers,
     )
     assert response.status_code == 422

@@ -5,7 +5,7 @@ import json
 import logging
 import sys
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from enum import Enum
 from typing import Any
 
@@ -102,7 +102,7 @@ def process_evidence(
     with db.begin_nested():
         rows = ArtifactService().store_artifacts(db, evidence.id, parsed)
         facts = 0
-        context = build_context(rows)
+        context = replace(build_context(rows), session_timezone=_session_timezone(db, evidence))
         for row in rows:
             for fact in normalize(
                 row,
@@ -147,6 +147,13 @@ def _operation_parameters(db: Session, evidence: Evidence) -> dict[str, str]:
     if row is None or not isinstance(row.parameters, dict):
         return {}
     return {str(k): v for k, v in row.parameters.items() if isinstance(v, str)}
+
+
+def _session_timezone(db: Session, evidence: Evidence) -> str | None:
+    """Device timezone recorded for the evidence's session (`unknown` until a metadata artifact
+    of that session set it)."""
+    session = db.get(AcquisitionSession, evidence.acquisition_session_id)
+    return session.timezone if session is not None else None
 
 
 def _fill_session_timezone(db: Session, evidence: Evidence, rows: list[Artifact]) -> str | None:

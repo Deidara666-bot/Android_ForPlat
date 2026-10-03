@@ -109,6 +109,7 @@ MAPPED_OPERATIONS: frozenset[str] = frozenset(
         "collect_package_inventory",
         "collect_package_detail",
         "collect_accessibility_state",
+        "collect_usage_state",
     }
 )
 
@@ -125,6 +126,7 @@ OPERATION_SOURCE_GROUP: dict[str, str | None] = {
     "collect_package_inventory": SourceGroup.APP_SYSTEM_STATE.value,
     "collect_package_detail": SourceGroup.APP_SYSTEM_STATE.value,
     "collect_accessibility_state": SourceGroup.APP_SYSTEM_STATE.value,
+    "collect_usage_state": SourceGroup.APP_SYSTEM_STATE.value,
 }
 
 # Largest evidence file the upload endpoint accepts.

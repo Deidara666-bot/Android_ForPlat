@@ -27,6 +27,11 @@ OPERATION_PARTS: dict[str, list[tuple[str, list[str]]]] = {
         ),
         ("appops overlay", ["shell", "appops", "get", "{package_name}", "SYSTEM_ALERT_WINDOW"]),
     ],
+    "collect_usage_state": [
+        ("dumpsys usagestats", ["shell", "dumpsys", "usagestats"]),
+        ("dumpsys activity", ["shell", "dumpsys", "activity", "activities"]),
+        ("ps", ["shell", "ps", "-A", "-o", "PID,UID,USER,NAME"]),
+    ],
 }
 
 # Operation ID -> the exact parameter names the job must carry (none for the others).

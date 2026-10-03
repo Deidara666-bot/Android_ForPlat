@@ -34,13 +34,14 @@ def _row(operation: str, sequence: int = 1) -> SimpleNamespace:
     return SimpleNamespace(operation_id=operation, sequence=sequence)
 
 
-def test_eight_allowed_and_four_mapped_operations() -> None:
+def test_eight_allowed_and_five_mapped_operations() -> None:
     assert len(ALLOWED_OPERATIONS) == 8
     assert MAPPED_OPERATIONS == {
         "collect_device_metadata",
         "collect_package_inventory",
         "collect_package_detail",
         "collect_accessibility_state",
+        "collect_usage_state",
     }
     assert MAPPED_OPERATIONS <= ALLOWED_OPERATIONS
 

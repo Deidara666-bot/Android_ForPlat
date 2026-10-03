@@ -10,11 +10,16 @@ from app.normalization.subject_resolution import (
     ArtifactLike,
     subject_from_inventory,
 )
-from app.normalization.temporal import current_state_times
+from app.normalization.temporal import (
+    current_state_times,
+    historical_event_times,
+    local_wall_clock_to_utc,
+)
 from app.normalization.vocabulary import (
     BIND_ACCESSIBILITY_PERMISSION,
     BIND_NOTIFICATION_LISTENER_PERMISSION,
     EVENT_TRIGGER_ACTIONS,
+    FOREGROUND_USAGE_EVENTS,
     OVERLAY_PERMISSION,
     SENSITIVE_COMMUNICATION_PERMISSIONS,
     SPECIAL_ACCESS_ACCESSIBILITY,
@@ -32,6 +37,11 @@ DETAIL_ARTIFACT_TYPES = frozenset({_IDENTITY, _REQUESTED, _GRANTED, _COMPONENT, 
 _SECURE_LIST = "settings_secure_list"
 _SECURE_COMPONENT = "enabled_special_access_component"
 _OVERLAY_APP_OP = "overlay_app_op"
+_USAGE_EVENT = "usage_event"
+_RESUMED_ACTIVITY = "resumed_activity"
+_RUNNING_PROCESS = "running_process"
+# Summary rows that prove a whole list was read; they carry no claim.
+_LIST_ARTIFACT_TYPES = frozenset({_SECURE_LIST, "usage_event_list", "process_list"})
 
 _SPECIAL = "special_access_capability_observed_declared"
 
@@ -50,6 +60,7 @@ class NormalizationContext:
 
     subject_uid: int | None = None
     component_kinds: Mapping[str, frozenset[str]] = field(default_factory=dict)
+    session_timezone: str | None = None  # device zone of the session; None/"unknown" = not known
 
 
 def build_context(artifacts: Sequence[ArtifactLike]) -> NormalizationContext:
@@ -98,8 +109,10 @@ def normalize(
         return []
     if artifact.artifact_type in DETAIL_ARTIFACT_TYPES:
         return _normalize_detail(artifact, observed_at, context or NormalizationContext())
-    if artifact.artifact_type == _SECURE_LIST:
-        return []  # proof that the whole value was read; the components carry the facts
+    if artifact.artifact_type in _LIST_ARTIFACT_TYPES:
+        return []  # proof that the whole list was read; the entries carry the facts
+    if artifact.artifact_type in (_USAGE_EVENT, _RESUMED_ACTIVITY, _RUNNING_PROCESS):
+        return _normalize_execution(artifact, observed_at, context or NormalizationContext())
     if artifact.artifact_type in (_SECURE_COMPONENT, _OVERLAY_APP_OP):
         return _normalize_special_access_state(artifact, observed_at)
     if artifact.artifact_type != INVENTORY_ARTIFACT_TYPE:
@@ -262,3 +275,75 @@ def _normalize_special_access_state(
     return split_claims(
         base, [("special_access_capability_observed_enabled", "special_access", access)]
     )
+
+
+def _normalize_execution(
+    artifact: ArtifactLike, observed_at: datetime, context: NormalizationContext
+) -> list[NormalizedFact]:
+    """Execution-observed facts of the usage state.
+
+    A foreground usage event is a historical event: its device-local time becomes `event_time`
+    only through the recorded session timezone; otherwise `event_time` stays null and the local
+    text is kept in `context_json.local_time` with the reason. The resumed activity and the
+    running process are snapshots (current state) and never get an event time.
+    """
+    value = artifact.parsed_value_json
+    kind = artifact.artifact_type
+    package = artifact.subject_key
+    uid: int | None = None
+    extras: dict[str, object]
+    times: Mapping[str, Any]
+    if kind == _USAGE_EVENT:
+        event = _text(value, "event")
+        if event not in FOREGROUND_USAGE_EVENTS:
+            return []
+        package = _text(value, "package")
+        local_time = _text(value, "local_time")
+        event_time, note = local_wall_clock_to_utc(local_time, context.session_timezone)
+        extras = {
+            "event": event,
+            "user": value.get("user"),
+            "class": value.get("class"),
+            "local_time": local_time,
+        }
+        if event_time is None:
+            extras["event_time_note"] = note
+        else:
+            extras["timezone"] = context.session_timezone
+        claim = ("app_usage_observed", "usage_event", event)
+        times = historical_event_times(observed_at, event_time)
+    elif kind == _RESUMED_ACTIVITY:
+        if value.get("has_resumed_activity") is not True:
+            return []
+        package = _text(value, "package")
+        extras = {key: value.get(key) for key in ("user", "task", "display", "source")}
+        claim = ("activity_observed_resumed", "component", _text(value, "component"))
+        times = current_state_times(observed_at)
+    else:  # _RUNNING_PROCESS
+        if value.get("package") is None:
+            return []  # the name does not have the shape of a package: no subject, no fact
+        package = _text(value, "package")
+        pid, process_uid = value.get("pid"), value.get("uid")
+        if isinstance(process_uid, bool) or not isinstance(process_uid, int):
+            raise ValueError("running process has no integer uid")
+        uid = process_uid
+        extras = {"pid": pid, "user": value.get("user"), "process_name": value.get("name")}
+        claim = ("process_observed_running", "process", _text(value, "name"))
+        times = current_state_times(observed_at)
+    if not isinstance(package, str) or not package:
+        raise ValueError("execution artifact has no subject_key")
+    base: dict[str, Any] = {
+        "subject_package": package,
+        "subject_uid": uid,
+        "predicate_value": True,
+        "evidence_state": EvidenceState.observed_true,
+        "context_json": {
+            "artifact_type": artifact.artifact_type,
+            "parser_name": artifact.parser_name,
+            "parser_version": artifact.parser_version,
+            "line_no": value.get("line_no"),
+            **extras,
+        },
+        **times,
+    }
+    return split_claims(base, [claim])

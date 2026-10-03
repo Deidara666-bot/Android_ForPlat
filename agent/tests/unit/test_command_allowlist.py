@@ -50,6 +50,7 @@ def test_unknown_operation_is_not_allowed_and_audited(operation: str, audit_file
             "collect_package_inventory",
             "collect_package_detail",
             "collect_accessibility_state",
+            "collect_usage_state",
         }
     ),
 )

@@ -13,7 +13,7 @@ from src.device import adb_controller
 from src.device.adb_commands import OPERATION_ARGS, OPERATION_PARTS
 from src.exceptions import OperationNotAllowedError, OperationNotMappedError
 
-_PARAMETERLESS = {"collect_device_metadata", "collect_package_inventory"}
+_PARAMETERLESS = {"collect_device_metadata", "collect_package_inventory", "collect_usage_state"}
 _MAPPED = _PARAMETERLESS | {"collect_package_detail", "collect_accessibility_state"}
 
 
@@ -28,10 +28,10 @@ def _records(path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
-def test_eight_allowed_four_mapped_four_not_mapped() -> None:
+def test_eight_allowed_five_mapped_three_not_mapped() -> None:
     assert len(ALLOWED_OPERATIONS) == 8
     assert set(OPERATION_ARGS) | set(OPERATION_PARTS) == _MAPPED
-    assert len(ALLOWED_OPERATIONS - _MAPPED) == 4
+    assert len(ALLOWED_OPERATIONS - _MAPPED) == 3
 
 
 def test_mapped_operations_resolve_to_registered_argument_lists() -> None:
@@ -51,7 +51,7 @@ def test_resolve_returns_a_copy_so_callers_cannot_mutate_the_allowlist() -> None
 
 
 @pytest.mark.parametrize("operation", sorted(ALLOWED_OPERATIONS - _MAPPED))
-def test_four_other_ids_stay_not_mapped(operation: str, audit_file: Path) -> None:
+def test_three_other_ids_stay_not_mapped(operation: str, audit_file: Path) -> None:
     with pytest.raises(OperationNotMappedError):
         resolve_operation(operation, {})
     assert _records(audit_file)[0]["error_class"] == "OperationNotMappedError"
@@ -182,3 +182,17 @@ def test_accessibility_state_rejects_bad_parameters_before_any_part(
         resolve_operation_parts("collect_accessibility_state", parameters)
     assert _records(audit_file)[0]["event"] == "operation_rejected"
     assert "rm -rf" not in json.dumps(_records(audit_file)[0])
+
+
+def test_usage_state_resolves_to_three_ordered_parameterless_parts() -> None:
+    assert resolve_operation_parts("collect_usage_state", {}) == [
+        ("dumpsys usagestats", ["shell", "dumpsys", "usagestats"]),
+        ("dumpsys activity", ["shell", "dumpsys", "activity", "activities"]),
+        ("ps", ["shell", "ps", "-A", "-o", "PID,UID,USER,NAME"]),
+    ]
+
+
+def test_usage_state_takes_no_parameters_not_even_a_package(audit_file: Path) -> None:
+    with pytest.raises(ValueError, match="does not accept parameters"):
+        resolve_operation_parts("collect_usage_state", {"package_name": "com.android.settings"})
+    assert _records(audit_file)[0]["event"] == "operation_rejected"

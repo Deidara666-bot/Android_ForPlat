@@ -28,3 +28,6 @@ SPECIAL_ACCESS_DRAW_OVER = "draw_over_other_apps"
 BIND_ACCESSIBILITY_PERMISSION = "android.permission.BIND_ACCESSIBILITY_SERVICE"
 BIND_NOTIFICATION_LISTENER_PERMISSION = "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
 OVERLAY_PERMISSION = "android.permission.SYSTEM_ALERT_WINDOW"
+
+# Usage events that mark an app coming to the foreground. Other events stay as artifacts only.
+FOREGROUND_USAGE_EVENTS: frozenset[str] = frozenset({"ACTIVITY_RESUMED", "MOVE_TO_FOREGROUND"})

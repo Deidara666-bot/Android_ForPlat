@@ -130,7 +130,7 @@ def test_file_name_uses_the_sequence_carried_by_the_job(
 def test_unmapped_operation_never_calls_adb_and_reports_failure(
     tmp_path: Path, adb_calls: list[tuple[list[str], str | None]], audit_file: Path
 ) -> None:
-    status = AcquisitionRunner(_UPLOADER, raw_root=tmp_path).run_job(_job("collect_usage_state"))
+    status = AcquisitionRunner(_UPLOADER, raw_root=tmp_path).run_job(_job("collect_network_stats"))
     assert adb_calls == []
     assert status is not None
     assert status["returncode"] == -1
