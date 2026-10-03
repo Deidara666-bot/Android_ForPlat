@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from app.core import raw_sources
 from app.core.constants import AvailabilityStatus, EvidenceState, ParseStatus
 from app.normalization.event_schema import NormalizedFact
 from app.normalization.subject_resolution import (
@@ -462,11 +463,11 @@ def _normalize_static(
 # (`NormalizationService`) checks that through `CoverageService`; this code only reads artifacts.
 # Each fact comes with the artifact that proves the absence: the row showing the source was read.
 
-_A11Y_PART = ("collect_accessibility_state", "settings secure a11y")
-_NLS_PART = ("collect_accessibility_state", "settings secure nls")
-_OVERLAY_PART = ("collect_accessibility_state", "appops overlay")
-_DETAIL_PART = ("collect_package_detail", "dumpsys package")
-_MANIFEST_PART = ("pull_subject_apk", "static:manifest.txt")
+_A11Y_PART = ("collect_accessibility_state", raw_sources.SETTINGS_SECURE_A11Y)
+_NLS_PART = ("collect_accessibility_state", raw_sources.SETTINGS_SECURE_NLS)
+_OVERLAY_PART = ("collect_accessibility_state", raw_sources.APPOPS_OVERLAY)
+_DETAIL_PART = ("collect_package_detail", raw_sources.DUMPSYS_PACKAGE)
+_MANIFEST_PART = ("pull_subject_apk", raw_sources.STATIC_MANIFEST)
 NEGATIVE_SOURCES: frozenset[tuple[str, str]] = frozenset(
     {_A11Y_PART, _NLS_PART, _OVERLAY_PART, _DETAIL_PART, _MANIFEST_PART}
 )

@@ -60,8 +60,7 @@ async def create_acquisition(
     audit = AuditService(db)
     try:
         operations = service.operations_for(body.profile, body.operation)
-        if body.operation is not None:
-            service.validate_parameters(body.operation, body.parameters)
+        service.validate_session_parameters(operations, body.parameters)
     except (
         OperationNotMappedError,
         OperationNotAllowedError,
@@ -87,7 +86,7 @@ async def create_acquisition(
             "OperationNotMappedError": f"operasi '{body.operation}' belum dipetakan",
             "OperationNotAllowedError": f"operasi '{body.operation}' bukan operasi allowlist",
             "UnknownProfileError": f"profil '{body.profile}' tidak ada",
-            "InvalidParametersError": f"parameter operasi '{body.operation}' tidak valid",
+            "InvalidParametersError": f"parameter sesi '{requested}' tidak valid",
         }
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, detail={"jenis": kind, "pesan": messages[kind]}

@@ -41,7 +41,10 @@ class AcquisitionDetailOut(AcquisitionSessionOut):
 
 
 class AcquisitionCreate(BaseModel):
-    """Request a session by `profile` or by a single `operation` (exactly one of them)."""
+    """Request a session by `profile` or by a single `operation` (exactly one of them).
+
+    `parameters` are the session subject: every operation that takes parameters gets them,
+    the others get none."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -55,8 +58,6 @@ class AcquisitionCreate(BaseModel):
     def _exactly_one_selector(self) -> "AcquisitionCreate":
         if (self.profile is None) == (self.operation is None):
             raise ValueError("provide exactly one of `profile` or `operation`")
-        if self.profile is not None and self.parameters:
-            raise ValueError("`parameters` apply to a single `operation`, not to a `profile`")
         return self
 
 

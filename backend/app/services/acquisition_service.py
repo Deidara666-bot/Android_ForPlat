@@ -14,6 +14,7 @@ from app.core.constants import (
     OPERATION_PARAMETERS,
     OPERATION_SOURCE_GROUP,
     PACKAGE_NAME_PATTERN,
+    SESSION_FIRST_OPERATION,
     AvailabilityStatus,
     SessionStatus,
 )
@@ -69,8 +70,25 @@ class AcquisitionService:
                 raise InvalidParametersError(f"parameter {name!r} has an invalid shape")
 
     @staticmethod
+    def validate_session_parameters(operations: list[str], parameters: dict[str, str]) -> None:
+        """The session's parameters are the union of what its operations take: all of them
+        present, none extra, each with a valid shape. Operations without parameters get none."""
+        needed = {name for item in operations for name in OPERATION_PARAMETERS.get(item, ())}
+        if set(parameters) != needed:
+            raise InvalidParametersError(f"this session takes {sorted(needed)!r}")
+        for name, value in parameters.items():
+            if name == "package_name" and re.fullmatch(PACKAGE_NAME_PATTERN, value) is None:
+                raise InvalidParametersError(f"parameter {name!r} has an invalid shape")
+
+    @staticmethod
+    def parameters_for(operation: str, parameters: dict[str, str]) -> dict[str, str]:
+        """The part of the session's parameters one operation takes (`{}` for most)."""
+        return {name: parameters[name] for name in OPERATION_PARAMETERS.get(operation, ())}
+
+    @staticmethod
     def operations_for(profile: str | None, operation: str | None) -> list[str]:
-        """Operation IDs to run, validated. Exactly one of `profile` / `operation` is expected."""
+        """Operation IDs to run, validated. Exactly one of `profile` / `operation` is expected.
+        `collect_device_metadata` is added as the first operation when the request lacks it."""
         if profile is not None:
             if profile not in ACQUISITION_PROFILES:
                 raise UnknownProfileError(f"profile {profile!r} does not exist")
@@ -79,6 +97,8 @@ class AcquisitionService:
             operations = [str(operation)]
         for item in operations:
             AcquisitionService.validate_operation(item)
+        if SESSION_FIRST_OPERATION not in operations:
+            operations.insert(0, SESSION_FIRST_OPERATION)
         return operations
 
     def build_job(
@@ -133,7 +153,7 @@ class AcquisitionService:
                 session_id=session.id,
                 sequence=index,
                 operation_id=operation,
-                parameters=dict(parameters or {}),
+                parameters=self.parameters_for(operation, parameters or {}),
             )
             for index, operation in enumerate(operations, start=1)
         ]

@@ -370,11 +370,13 @@ def test_package_detail_sends_the_validated_parameter_in_the_job_and_stores_it(
             headers=auth_headers,
         )
         assert response.status_code == 201, response.text
-        job = ws.receive_json()
+        first, job = ws.receive_json(), ws.receive_json()
+    assert first["operation"] == "collect_device_metadata" and first["sequence"] == 1
+    assert first["parameters"] == {}
     assert set(job) == _EIGHT_KEYS
-    assert job["operation"] == _DETAIL
+    assert job["operation"] == _DETAIL and job["sequence"] == 2
     assert job["parameters"] == {"package_name": "com.android.settings"}
-    stored = response.json()["operations"][0]
+    stored = response.json()["operations"][1]
     assert stored["parameters"] == {"package_name": "com.android.settings"}
 
 
@@ -455,3 +457,143 @@ def test_non_string_parameter_value_is_422(
         headers=auth_headers,
     )
     assert response.status_code == 422
+
+
+# --- session subject and the metadata operation that always comes first (v0.45.8) ------------
+
+
+def _post_session(
+    client: TestClient, headers: dict[str, str], case: Case, device: Device, **extra: object
+) -> object:
+    return client.post("/api/acquisitions", json=_body(case, device, **extra), headers=headers)
+
+
+def test_a_single_operation_session_starts_with_the_metadata_operation(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    case: Case,
+    device: Device,
+    agent_token: str,
+) -> None:
+    with client.websocket_connect(
+        "/ws/agent", headers={"Authorization": f"Bearer {agent_token}"}
+    ) as ws:
+        response = _post_session(
+            client, auth_headers, case, device, operation="collect_usage_state"
+        )
+        assert response.status_code == 201, response.text  # type: ignore[attr-defined]
+        jobs = [ws.receive_json(), ws.receive_json()]
+    operations = response.json()["operations"]  # type: ignore[attr-defined]
+    assert [(o["sequence"], o["operation_id"]) for o in operations] == [
+        (1, "collect_device_metadata"),
+        (2, "collect_usage_state"),
+    ]
+    assert [(j["sequence"], j["operation"]) for j in jobs] == [
+        (1, "collect_device_metadata"),
+        (2, "collect_usage_state"),
+    ]
+
+
+def test_a_request_that_already_holds_the_metadata_operation_gets_no_second_one(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    case: Case,
+    device: Device,
+    agent_token: str,
+) -> None:
+    with client.websocket_connect(
+        "/ws/agent", headers={"Authorization": f"Bearer {agent_token}"}
+    ) as ws:
+        response = _post_session(
+            client, auth_headers, case, device, operation="collect_device_metadata"
+        )
+        assert response.status_code == 201  # type: ignore[attr-defined]
+        ws.receive_json()
+    assert [o["operation_id"] for o in response.json()["operations"]] == [  # type: ignore[attr-defined]
+        "collect_device_metadata"
+    ]
+
+
+def test_a_profile_with_a_subject_gives_it_only_to_the_operations_that_take_one(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    case: Case,
+    device: Device,
+    agent_token: str,
+) -> None:
+    with client.websocket_connect(
+        "/ws/agent", headers={"Authorization": f"Bearer {agent_token}"}
+    ) as ws:
+        response = _post_session(
+            client,
+            auth_headers,
+            case,
+            device,
+            profile="tier2_g1",
+            parameters={"package_name": "com.android.settings"},
+        )
+        assert response.status_code == 201, response.text  # type: ignore[attr-defined]
+        jobs = [ws.receive_json() for _ in range(6)]
+    by_operation = {job["operation"]: job for job in jobs}
+    assert [job["operation"] for job in jobs] == [
+        "collect_device_metadata",
+        "collect_package_inventory",
+        "collect_package_detail",
+        "collect_accessibility_state",
+        "collect_usage_state",
+        "pull_subject_apk",
+    ]
+    subject = {"package_name": "com.android.settings"}
+    for name in ("collect_package_detail", "collect_accessibility_state", "pull_subject_apk"):
+        assert by_operation[name]["parameters"] == subject
+    for name in ("collect_device_metadata", "collect_package_inventory", "collect_usage_state"):
+        assert by_operation[name]["parameters"] == {}
+    stored = {o["operation_id"]: o["parameters"] for o in response.json()["operations"]}  # type: ignore[attr-defined]
+    assert stored["collect_usage_state"] == {} and stored["collect_package_detail"] == subject
+
+
+def test_g1_full_is_the_same_sequence_as_tier2_g1() -> None:
+    from app.core.constants import ACQUISITION_PROFILES
+
+    assert ACQUISITION_PROFILES["g1_full"] == ACQUISITION_PROFILES["tier2_g1"]
+
+
+@pytest.mark.parametrize(
+    ("extra", "why"),
+    [
+        ({"profile": "tier2_g1"}, "a profile with subject operations needs the subject"),
+        (
+            {"profile": "baseline_v030", "parameters": {"package_name": "com.x"}},
+            "no operation of the profile takes a subject",
+        ),
+        (
+            {"profile": "tier2_g1", "parameters": {"package_name": "com.x; id"}},
+            "the subject has an invalid shape",
+        ),
+        (
+            {"profile": "tier2_g1", "parameters": {"package_name": "com.x", "extra": "y"}},
+            "no extra names",
+        ),
+        (
+            {"operation": "collect_usage_state", "parameters": {"package_name": "com.x"}},
+            "an operation without parameters takes none",
+        ),
+    ],
+)
+def test_session_parameters_must_match_what_its_operations_take(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    case: Case,
+    device: Device,
+    session: Session,
+    extra: dict[str, object],
+    why: str,
+) -> None:
+    from sqlalchemy import select
+
+    from app.models.acquisition_session import AcquisitionSession
+
+    response = _post_session(client, auth_headers, case, device, **extra)
+    assert response.status_code == 422, why  # type: ignore[attr-defined]
+    assert response.json()["detail"]["jenis"] == "InvalidParametersError"  # type: ignore[attr-defined]
+    assert list(session.scalars(select(AcquisitionSession))) == []

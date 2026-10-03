@@ -136,9 +136,21 @@ OPERATION_SOURCE_GROUP: dict[str, str | None] = {
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 # Named operation sequences a session may request (the agent keeps the same profile table).
+_G1_OPERATIONS = (
+    "collect_device_metadata",
+    "collect_package_inventory",
+    "collect_package_detail",
+    "collect_accessibility_state",
+    "collect_usage_state",
+    "pull_subject_apk",
+)
 ACQUISITION_PROFILES: dict[str, tuple[str, ...]] = {
     "baseline_v030": ("collect_device_metadata", "collect_package_inventory"),
+    "g1_full": _G1_OPERATIONS,
+    "tier2_g1": _G1_OPERATIONS,  # the Tier-2 name of the same sequence (REF §TIER2)
 }
+# Every session starts with this operation: the session timezone comes only from its own evidence.
+SESSION_FIRST_OPERATION = "collect_device_metadata"
 
 # Order in which a failed acquisition is classified (first match wins, remainder is `failed`).
 AVAILABILITY_CHECK_ORDER = (
