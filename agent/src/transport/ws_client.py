@@ -70,8 +70,7 @@ async def _handle_messages(websocket: ClientConnection, runner: AcquisitionRunne
             continue
         if not isinstance(message, dict) or message.get("type") != "job":
             continue
-        status = await runner.handle_job(message)
-        if status is not None:
+        for status in await runner.handle_job(message):
             await websocket.send(json.dumps(status))
 
 

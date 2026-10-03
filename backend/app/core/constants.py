@@ -104,12 +104,18 @@ ALLOWED_OPERATIONS: frozenset[str] = frozenset(
 )
 # Operations the agent can run today; the others are rejected as not mapped yet.
 MAPPED_OPERATIONS: frozenset[str] = frozenset(
-    {"collect_device_metadata", "collect_package_inventory", "collect_package_detail"}
+    {
+        "collect_device_metadata",
+        "collect_package_inventory",
+        "collect_package_detail",
+        "collect_accessibility_state",
+    }
 )
 
 # Parameter names each operation requires (none for the others); values are validated by shape.
 OPERATION_PARAMETERS: dict[str, tuple[str, ...]] = {
     "collect_package_detail": ("package_name",),
+    "collect_accessibility_state": ("package_name",),
 }
 PACKAGE_NAME_PATTERN = r"^[A-Za-z0-9_.]{1,200}$"
 
@@ -118,6 +124,7 @@ OPERATION_SOURCE_GROUP: dict[str, str | None] = {
     "collect_device_metadata": None,
     "collect_package_inventory": SourceGroup.APP_SYSTEM_STATE.value,
     "collect_package_detail": SourceGroup.APP_SYSTEM_STATE.value,
+    "collect_accessibility_state": SourceGroup.APP_SYSTEM_STATE.value,
 }
 
 # Largest evidence file the upload endpoint accepts.

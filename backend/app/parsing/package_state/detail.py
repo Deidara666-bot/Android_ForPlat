@@ -1,4 +1,4 @@
-"""Parser for `dumpsys package <pkg>` (operation `collect_package_detail`).
+"""Parser for the per-package dump (operation `collect_package_detail`).
 
 Strict by design: if the output does not have the structure this parser knows, the result is one
 `failed` artifact and nothing is read partially. Inside a recognised section, a line that does not
@@ -7,8 +7,8 @@ fit its expected shape becomes a `failed` artifact that keeps the original line.
 Only these parts of the output become artifacts; the rest stays in the raw evidence file:
 identity keys of the `Package [<name>]` block, its requested/install/runtime permissions (plus the
 permissions of its shared user), and the components that appear in the four resolver tables.
-A component with no intent filter is not printed by dumpsys, so `component_declared` is a list of
-the components that dumpsys shows, not a complete manifest.
+A component with no intent filter is not printed in this dump, so `component_declared` is a list
+of the components the dump shows, not a complete manifest.
 """
 
 import re
@@ -138,11 +138,13 @@ class PackageDetailParser:
             return [decode_failure(_IDENTITY_TYPE, self.parser_name, self.parser_version, error)]
         lines = numbered_lines(text)
         if all(line.strip() == "" for _, line in lines):
-            return [self._whole("", ParseStatus.empty, "bukti tidak memuat keluaran dumpsys")]
+            return [self._whole("", ParseStatus.empty, "bukti tidak memuat keluaran dump paket")]
         if lines[0][1].startswith("Unable to find package:"):
             return [
                 self._whole(
-                    lines[0][1], ParseStatus.failed, "dumpsys melaporkan paket tidak ditemukan"
+                    lines[0][1],
+                    ParseStatus.failed,
+                    "keluaran dump melaporkan paket tidak ditemukan",
                 )
             ]
 

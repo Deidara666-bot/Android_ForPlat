@@ -29,6 +29,9 @@ _GRANTED = "granted_permission"
 _COMPONENT = "component_declared"
 _ACTION = "intent_filter_action"
 DETAIL_ARTIFACT_TYPES = frozenset({_IDENTITY, _REQUESTED, _GRANTED, _COMPONENT, _ACTION})
+_SECURE_LIST = "settings_secure_list"
+_SECURE_COMPONENT = "enabled_special_access_component"
+_OVERLAY_APP_OP = "overlay_app_op"
 
 _SPECIAL = "special_access_capability_observed_declared"
 
@@ -95,6 +98,10 @@ def normalize(
         return []
     if artifact.artifact_type in DETAIL_ARTIFACT_TYPES:
         return _normalize_detail(artifact, observed_at, context or NormalizationContext())
+    if artifact.artifact_type == _SECURE_LIST:
+        return []  # proof that the whole value was read; the components carry the facts
+    if artifact.artifact_type in (_SECURE_COMPONENT, _OVERLAY_APP_OP):
+        return _normalize_special_access_state(artifact, observed_at)
     if artifact.artifact_type != INVENTORY_ARTIFACT_TYPE:
         raise UnsupportedArtifactTypeError(artifact.artifact_type)
 
@@ -213,3 +220,45 @@ def _normalize_detail(
         **current_state_times(observed_at),
     }
     return split_claims(base, claims)
+
+
+def _normalize_special_access_state(
+    artifact: ArtifactLike, observed_at: datetime
+) -> list[NormalizedFact]:
+    """`special_access_capability_observed_enabled` from an enabled-services entry or an app-op.
+
+    A component in the enabled list is an enabled special access for its package. The overlay
+    app-op counts only when its mode is exactly `allow`; any other mode (`default`, `ignore`,
+    `deny`) yields no fact here. Enabled is a state, not proof that the access was used.
+    """
+    package = artifact.subject_key
+    if not isinstance(package, str) or not package:
+        raise ValueError("special-access artifact has no subject_key")
+    value = artifact.parsed_value_json
+    if artifact.artifact_type == _SECURE_COMPONENT:
+        access = _text(value, "special_access")
+        if access not in (SPECIAL_ACCESS_ACCESSIBILITY, SPECIAL_ACCESS_NOTIFICATION_LISTENER):
+            raise ValueError(f"special_access {access!r} is not in the closed vocabulary")
+        extras: dict[str, object] = {"component": _text(value, "component")}
+    else:
+        if _text(value, "mode") != "allow":
+            return []
+        access = SPECIAL_ACCESS_DRAW_OVER
+        extras = {"mode": "allow", "mode_source": value.get("mode_source")}
+    base: dict[str, Any] = {
+        "subject_package": package,
+        "subject_uid": None,
+        "predicate_value": True,
+        "evidence_state": EvidenceState.observed_true,
+        "context_json": {
+            "artifact_type": artifact.artifact_type,
+            "parser_name": artifact.parser_name,
+            "parser_version": artifact.parser_version,
+            "line_no": value.get("line_no"),
+            **extras,
+        },
+        **current_state_times(observed_at),
+    }
+    return split_claims(
+        base, [("special_access_capability_observed_enabled", "special_access", access)]
+    )

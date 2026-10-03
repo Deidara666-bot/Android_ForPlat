@@ -13,9 +13,26 @@ OPERATION_ARGS: dict[str, list[str]] = {
     "collect_package_detail": ["shell", "dumpsys", "package", "{package_name}"],
 }
 
+# Multi-command operations: ordered `(raw_source label, adb arguments)`, one evidence file per
+# command (`part` 1..n). Same `{name}` substitution rules as OPERATION_ARGS.
+OPERATION_PARTS: dict[str, list[tuple[str, list[str]]]] = {
+    "collect_accessibility_state": [
+        (
+            "settings secure a11y",
+            ["shell", "settings", "get", "secure", "enabled_accessibility_services"],
+        ),
+        (
+            "settings secure nls",
+            ["shell", "settings", "get", "secure", "enabled_notification_listeners"],
+        ),
+        ("appops overlay", ["shell", "appops", "get", "{package_name}", "SYSTEM_ALERT_WINDOW"]),
+    ],
+}
+
 # Operation ID -> the exact parameter names the job must carry (none for the others).
 OPERATION_PARAMETERS: dict[str, tuple[str, ...]] = {
     "collect_package_detail": ("package_name",),
+    "collect_accessibility_state": ("package_name",),
 }
 
 # Shape of a package name accepted as a parameter (REF §OPS2); no '-', so never an adb option.

@@ -4,13 +4,17 @@ from pathlib import Path
 import pytest
 
 from src.acquisition.acquisition_profiles import PROFILES
-from src.acquisition.command_allowlist import ALLOWED_OPERATIONS, resolve_operation
+from src.acquisition.command_allowlist import (
+    ALLOWED_OPERATIONS,
+    resolve_operation,
+    resolve_operation_parts,
+)
 from src.device import adb_controller
-from src.device.adb_commands import OPERATION_ARGS
+from src.device.adb_commands import OPERATION_ARGS, OPERATION_PARTS
 from src.exceptions import OperationNotAllowedError, OperationNotMappedError
 
 _PARAMETERLESS = {"collect_device_metadata", "collect_package_inventory"}
-_MAPPED = _PARAMETERLESS | {"collect_package_detail"}
+_MAPPED = _PARAMETERLESS | {"collect_package_detail", "collect_accessibility_state"}
 
 
 @pytest.fixture
@@ -24,10 +28,10 @@ def _records(path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
-def test_eight_allowed_three_mapped_five_not_mapped() -> None:
+def test_eight_allowed_four_mapped_four_not_mapped() -> None:
     assert len(ALLOWED_OPERATIONS) == 8
-    assert set(OPERATION_ARGS) == _MAPPED
-    assert len(ALLOWED_OPERATIONS - set(OPERATION_ARGS)) == 5
+    assert set(OPERATION_ARGS) | set(OPERATION_PARTS) == _MAPPED
+    assert len(ALLOWED_OPERATIONS - _MAPPED) == 4
 
 
 def test_mapped_operations_resolve_to_registered_argument_lists() -> None:
@@ -47,7 +51,7 @@ def test_resolve_returns_a_copy_so_callers_cannot_mutate_the_allowlist() -> None
 
 
 @pytest.mark.parametrize("operation", sorted(ALLOWED_OPERATIONS - _MAPPED))
-def test_five_other_ids_stay_not_mapped(operation: str, audit_file: Path) -> None:
+def test_four_other_ids_stay_not_mapped(operation: str, audit_file: Path) -> None:
     with pytest.raises(OperationNotMappedError):
         resolve_operation(operation, {})
     assert _records(audit_file)[0]["error_class"] == "OperationNotMappedError"
@@ -138,3 +142,43 @@ def test_package_detail_rejects_a_bad_package_name_before_adb(
     records = _records(audit_file)
     assert len(records) == 1 and records[0]["event"] == "operation_rejected"
     assert "rm -rf" not in json.dumps(records[0])
+
+
+def test_accessibility_state_resolves_to_three_ordered_parts() -> None:
+    parts = resolve_operation_parts(
+        "collect_accessibility_state", {"package_name": "com.android.settings"}
+    )
+    assert parts == [
+        (
+            "settings secure a11y",
+            ["shell", "settings", "get", "secure", "enabled_accessibility_services"],
+        ),
+        (
+            "settings secure nls",
+            ["shell", "settings", "get", "secure", "enabled_notification_listeners"],
+        ),
+        (
+            "appops overlay",
+            ["shell", "appops", "get", "com.android.settings", "SYSTEM_ALERT_WINDOW"],
+        ),
+    ]
+    # the registered templates are never mutated by a call
+    assert OPERATION_PARTS["collect_accessibility_state"][2][1][3] == "{package_name}"
+
+
+def test_single_command_resolution_refuses_a_multi_part_operation() -> None:
+    with pytest.raises(ValueError, match="several parts"):
+        resolve_operation("collect_accessibility_state", {"package_name": "com.android.settings"})
+
+
+@pytest.mark.parametrize(
+    "parameters",
+    [{}, {"package_name": "com.x; rm -rf /"}, {"package_name": "-h"}, {"pkg": "com.x"}],
+)
+def test_accessibility_state_rejects_bad_parameters_before_any_part(
+    parameters: dict[str, str], audit_file: Path
+) -> None:
+    with pytest.raises(ValueError):
+        resolve_operation_parts("collect_accessibility_state", parameters)
+    assert _records(audit_file)[0]["event"] == "operation_rejected"
+    assert "rm -rf" not in json.dumps(_records(audit_file)[0])

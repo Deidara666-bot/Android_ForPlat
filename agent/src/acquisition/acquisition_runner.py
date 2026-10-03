@@ -9,9 +9,8 @@ from typing import Any
 from pydantic import ValidationError
 
 from src.acquisition.availability import classify_failure, is_acquired
-from src.acquisition.command_allowlist import resolve_operation
+from src.acquisition.command_allowlist import resolve_operation_parts
 from src.acquisition.evidence_writer import write_evidence
-from src.device.adb_commands import RAW_SOURCE_LABEL
 from src.device.adb_controller import adb_version, run_adb
 from src.device.device_detection import collect_safe_metadata, detect_devices
 from src.exceptions import AgentError
@@ -21,9 +20,6 @@ from src.state.audit_logger import audit
 from src.transport.uploader import EvidenceUploader
 
 RAW_ROOT = Path(__file__).resolve().parents[2] / "var" / "raw"
-# v0.30 operations run one command each; multi-command operations arrive in v0.45.
-_PART = 1
-_PARTS_TOTAL = 1
 
 
 def _failure_reason(exc: Exception) -> str:
@@ -36,6 +32,9 @@ class AcquisitionRunner:
     """Executes jobs one at a time. Evidence goes to disk byte-exact before it is hashed.
 
     The job names its device (`serial`) and its position (`sequence`); the agent chooses neither.
+    An operation with several commands runs them in order, one evidence file and one status per
+    command (`part`), and stops after the first command that is not acquired: the backend marks
+    the operation failed at that point and ignores later statuses for it.
     """
 
     def __init__(
@@ -50,26 +49,48 @@ class AcquisitionRunner:
         self._tool_version: str | None = None
         self._device_context: dict[str, dict[str, Any]] = {}
 
-    async def handle_job(self, message: dict[str, Any]) -> dict[str, Any] | None:
-        """Return the `job_status` message, or None when the job is too malformed to report."""
-        return await asyncio.to_thread(self.run_job, message)
+    async def handle_job(self, message: dict[str, Any]) -> list[dict[str, Any]]:
+        """The `job_status` messages to send, in order; empty when the job is too malformed."""
+        return await asyncio.to_thread(self.run_job_parts, message)
 
     def run_job(self, message: dict[str, Any]) -> dict[str, Any] | None:
+        """The last status of the job, i.e. the one that decides the operation."""
+        statuses = self.run_job_parts(message)
+        return statuses[-1] if statuses else None
+
+    def run_job_parts(self, message: dict[str, Any]) -> list[dict[str, Any]]:
         try:
             job = AcquisitionJob(**message)
             uuid.UUID(job.session_id)  # the folder name comes from this value
         except (ValidationError, ValueError, TypeError) as exc:
             audit("job_rejected", "invalid job message", error_class=type(exc).__name__)
-            return self._failed_from_raw(message, type(exc).__name__)
+            status = self._failed_from_raw(message, type(exc).__name__)
+            return [status] if status is not None else []
 
+        try:
+            parts = resolve_operation_parts(job.operation, job.parameters)
+            self._require_ready(job.serial)
+        except (AgentError, ValueError, OSError, KeyError) as exc:
+            return [self._job_failed(job, exc)]
+
+        statuses: list[dict[str, Any]] = []
+        for part, (label, args) in enumerate(parts, start=1):
+            status = self._run_part(job, part, len(parts), label, args)
+            statuses.append(status)
+            if status["availability_status"] != AvailabilityStatus.acquired.value:
+                break
+        return statuses
+
+    def _run_part(
+        self, job: AcquisitionJob, part: int, parts_total: int, label: str, args: list[str]
+    ) -> dict[str, Any]:
         digest: str | None = None
         size: int | None = None
         try:
-            args = resolve_operation(job.operation, job.parameters)
-            self._require_ready(job.serial)
             result = run_adb(args, job.serial, adb_path=self._adb_path)
             acquired_at = datetime.now(UTC)
-            path = self._raw_root / job.session_id / f"{job.sequence}-{job.operation}-{_PART}.bin"
+            name = f"{job.sequence}-{job.operation}-{part}.bin"
+            path = self._raw_root / job.session_id / name
             size = write_evidence(path, result.stdout)
             digest = sha256_file(path)
             availability, reason = AvailabilityStatus.acquired, None
@@ -80,11 +101,11 @@ class AcquisitionRunner:
                     session_id=job.session_id,
                     operation_id=job.operation,
                     sequence=job.sequence,
-                    part=_PART,
+                    part=part,
                     sha256_agent=digest,
                     size_bytes=size,
                     acquired_at=acquired_at,
-                    raw_source=RAW_SOURCE_LABEL[job.operation],
+                    raw_source=label,
                     tool_version=self._tool_version,
                     android_version=context.get("android_version"),
                     device_build=context.get("device_build"),
@@ -93,30 +114,16 @@ class AcquisitionRunner:
             else:  # nothing usable to upload: report why (unsupported/denied/unavailable/failed)
                 availability, reason = classify_failure(result)
         except (AgentError, ValueError, OSError, KeyError) as exc:
-            audit(
-                "job_failed",
-                type(exc).__name__,
-                session_id=job.session_id,
-                sequence=job.sequence,
-                operation=job.operation,
-            )
             # Keep the digest and size when the file exists locally but the upload failed.
-            return self._status(
-                job.session_id,
-                job.sequence,
-                job.operation,
-                job.serial,
-                sha256_agent=digest,
-                size_bytes=size,
-                error=type(exc).__name__,
-                availability=AvailabilityStatus.failed,
-                reason=_failure_reason(exc),
+            return self._job_failed(
+                job, exc, part=part, parts_total=parts_total, digest=digest, size=size
             )
 
         audit(
             "job_done",
             session_id=job.session_id,
             sequence=job.sequence,
+            part=part,
             operation=job.operation,
             returncode=result.returncode,
             size_bytes=size,
@@ -127,11 +134,45 @@ class AcquisitionRunner:
             job.sequence,
             job.operation,
             job.serial,
+            part=part,
+            parts_total=parts_total,
             sha256_agent=digest,
             size_bytes=size,
             returncode=result.returncode,
             availability=availability,
             reason=reason,
+        )
+
+    def _job_failed(
+        self,
+        job: AcquisitionJob,
+        exc: Exception,
+        *,
+        part: int = 1,
+        parts_total: int = 1,
+        digest: str | None = None,
+        size: int | None = None,
+    ) -> dict[str, Any]:
+        audit(
+            "job_failed",
+            type(exc).__name__,
+            session_id=job.session_id,
+            sequence=job.sequence,
+            part=part,
+            operation=job.operation,
+        )
+        return self._status(
+            job.session_id,
+            job.sequence,
+            job.operation,
+            job.serial,
+            part=part,
+            parts_total=parts_total,
+            sha256_agent=digest,
+            size_bytes=size,
+            error=type(exc).__name__,
+            availability=AvailabilityStatus.failed,
+            reason=_failure_reason(exc),
         )
 
     def _context_for(self, serial: str) -> dict[str, Any]:
@@ -172,6 +213,8 @@ class AcquisitionRunner:
         operation: str,
         serial: str | None,
         *,
+        part: int = 1,
+        parts_total: int = 1,
         sha256_agent: str | None = None,
         size_bytes: int | None = None,
         returncode: int = -1,
@@ -183,8 +226,8 @@ class AcquisitionRunner:
             "type": "job_status",
             "session_id": session_id,
             "sequence": sequence,
-            "part": _PART,
-            "parts_total": _PARTS_TOTAL,
+            "part": part,
+            "parts_total": parts_total,
             "operation": operation,
             "serial": serial,
             "sha256_agent": sha256_agent,

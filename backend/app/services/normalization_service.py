@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 import app.parsing  # noqa: F401  (importing the package fills the parser registry)
 from app.core.constants import ActorType, AuditEventType, AvailabilityStatus, ParseStatus
+from app.models.acquisition_operation import AcquisitionOperation
 from app.models.acquisition_session import AcquisitionSession
 from app.models.artifact import Artifact
 from app.models.evidence import Evidence
@@ -76,7 +77,7 @@ def process_evidence(
         return _skip(db, evidence, f"availability_status={evidence.availability_status}")
     assert_evidence_ready(evidence.sha256_agent, evidence.sha256_server)
     try:
-        parser = get_parser(evidence.operation_id)
+        parser = get_parser(evidence.operation_id, evidence.raw_source)
     except UnknownOperationError:
         return _skip(db, evidence, f"tidak ada pengurai untuk {evidence.operation_id}")
     already = db.scalar(
@@ -94,8 +95,12 @@ def process_evidence(
         raise EvidenceNotReadyError("acquired evidence has no stored file")
 
     raw = ArtifactService().read_evidence_bytes(storage.resolve(evidence.stored_path))
+    if getattr(parser, "uses_parameters", False):
+        parsed = parser.parse(raw, parameters=_operation_parameters(db, evidence))  # type: ignore[call-arg]
+    else:
+        parsed = parser.parse(raw)
     with db.begin_nested():
-        rows = ArtifactService().store_artifacts(db, evidence.id, parser.parse(raw))
+        rows = ArtifactService().store_artifacts(db, evidence.id, parsed)
         facts = 0
         context = build_context(rows)
         for row in rows:
@@ -122,6 +127,26 @@ def process_evidence(
             details={"timezone": timezone, "source": _TIMEZONE_KEY},
         )
     return ProcessResult(evidence.id, len(rows), facts, None)
+
+
+def _operation_parameters(db: Session, evidence: Evidence) -> dict[str, str]:
+    """Parameters the operation was requested with (the output may not name its own subject).
+
+    Evidence carries no sequence, so the operation row is matched by (session, operation_id);
+    a session holds one row per operation id today.
+    """
+    row = db.scalar(
+        select(AcquisitionOperation)
+        .where(
+            AcquisitionOperation.session_id == evidence.acquisition_session_id,
+            AcquisitionOperation.operation_id == evidence.operation_id,
+        )
+        .order_by(AcquisitionOperation.sequence)
+        .limit(1)
+    )
+    if row is None or not isinstance(row.parameters, dict):
+        return {}
+    return {str(k): v for k, v in row.parameters.items() if isinstance(v, str)}
 
 
 def _fill_session_timezone(db: Session, evidence: Evidence, rows: list[Artifact]) -> str | None:
