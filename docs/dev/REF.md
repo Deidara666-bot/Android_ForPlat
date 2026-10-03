@@ -382,8 +382,16 @@ di sesi itu; **subjek** = hanya `parameters.package_name` sesi itu. Sumber = ses
   Runner memverifikasi `api` label = sdk perangkat yang tersambung; beda atau perangkat tidak ada → berhenti sebelum reset.
 - CSV `experiments/feasibility_tier2/results/<profile>_<env>.csv`, kolom:
   `artifact_id,env,subject,rep,android_version,api,build,device_or_emulator,operation_id,command,privilege_state,test_action,expected_evidence,actual_result,availability_status,availability_reason,raw_output_ref,temporal_semantics,git_commit,adb_version,acquired_at`.
-- Status per artefak per lingkungan: 3/3 = konsisten · 1–2/3 = `CONDITIONAL` · 0/3 = status non-acquired
-  dominan + alasan (⛔ tidak diciutkan). Ringkasan di `docs/tier2_<profile>.md`.
+- `actual_result` (per baris): `observed` (sumber terurai penuh + datum Tier-1 ada; nilai `null` setting terbaca utuh juga
+  `observed`) · `not_observed` (sumber terurai, datum kosong) · `not_evaluated` (Tier-2 belum bisa menilai artefak ini) ·
+  `parse_incomplete` · status non-acquired · `not_acquired`.
+- Status per artefak per lingkungan (per subjek): hitung ulangan `observed` → 3/3 = konsisten · 1–2/3 = `CONDITIONAL` ·
+  0/3 = dipilah §11.1 `unavailable`/`denied`/`unsupported`/`failed` + alasan (⛔ tidak diciutkan, ⛔ label lain):
+  `not_observed` → `unavailable` (sumber terakses, datum tidak muncul); `parse_incomplete` → `failed`.
+  Batas platform (mis. unggah > 50 MiB, HTTP 413) → `failed` + alasan "batas platform", bukan sifat perangkat; artefak dinilai
+  dari subjek lain bila ada. Ringkasan di `docs/tier2_<profile>.md`.
+- `not_evaluated` tidak masuk hitungan 3/3–0/3; dilaporkan terpisah dengan alasan dan kartu yang menilainya.
+  G1-B8 = `not_evaluated` sampai atribusi boot/package-event divalidasi (v0.80, simulator); ketersediaan sumbernya = G1-A10.
 - Pemetaan artefak Tier-1 → operasi: G1-A1/A2 `collect_package_inventory`/`pull_subject_apk` · G1-A3 `pull_subject_apk` ·
   G1-A4..A9, G1-B7 `collect_package_detail` · G1-A10, A11, B8 `collect_usage_state` · G1-B1..B3 `collect_accessibility_state` ·
   G2-C1, C3, C4 `collect_sensitive_provider_data` · G3-D1 `collect_network_stats`.

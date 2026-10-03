@@ -13,7 +13,7 @@
 | *Increment* aktif | **1 selesai** (irisan tegak minimum, tag `v0.40`). Berikutnya **2** |
 | Milestone aktif | **`v0.45`** berjalan (`feature/v0.45`; `docs/dev/v0.45.md` masih draf, belum `/plan-milestone`). `v0.40` tercapai (tag `v0.40`) |
 | Kartu terakhir | **`v0.45.8`** (2026-10-04) |
-| Kartu berikutnya | `/card v0.45.9` (Tier-2 G1 formatif 3 ulangan; AVD #1 + snapshot `clean`; kartu terakhir milestone → `/finish-branch`, lalu persetujuan `/milestone v0.45`). Satu kartu per "mulai" |
+| Kartu berikutnya | Commit `fix` G1-B8 → `not_evaluated` [v0.45.8], lalu `/card v0.45.9` (Tier-2 G1 formatif 3 ulangan; AVD #1 + snapshot `clean`; kartu terakhir milestone → `/finish-branch`, lalu persetujuan `/milestone v0.45`). Satu kartu per "mulai" |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30`, `v0.40` (2026-10-02)
@@ -143,6 +143,9 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
   label `raw_source` backend di `app/core/raw_sources.py`, grep larangan tetap (`.5`); semua part dijalankan + cakupan per part
   REF §COV (`.6`); negatif hanya untuk subjek sesi, overlay `default` tanpa fakta (`.7`); proses diikat lewat UID (`v0.60.2`).
   Kartu selesai tidak dikerjakan ulang.
+- 2026-10-04 — REF §TIER2: kosakata `actual_result` + pemetaan ke status §11.1 (`not_observed` → `unavailable`, batas platform
+  413 → `failed` + alasan, `not_evaluated` di luar hitungan). G1-B8 `not_evaluated` sampai v0.80 (atribusi); runner `.8` diperbaiki
+  lewat commit `fix [v0.45.8]` sebelum `.9`. `v0.80.9`: S-B utamakan APK ≤ 50 MiB.
 
 ## Keputusan / aksi user yang tertunda
 
