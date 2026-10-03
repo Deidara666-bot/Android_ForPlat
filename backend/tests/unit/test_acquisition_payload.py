@@ -27,6 +27,7 @@ _EIGHT_KEYS = {
 _PARAMS = {
     "collect_package_detail": {"package_name": "com.android.settings"},
     "collect_accessibility_state": {"package_name": "com.android.settings"},
+    "pull_subject_apk": {"package_name": "com.android.stk"},
 }
 
 
@@ -34,7 +35,7 @@ def _row(operation: str, sequence: int = 1) -> SimpleNamespace:
     return SimpleNamespace(operation_id=operation, sequence=sequence)
 
 
-def test_eight_allowed_and_five_mapped_operations() -> None:
+def test_eight_allowed_and_six_mapped_operations() -> None:
     assert len(ALLOWED_OPERATIONS) == 8
     assert MAPPED_OPERATIONS == {
         "collect_device_metadata",
@@ -42,6 +43,7 @@ def test_eight_allowed_and_five_mapped_operations() -> None:
         "collect_package_detail",
         "collect_accessibility_state",
         "collect_usage_state",
+        "pull_subject_apk",
     }
     assert MAPPED_OPERATIONS <= ALLOWED_OPERATIONS
 
@@ -91,6 +93,10 @@ def test_the_two_rejections_are_distinct_types() -> None:
         ("collect_accessibility_state", {}),
         ("collect_accessibility_state", {"package_name": "com.x; id"}),
         ("collect_accessibility_state", {"package_name": "com.x", "extra": "y"}),
+        ("pull_subject_apk", {}),
+        ("pull_subject_apk", {"package_name": "x", "path": "/sdcard/evil.apk"}),
+        ("pull_subject_apk", {"path": "/sdcard/evil.apk"}),
+        ("pull_subject_apk", {"package_name": "com.x; id"}),
         ("collect_device_metadata", {"package_name": "com.android.settings"}),
         ("collect_package_inventory", {"anything": "x"}),
     ],

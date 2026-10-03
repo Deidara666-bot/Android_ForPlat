@@ -32,6 +32,7 @@ def test_package_import_fills_registry() -> None:
             "collect_package_detail",
             "collect_accessibility_state",
             "collect_usage_state",
+            "pull_subject_apk",
         }
         assert isinstance(registry.get_parser("collect_package_inventory"), InventoryParser)
         assert isinstance(registry.get_parser("collect_device_metadata"), DeviceMetadataParser)

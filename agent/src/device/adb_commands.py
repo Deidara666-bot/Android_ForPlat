@@ -32,12 +32,23 @@ OPERATION_PARTS: dict[str, list[tuple[str, list[str]]]] = {
         ("dumpsys activity", ["shell", "dumpsys", "activity", "activities"]),
         ("ps", ["shell", "ps", "-A", "-o", "PID,UID,USER,NAME"]),
     ],
+    # Parts 3.. of this operation are the static extractor's bundle files, not adb commands.
+    # `{apk_path}` and `{local_path}` are filled by the runner (never from job parameters):
+    # the first from the output of part 1, the second from the evidence path of part 2.
+    "pull_subject_apk": [
+        ("pm path", ["shell", "pm", "path", "{package_name}"]),
+        ("apk file", ["pull", "{apk_path}", "{local_path}"]),
+    ],
 }
+
+# Where a pulled APK may live on the device (REF §OPS2); anything else is refused.
+APK_PATH_PATTERN = r"^/(data/app|system|product|system_ext)/[^\s]+\.apk$"
 
 # Operation ID -> the exact parameter names the job must carry (none for the others).
 OPERATION_PARAMETERS: dict[str, tuple[str, ...]] = {
     "collect_package_detail": ("package_name",),
     "collect_accessibility_state": ("package_name",),
+    "pull_subject_apk": ("package_name",),
 }
 
 # Shape of a package name accepted as a parameter (REF §OPS2); no '-', so never an adb option.

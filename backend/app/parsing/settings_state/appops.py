@@ -12,6 +12,7 @@ import re
 from collections.abc import Mapping
 
 from app.core.constants import ParseStatus
+from app.core.raw_sources import APPOPS_OVERLAY
 from app.parsing.base import ParsedArtifact
 from app.parsing.package_state._text import decode_failure, numbered_lines
 
@@ -27,7 +28,7 @@ class AppOpsOverlayParser:
     operation_id = "collect_accessibility_state"
     parser_name = "settings_state.appops"
     parser_version = "1"
-    raw_source = "appops overlay"
+    raw_source = APPOPS_OVERLAY
     uses_parameters = True
 
     def parse(

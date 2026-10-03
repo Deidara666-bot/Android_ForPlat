@@ -14,6 +14,7 @@ import re
 from datetime import datetime
 
 from app.core.constants import ParseStatus
+from app.core.raw_sources import DUMPSYS_USAGESTATS
 from app.parsing.base import ParsedArtifact
 from app.parsing.package_state._text import decode_failure, numbered_lines
 
@@ -36,7 +37,7 @@ class UsageStatsParser:
     operation_id = "collect_usage_state"
     parser_name = "usage_stats.usagestats"
     parser_version = "1"
-    raw_source = "dumpsys usagestats"
+    raw_source = DUMPSYS_USAGESTATS
 
     def parse(self, raw: bytes) -> list[ParsedArtifact]:
         try:

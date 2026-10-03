@@ -14,7 +14,11 @@ from src.device.adb_commands import OPERATION_ARGS, OPERATION_PARTS
 from src.exceptions import OperationNotAllowedError, OperationNotMappedError
 
 _PARAMETERLESS = {"collect_device_metadata", "collect_package_inventory", "collect_usage_state"}
-_MAPPED = _PARAMETERLESS | {"collect_package_detail", "collect_accessibility_state"}
+_MAPPED = _PARAMETERLESS | {
+    "collect_package_detail",
+    "collect_accessibility_state",
+    "pull_subject_apk",
+}
 
 
 @pytest.fixture
@@ -28,10 +32,10 @@ def _records(path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
-def test_eight_allowed_five_mapped_three_not_mapped() -> None:
+def test_eight_allowed_six_mapped_two_not_mapped() -> None:
     assert len(ALLOWED_OPERATIONS) == 8
     assert set(OPERATION_ARGS) | set(OPERATION_PARTS) == _MAPPED
-    assert len(ALLOWED_OPERATIONS - _MAPPED) == 3
+    assert len(ALLOWED_OPERATIONS - _MAPPED) == 2
 
 
 def test_mapped_operations_resolve_to_registered_argument_lists() -> None:
@@ -51,7 +55,7 @@ def test_resolve_returns_a_copy_so_callers_cannot_mutate_the_allowlist() -> None
 
 
 @pytest.mark.parametrize("operation", sorted(ALLOWED_OPERATIONS - _MAPPED))
-def test_three_other_ids_stay_not_mapped(operation: str, audit_file: Path) -> None:
+def test_two_other_ids_stay_not_mapped(operation: str, audit_file: Path) -> None:
     with pytest.raises(OperationNotMappedError):
         resolve_operation(operation, {})
     assert _records(audit_file)[0]["error_class"] == "OperationNotMappedError"

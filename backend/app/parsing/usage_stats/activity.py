@@ -9,6 +9,7 @@ spells it `mResumedActivity:`). The result is a snapshot, a current state, never
 import re
 
 from app.core.constants import ParseStatus
+from app.core.raw_sources import DUMPSYS_ACTIVITY
 from app.parsing.base import ParsedArtifact
 from app.parsing.package_state._text import decode_failure, numbered_lines
 
@@ -27,7 +28,7 @@ class ResumedActivityParser:
     operation_id = "collect_usage_state"
     parser_name = "usage_stats.activity"
     parser_version = "1"
-    raw_source = "dumpsys activity"
+    raw_source = DUMPSYS_ACTIVITY
 
     def parse(self, raw: bytes) -> list[ParsedArtifact]:
         try:

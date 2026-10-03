@@ -44,6 +44,16 @@ _RUNNING_PROCESS = "running_process"
 _LIST_ARTIFACT_TYPES = frozenset({_SECURE_LIST, "usage_event_list", "process_list"})
 
 _SPECIAL = "special_access_capability_observed_declared"
+_APK_IDENTITY = "apk_identity"
+_APK_PERMISSION = "apk_permission"
+_APK_COMPONENT = "apk_component"
+_APK_ACTION = "apk_intent_action"
+_APK_ENDPOINT = "apk_endpoint_reference"
+STATIC_ARTIFACT_TYPES = frozenset(
+    {_APK_IDENTITY, _APK_PERMISSION, _APK_COMPONENT, _APK_ACTION, _APK_ENDPOINT}
+)
+# Static-bundle files whose artifacts record the file itself, not a claim about the package.
+_STATIC_NO_FACT = frozenset({"apk_badging", "apk_certificate", "apk_bundle_manifest"})
 
 
 class UnsupportedArtifactTypeError(ValueError):
@@ -79,6 +89,11 @@ def build_context(artifacts: Sequence[ArtifactLike]) -> NormalizationContext:
             name, kind = value.get("name"), value.get("kind")
             if isinstance(name, str) and isinstance(kind, str):
                 kinds.setdefault(name, set()).add(kind)
+        elif artifact.artifact_type == _APK_COMPONENT:
+            name, kind = value.get("name"), value.get("kind")
+            if isinstance(name, str) and isinstance(kind, str) and artifact.subject_key:
+                qualified = qualify_component(artifact.subject_key, name)
+                kinds.setdefault(qualified, set()).add(kind)
     return NormalizationContext(uid, {name: frozenset(k) for name, k in kinds.items()})
 
 
@@ -109,6 +124,10 @@ def normalize(
         return []
     if artifact.artifact_type in DETAIL_ARTIFACT_TYPES:
         return _normalize_detail(artifact, observed_at, context or NormalizationContext())
+    if artifact.artifact_type in _STATIC_NO_FACT:
+        return []
+    if artifact.artifact_type in STATIC_ARTIFACT_TYPES:
+        return _normalize_static(artifact, observed_at, context or NormalizationContext())
     if artifact.artifact_type in _LIST_ARTIFACT_TYPES:
         return []  # proof that the whole list was read; the entries carry the facts
     if artifact.artifact_type in (_USAGE_EVENT, _RESUMED_ACTIVITY, _RUNNING_PROCESS):
@@ -139,6 +158,50 @@ def normalize(
             ("uid_observed", "uid", str(uid)),
         ],
     )
+
+
+def qualify_component(package: str, name: str) -> str:
+    """`package/<name>` the way the package dump prints it: a class inside the package is
+    shortened to `.Rest`, a class from elsewhere stays fully qualified. Manifest names may be
+    relative (`.Main`), shortened-able (`pkg.Main`) or foreign (`other.Main`)."""
+    if name.startswith("."):
+        short = name
+    elif name.startswith(package + "."):
+        short = name[len(package) :]
+    else:
+        short = name
+    return f"{package}/{short}"
+
+
+def _requested_claims(name: str) -> list[tuple[str, str, str]]:
+    claims = [("permission_observed_requested", "permission", name)]
+    if name in SENSITIVE_COMMUNICATION_PERMISSIONS:
+        claims.append(("sensitive_communication_capability_observed_declared", "permission", name))
+    if name == OVERLAY_PERMISSION:
+        claims.append((_SPECIAL, "special_access", SPECIAL_ACCESS_DRAW_OVER))
+    return claims
+
+
+def _service_claims(name: str, permission: object) -> list[tuple[str, str, str]]:
+    claims = [("service_observed_declared", "component", name)]
+    if permission == BIND_ACCESSIBILITY_PERMISSION:
+        claims += [
+            ("accessibility_service_observed_declared", "component", name),
+            (_SPECIAL, "special_access", SPECIAL_ACCESS_ACCESSIBILITY),
+        ]
+    elif permission == BIND_NOTIFICATION_LISTENER_PERMISSION:
+        claims.append((_SPECIAL, "special_access", SPECIAL_ACCESS_NOTIFICATION_LISTENER))
+    return claims
+
+
+def _trigger_claims(
+    action: str, component: str, context: NormalizationContext
+) -> list[tuple[str, str, str]]:
+    """A vocabulary action declared by a component known to be a receiver."""
+    is_receiver = "receiver" in context.component_kinds.get(component, frozenset())
+    if is_receiver and action in EVENT_TRIGGER_ACTIONS:
+        return [("event_trigger_capability_observed_declared", "intent_action", action)]
+    return []
 
 
 def _text(value: Mapping[str, object], key: str) -> str:
@@ -184,14 +247,7 @@ def _normalize_detail(
             ("uid_observed", "uid", str(user_id)),
         ]
     elif kind == _REQUESTED:
-        name = _text(value, "name")
-        claims = [("permission_observed_requested", "permission", name)]
-        if name in SENSITIVE_COMMUNICATION_PERMISSIONS:
-            claims.append(
-                ("sensitive_communication_capability_observed_declared", "permission", name)
-            )
-        if name == OVERLAY_PERMISSION:
-            claims.append((_SPECIAL, "special_access", SPECIAL_ACCESS_DRAW_OVER))
+        claims = _requested_claims(_text(value, "name"))
     elif kind == _GRANTED:
         name = _text(value, "name")
         extras = {"permission_kind": value.get("kind"), "scope": value.get("scope")}
@@ -203,20 +259,11 @@ def _normalize_detail(
         permission = value.get("permission")
         extras = {"component_kind": component_kind, "permission": permission}
         if component_kind == "service":
-            claims = [("service_observed_declared", "component", name)]
-            if permission == BIND_ACCESSIBILITY_PERMISSION:
-                claims += [
-                    ("accessibility_service_observed_declared", "component", name),
-                    (_SPECIAL, "special_access", SPECIAL_ACCESS_ACCESSIBILITY),
-                ]
-            elif permission == BIND_NOTIFICATION_LISTENER_PERMISSION:
-                claims.append((_SPECIAL, "special_access", SPECIAL_ACCESS_NOTIFICATION_LISTENER))
+            claims = _service_claims(name, permission)
     else:  # _ACTION
         component, action = _text(value, "component"), _text(value, "action")
         extras = {"component": component}
-        is_receiver = "receiver" in context.component_kinds.get(component, frozenset())
-        if is_receiver and action in EVENT_TRIGGER_ACTIONS:
-            claims = [("event_trigger_capability_observed_declared", "intent_action", action)]
+        claims = _trigger_claims(action, component, context)
 
     base: dict[str, Any] = {
         "subject_package": package,
@@ -347,3 +394,63 @@ def _normalize_execution(
         **times,
     }
     return split_claims(base, [claim])
+
+
+def _normalize_static(
+    artifact: ArtifactLike, observed_at: datetime, context: NormalizationContext
+) -> list[NormalizedFact]:
+    """Facts from the static bundle of an APK file: identity and declared capabilities only.
+
+    They are never `execution_observed`, never a runtime state: the file says what an APK
+    declares, not that anything ran or was granted. The subject is the operation's package.
+    """
+    package = artifact.subject_key
+    if not isinstance(package, str) or not package:
+        raise ValueError("static artifact has no subject_key")
+    value = artifact.parsed_value_json
+    kind = artifact.artifact_type
+    extras: dict[str, object] = {}
+    claims: list[tuple[str, str, str]] = []
+
+    if kind == _APK_IDENTITY:
+        claims = [("apk_identity_observed", "apk_sha256", _text(value, "sha256"))]
+    elif kind == _APK_PERMISSION:
+        if value.get("role") == "requested":
+            claims = _requested_claims(_text(value, "name"))
+            extras = {"variant": value.get("variant"), "max_sdk": value.get("max_sdk")}
+    elif kind == _APK_COMPONENT:
+        name = qualify_component(package, _text(value, "name"))
+        component_kind = _text(value, "kind")
+        permission = value.get("permission")
+        extras = {
+            "component_kind": component_kind,
+            "permission": permission,
+            "exported": value.get("exported"),
+            "enabled": value.get("enabled"),
+        }
+        if component_kind == "service":
+            claims = _service_claims(name, permission)
+    elif kind == _APK_ACTION:
+        component = qualify_component(package, _text(value, "component"))
+        claims = _trigger_claims(_text(value, "action"), component, context)
+        extras = {"component": component}
+    else:  # _APK_ENDPOINT
+        claims = [("apk_endpoint_reference_observed", "endpoint", _text(value, "value"))]
+        extras = {"endpoint_kind": value.get("kind")}
+
+    base: dict[str, Any] = {
+        "subject_package": package,
+        "subject_uid": None,
+        "predicate_value": True,
+        "evidence_state": EvidenceState.observed_true,
+        "context_json": {
+            "artifact_type": artifact.artifact_type,
+            "parser_name": artifact.parser_name,
+            "parser_version": artifact.parser_version,
+            "line_no": value.get("line_no"),
+            "source": "apk_static",
+            **extras,
+        },
+        **current_state_times(observed_at),
+    }
+    return split_claims(base, claims)

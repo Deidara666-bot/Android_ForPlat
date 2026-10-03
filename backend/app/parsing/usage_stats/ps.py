@@ -10,6 +10,7 @@ the later subject binding decides.
 import re
 
 from app.core.constants import ParseStatus
+from app.core.raw_sources import PS
 from app.parsing.base import ParsedArtifact
 from app.parsing.package_state._text import decode_failure, numbered_lines
 
@@ -24,7 +25,7 @@ class ProcessTableParser:
     operation_id = "collect_usage_state"
     parser_name = "usage_stats.ps"
     parser_version = "1"
-    raw_source = "ps"
+    raw_source = PS
 
     def parse(self, raw: bytes) -> list[ParsedArtifact]:
         try:

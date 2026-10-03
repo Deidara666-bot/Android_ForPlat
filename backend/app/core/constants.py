@@ -110,6 +110,7 @@ MAPPED_OPERATIONS: frozenset[str] = frozenset(
         "collect_package_detail",
         "collect_accessibility_state",
         "collect_usage_state",
+        "pull_subject_apk",
     }
 )
 
@@ -117,6 +118,7 @@ MAPPED_OPERATIONS: frozenset[str] = frozenset(
 OPERATION_PARAMETERS: dict[str, tuple[str, ...]] = {
     "collect_package_detail": ("package_name",),
     "collect_accessibility_state": ("package_name",),
+    "pull_subject_apk": ("package_name",),
 }
 PACKAGE_NAME_PATTERN = r"^[A-Za-z0-9_.]{1,200}$"
 
@@ -127,6 +129,7 @@ OPERATION_SOURCE_GROUP: dict[str, str | None] = {
     "collect_package_detail": SourceGroup.APP_SYSTEM_STATE.value,
     "collect_accessibility_state": SourceGroup.APP_SYSTEM_STATE.value,
     "collect_usage_state": SourceGroup.APP_SYSTEM_STATE.value,
+    "pull_subject_apk": SourceGroup.APP_SYSTEM_STATE.value,
 }
 
 # Largest evidence file the upload endpoint accepts.
