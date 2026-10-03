@@ -131,6 +131,10 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
   Teks `v0.30.5`, `.6`, `v0.40.3`, `.6`, `.9`, `v0.45.3`, `.4` disesuaikan. Bukan beda core → tanpa entri register.
 - 2026-10-02 — `raw_value` wajib hanya untuk `parsed`; boleh kosong untuk `empty`/`failed` (opsi 1 temuan `v0.40.2`). `v0.40.2`
   direvisi (commit revisi); `v0.40.3`: baris `failed` membawa baris asli, decode gagal → 1 artefak `failed` + offset byte (kedua parser).
+- 2026-10-03 — Refresh `v0.45.5`–`.9` (temuan `v0.45.4`): sesi selalu diawali `collect_device_metadata` + satu subjek per sesi (`.8`);
+  label `raw_source` backend di `app/core/raw_sources.py`, grep larangan tetap (`.5`); semua part dijalankan + cakupan per part
+  REF §COV (`.6`); negatif hanya untuk subjek sesi, overlay `default` tanpa fakta (`.7`); proses diikat lewat UID (`v0.60.2`).
+  Kartu selesai tidak dikerjakan ulang.
 
 ## Keputusan / aksi user yang tertunda
 

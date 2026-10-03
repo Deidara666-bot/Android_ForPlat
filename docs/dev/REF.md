@@ -176,6 +176,11 @@ Tepat 8, tertutup: `collect_device_metadata` · `collect_package_inventory` · `
 
 - ID di luar 8 → `OperationNotAllowedError`. Dua galat **berbeda tipe**.
 - String perintah ADB hanya boleh ada di `agent/src/device/adb_commands.py`, sebagai `list[str]`.
+- Label `raw_source` (§OPS2) di backend hanya di `backend/app/core/raw_sources.py`. Grep larangan mengecualikan
+  berkas itu dan `adb_commands.py` (v0.45.5).
+- Setiap sesi diawali `collect_device_metadata`: backend menambahkannya sebagai `sequence` 1 bila profil/operasi tidak
+  memuatnya (v0.45.8). Zona waktu sesi hanya dari bukti sesi itu.
+- Satu sesi = paling banyak satu subjek: `parameters.package_name` dipakai semua operasi berparameter di sesi itu (v0.45.8).
 - Deteksi perangkat (`adb devices -l`) dan `adb version` **bukan** operasi allowlist.
 
 ## §ENT — entitas & kolom (tabel snake_case jamak `[plan]`: hindari kata tercadang `user`, `case`)
@@ -236,8 +241,11 @@ backend→agent `job` = `{type, session_id, sequence, operation, case_id, device
 - `sequence` = `acquisition_operations.sequence`; `serial` = `devices.serial`, pola `^[A-Za-z0-9._:-]{1,64}$`, ⛔ awalan `-`.
   Agen menjalankan hanya bila `serial` ada di daftar perangkat `device`; ⛔ agen memilih perangkat atau menghitung urutan sendiri.
 - `job_status` = `{type, session_id, sequence, part, parts_total, operation, serial, sha256_agent, size_bytes, returncode, error}`
-  (+ `availability_status`, `availability_reason` mulai v0.30.6). Backend mencocokkan lewat `(session_id, sequence)`.
+  (+ `availability_status`, `availability_reason` mulai v0.30.6; + `raw_source` mulai v0.45.6). Backend mencocokkan lewat `(session_id, sequence)`.
 - `part` = urutan perintah dalam satu operasi (REF §OPS2), mulai 1; v0.30: `part = parts_total = 1`.
+- Mulai v0.45.6: semua part dijalankan, masing-masing tepat satu status. Part yang bergantung pada part sebelumnya
+  (`pull_subject_apk` part ≥ 2) tanpa prasyarat `acquired` → `failed`, alasan `prasyarat part <n> tidak diperoleh`,
+  perintahnya tidak dijalankan. Operasi selesai saat `part == parts_total`; `failed` bila ada part bukan `acquired`.
 Bita bukti **selalu** lewat `POST /api/evidence/upload`, tidak pernah WebSocket.
 
 ## §SVC — nama layanan (§X)
@@ -315,8 +323,11 @@ Satu operasi boleh menjalankan beberapa perintah berurutan → satu berkas bukti
 
 ## §STATIC — ekstraktor APK statis `[plan]` (K2 di MAP)
 
-`scripts/static/extract_apk.py <apk> <folder_keluar>` — Python stdlib + alat SDK, ⛔ tanpa menjalankan APK.
+Logika: `agent/src/static_analysis/extractor.py` `extract(apk, out_dir) -> list[Path]` (urutan tabel di bawah);
+CLI pembungkus untuk VM S-C: `scripts/static/extract_apk.py <apk> <folder_keluar>`. Python stdlib + alat SDK
+(list argumen, ⛔ shell), ⛔ memasang/menjalankan APK.
 Build-tools dicari dari `ANDROID_SDK_ROOT` → `ANDROID_HOME` → `%LOCALAPPDATA%/Android/Sdk`, versi 36.x.
+Di `pull_subject_apk`, 7 berkas ini = part 3..9 (`raw_source` `static:<nama>`), `parts_total = 9`.
 
 | Berkas bundel | Isi |
 |---|---|
@@ -328,9 +339,34 @@ Build-tools dicari dari `ANDROID_SDK_ROOT` → `ANDROID_HOME` → `%LOCALAPPDATA
 | `strings_urls.txt` | URL/domain/IP dari `classes*.dex` + `res/`, regex, urut unik, maks 5000 baris |
 | `bundle.json` | `{apk_sha256, extractor_version, tool_versions, created_at, files:{nama: sha256}}` |
 
-- S-A/S-B: dijalankan agen setelah `pull_subject_apk` (keluaran jadi bukti part 3..n).
+- S-A/S-B: dijalankan agen setelah `pull_subject_apk` (keluaran jadi bukti part 3..9). APK > 50 MiB → unggah part 2
+  ditolak (413) → `failed`, dicatat apa adanya.
 - S-C: dijalankan **di VM terisolasi** oleh user; hanya folder bundel (tanpa APK) yang diimpor lewat
   `POST /api/static-bundles` (v0.90). Keluaran `evidence_mode = apk_static`.
+
+## §COV — cakupan fakta → sumber (v0.45.6–.7) `[plan]`
+
+Cakupan dinilai per part `(operation_id, raw_source)`, bukan per operasi. Lingkup **perangkat** = berlaku untuk tiap subjek
+di sesi itu; **subjek** = hanya `parameters.package_name` sesi itu. Sumber = sesi terbaru di kasus yang memuat part itu
+(lingkup subjek: sesi dengan subjek itu).
+
+| event_type (object_value) | Operasi · `raw_source` | Lingkup | Negatif (v0.45.7) |
+|---|---|---|---|
+| `package_observed_installed`, `uid_observed` | `collect_package_inventory` · `pm list packages -U` | perangkat | — |
+| `sensitive_communication_capability_observed_granted` | `collect_package_detail` · `dumpsys package` | subjek | izin vocab tidak granted |
+| `event_trigger_capability_observed_declared` | `collect_package_detail` · `dumpsys package` | subjek | action vocab tidak dideklarasikan |
+| fakta deklaratif lain `collect_package_detail` | `collect_package_detail` · `dumpsys package` | subjek | — |
+| `special_access_capability_observed_enabled` (`accessibility_service`) | `collect_accessibility_state` · `settings secure a11y` | perangkat | subjek tak ada di daftar |
+| … (`notification_listener`) | `collect_accessibility_state` · `settings secure nls` | perangkat | subjek tak ada di daftar |
+| … (`draw_over_other_apps`) | `collect_accessibility_state` · `appops overlay` | subjek | mode `ignore`/`deny` saja (`default` → tanpa fakta) |
+| `app_usage_observed` | `collect_usage_state` · `dumpsys usagestats` | perangkat | — |
+| `activity_observed_resumed` | `collect_usage_state` · `dumpsys activity` | perangkat | — |
+| `process_observed_running` | `collect_usage_state` · `ps` | perangkat | — |
+| fakta dari bundel statis | `pull_subject_apk` · `static:<nama>` | subjek | action vocab tidak dideklarasikan |
+
+- Tanpa baris `evidence` untuk part itu → `not_acquired`; status bukan `acquired` → `availability_<status>`;
+  ada artefak `failed` → `parse_incomplete`. FALSE hanya bila `acquired` + semua artefak `parsed`/`empty`.
+- Fakta negatif hanya untuk subjek sesi, ⛔ untuk paket inventaris lain.
 
 ## §TIER2 — protokol Tier-2 lewat agen (§11.1) `[plan]`
 
@@ -345,7 +381,7 @@ Build-tools dicari dari `ANDROID_SDK_ROOT` → `ANDROID_HOME` → `%LOCALAPPDATA
 - Label lingkungan: `avd1-api36`, `avd2-api<N>`, `a10-api<N>` (N = `ro.build.version.sdk` Galaxy A10, dibaca di v0.90.7).
   Runner memverifikasi `api` label = sdk perangkat yang tersambung; beda atau perangkat tidak ada → berhenti sebelum reset.
 - CSV `experiments/feasibility_tier2/results/<profile>_<env>.csv`, kolom:
-  `artifact_id,env,rep,android_version,api,build,device_or_emulator,operation_id,command,privilege_state,test_action,expected_evidence,actual_result,availability_status,availability_reason,raw_output_ref,temporal_semantics,git_commit,adb_version,acquired_at`.
+  `artifact_id,env,subject,rep,android_version,api,build,device_or_emulator,operation_id,command,privilege_state,test_action,expected_evidence,actual_result,availability_status,availability_reason,raw_output_ref,temporal_semantics,git_commit,adb_version,acquired_at`.
 - Status per artefak per lingkungan: 3/3 = konsisten · 1–2/3 = `CONDITIONAL` · 0/3 = status non-acquired
   dominan + alasan (⛔ tidak diciutkan). Ringkasan di `docs/tier2_<profile>.md`.
 - Pemetaan artefak Tier-1 → operasi: G1-A1/A2 `collect_package_inventory`/`pull_subject_apk` · G1-A3 `pull_subject_apk` ·
