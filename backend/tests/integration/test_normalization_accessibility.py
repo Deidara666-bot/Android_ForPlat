@@ -145,12 +145,21 @@ def test_each_part_is_parsed_by_its_own_parser_and_facts_follow(
         3: ["settings_state.appops"],
     }
     facts = _facts(session)
-    assert [(f.subject_package, f.object_value) for f in facts] == [
+    positives = [f for f in facts if f.predicate_value is True]
+    assert [(f.subject_package, f.object_value) for f in positives] == [
         ("com.google.android.marvin.talkback", "accessibility_service"),
         ("com.android.settings", "draw_over_other_apps"),
     ]
     assert {f.event_type for f in facts} == {"special_access_capability_observed_enabled"}
-    assert all(f.event_time is None and f.predicate_value is True for f in facts)
+    assert all(f.event_time is None for f in facts)
+    # the session subject is in neither enabled list: one explicit negative per list; the
+    # overlay mode is `default`, which gives no fact at all
+    negatives = [f for f in facts if f.predicate_value is False]
+    assert [(f.subject_package, f.object_value) for f in negatives] == [
+        ("com.android.settings", "accessibility_service"),
+        ("com.android.settings", "notification_listener"),
+    ]
+    assert {f.evidence_state for f in negatives} == {"observed_false"}
 
 
 def test_unset_notification_listener_list_is_parsed_and_gives_no_fact(
@@ -163,7 +172,12 @@ def test_unset_notification_listener_list_is_parsed_and_gives_no_fact(
         ("settings_secure_list", "parsed")
     ]
     assert artifacts[0].parsed_value_json["is_null"] is True
-    assert _facts(session) == []
+    # no positive fact; the fully read, empty list proves the subject is not a listener
+    facts = _facts(session)
+    assert [(f.object_value, f.predicate_value) for f in facts] == [
+        ("notification_listener", False)
+    ]
+    assert facts[0].artifact_id == artifacts[0].id
 
 
 def test_without_the_operation_parameter_the_overlay_part_is_failed_and_gives_no_fact(

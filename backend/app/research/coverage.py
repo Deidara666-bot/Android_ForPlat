@@ -179,7 +179,11 @@ class CoverageService:
                 [],
                 UnknownReason.not_acquired.value,
             )
+        return CoverageService.for_session(db, session_id, part)
 
+    @staticmethod
+    def for_session(db: Session, session_id: uuid.UUID, part: PartSpec) -> Coverage:
+        """Coverage of one part inside one given session (not necessarily the newest)."""
         # Rows from before `raw_source` was reported carry the operation ID instead of the label.
         rows = list(
             db.scalars(

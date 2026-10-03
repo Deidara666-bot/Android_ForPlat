@@ -454,3 +454,239 @@ def _normalize_static(
         **current_state_times(observed_at),
     }
     return split_claims(base, claims)
+
+
+# ---- explicit negative facts (v0.45.7, REF §COV "Negatif") ------------------------------------
+# A negative fact says "the closed predicate is false for the session subject", and is only
+# produced when the source of that predicate was acquired and parsed completely. The caller
+# (`NormalizationService`) checks that through `CoverageService`; this code only reads artifacts.
+# Each fact comes with the artifact that proves the absence: the row showing the source was read.
+
+_A11Y_PART = ("collect_accessibility_state", "settings secure a11y")
+_NLS_PART = ("collect_accessibility_state", "settings secure nls")
+_OVERLAY_PART = ("collect_accessibility_state", "appops overlay")
+_DETAIL_PART = ("collect_package_detail", "dumpsys package")
+_MANIFEST_PART = ("pull_subject_apk", "static:manifest.txt")
+NEGATIVE_SOURCES: frozenset[tuple[str, str]] = frozenset(
+    {_A11Y_PART, _NLS_PART, _OVERLAY_PART, _DETAIL_PART, _MANIFEST_PART}
+)
+_LIST_ACCESS = {
+    _A11Y_PART: SPECIAL_ACCESS_ACCESSIBILITY,
+    _NLS_PART: SPECIAL_ACCESS_NOTIFICATION_LISTENER,
+}
+_OVERLAY_NEGATIVE_MODES = frozenset({"ignore", "deny"})
+
+
+def _parsed(artifact: ArtifactLike) -> bool:
+    return ParseStatus(artifact.parse_status) == ParseStatus.parsed
+
+
+def _pairs[A: ArtifactLike](
+    facts: list[NormalizedFact], anchor: A
+) -> list[tuple[NormalizedFact, A]]:
+    return [(fact, anchor) for fact in facts]
+
+
+def negative_facts[A: ArtifactLike](
+    operation_id: str,
+    raw_source: str,
+    rows: Sequence[A],
+    *,
+    subject: str,
+    observed_at: datetime,
+    context: NormalizationContext,
+) -> list[tuple[NormalizedFact, A]]:
+    """Negative facts for `subject` from the artifacts of one evidence file, each with its
+    proving artifact; `[]` when the source has no negative rule or holds no such row."""
+    part = (operation_id, raw_source)
+    if part not in NEGATIVE_SOURCES:
+        return []
+    if part == _DETAIL_PART:
+        return _detail_negatives(rows, subject, observed_at, context)
+    if part == _MANIFEST_PART:
+        return _manifest_negatives(rows, subject, observed_at, context)
+    if part == _OVERLAY_PART:
+        return _overlay_negatives(rows, subject, observed_at)
+    return _list_negatives(part, rows, subject, observed_at)
+
+
+def _negative_base(
+    anchor: ArtifactLike,
+    subject: str,
+    uid: int | None,
+    observed_at: datetime,
+    **extras: object,
+) -> dict[str, Any]:
+    return {
+        "subject_package": subject,
+        "subject_uid": uid,
+        "predicate_value": False,
+        "evidence_state": EvidenceState.observed_false,
+        "context_json": {
+            "artifact_type": anchor.artifact_type,
+            "parser_name": anchor.parser_name,
+            "parser_version": anchor.parser_version,
+            "line_no": anchor.parsed_value_json.get("line_no"),
+            **extras,
+        },
+        **current_state_times(observed_at),
+    }
+
+
+def _list_negatives[A: ArtifactLike](
+    part: tuple[str, str], rows: Sequence[A], subject: str, observed_at: datetime
+) -> list[tuple[NormalizedFact, A]]:
+    """The subject has no component in the enabled list that was read in full."""
+    access = _LIST_ACCESS[part]
+    anchor = next(
+        (
+            row
+            for row in rows
+            if row.artifact_type == _SECURE_LIST
+            and _parsed(row)
+            and row.parsed_value_json.get("special_access") == access
+        ),
+        None,
+    )
+    if anchor is None:
+        return []
+    listed = any(
+        row.artifact_type == _SECURE_COMPONENT and _parsed(row) and row.subject_key == subject
+        for row in rows
+    )
+    if listed:
+        return []  # the positive fact exists; no negative beside it
+    base = _negative_base(anchor, subject, None, observed_at, basis="not_in_enabled_list")
+    claim = ("special_access_capability_observed_enabled", "special_access", access)
+    return _pairs(split_claims(base, [claim]), anchor)
+
+
+def _overlay_negatives[A: ArtifactLike](
+    rows: Sequence[A], subject: str, observed_at: datetime
+) -> list[tuple[NormalizedFact, A]]:
+    """Overlay app-op mode `ignore` / `deny` only; `default` and `allow` give no negative."""
+    for row in rows:
+        if row.artifact_type != _OVERLAY_APP_OP or not _parsed(row) or row.subject_key != subject:
+            continue
+        mode = row.parsed_value_json.get("mode")
+        if mode not in _OVERLAY_NEGATIVE_MODES:
+            return []
+        base = _negative_base(
+            row,
+            subject,
+            None,
+            observed_at,
+            basis="overlay_mode_not_allow",
+            mode=mode,
+            mode_source=row.parsed_value_json.get("mode_source"),
+        )
+        claim = (
+            "special_access_capability_observed_enabled",
+            "special_access",
+            SPECIAL_ACCESS_DRAW_OVER,
+        )
+        return _pairs(split_claims(base, [claim]), row)
+    return []
+
+
+def _detail_negatives[A: ArtifactLike](
+    rows: Sequence[A],
+    subject: str,
+    observed_at: datetime,
+    context: NormalizationContext,
+) -> list[tuple[NormalizedFact, A]]:
+    anchor = next(
+        (
+            row
+            for row in rows
+            if row.artifact_type == _IDENTITY and _parsed(row) and row.subject_key == subject
+        ),
+        None,
+    )
+    if anchor is None:
+        return []
+    granted: dict[str, bool] = {}
+    for row in rows:
+        if row.artifact_type != _GRANTED or not _parsed(row) or row.subject_key != subject:
+            continue
+        name = row.parsed_value_json.get("name")
+        if isinstance(name, str) and name in SENSITIVE_COMMUNICATION_PERMISSIONS:
+            is_granted = row.parsed_value_json.get("granted") is True
+            granted[name] = granted.get(name, False) or is_granted
+    facts: list[tuple[NormalizedFact, A]] = []
+    for name in sorted(SENSITIVE_COMMUNICATION_PERMISSIONS):
+        if granted.get(name):
+            continue
+        basis = "granted_false_in_dump" if name in granted else "not_listed_in_dump"
+        base = _negative_base(anchor, subject, context.subject_uid, observed_at, basis=basis)
+        claim = ("sensitive_communication_capability_observed_granted", "permission", name)
+        facts += _pairs(split_claims(base, [claim]), anchor)
+    facts += _trigger_negatives(
+        anchor, rows, subject, context.subject_uid, observed_at, context, static=False
+    )
+    return facts
+
+
+def _manifest_negatives[A: ArtifactLike](
+    rows: Sequence[A],
+    subject: str,
+    observed_at: datetime,
+    context: NormalizationContext,
+) -> list[tuple[NormalizedFact, A]]:
+    anchor = next(
+        (
+            row
+            for row in rows
+            if row.artifact_type == _APK_COMPONENT and _parsed(row) and row.subject_key == subject
+        ),
+        None,
+    )
+    if anchor is None:
+        return []
+    return _trigger_negatives(anchor, rows, subject, None, observed_at, context, static=True)
+
+
+def _trigger_negatives[A: ArtifactLike](
+    anchor: A,
+    rows: Sequence[A],
+    subject: str,
+    uid: int | None,
+    observed_at: datetime,
+    context: NormalizationContext,
+    *,
+    static: bool,
+) -> list[tuple[NormalizedFact, A]]:
+    """Vocabulary actions that no receiver of the subject declares.
+
+    An action declared by a component whose kind is unknown (its component row is missing or
+    failed) is ambiguous: the source may still hold the positive fact, so no negative is made.
+    """
+    action_type = _APK_ACTION if static else _ACTION
+    declared: set[str] = set()
+    ambiguous: set[str] = set()
+    for row in rows:
+        if row.artifact_type != action_type or not _parsed(row) or row.subject_key != subject:
+            continue
+        action = row.parsed_value_json.get("action")
+        component = row.parsed_value_json.get("component")
+        if not isinstance(action, str) or action not in EVENT_TRIGGER_ACTIONS:
+            continue
+        if not isinstance(component, str):
+            ambiguous.add(action)
+            continue
+        kinds = context.component_kinds.get(
+            qualify_component(subject, component) if static else component
+        )
+        if kinds is None:
+            ambiguous.add(action)
+        elif "receiver" in kinds:
+            declared.add(action)
+    extras: dict[str, object] = {"basis": "action_not_declared_by_a_receiver"}
+    if static:
+        extras["source"] = "apk_static"
+    base = _negative_base(anchor, subject, uid, observed_at, **extras)
+    claims = [
+        ("event_trigger_capability_observed_declared", "intent_action", action)
+        for action in sorted(EVENT_TRIGGER_ACTIONS - declared - ambiguous)
+    ]
+    return _pairs(split_claims(base, claims), anchor)

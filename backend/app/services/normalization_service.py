@@ -19,8 +19,15 @@ from app.models.acquisition_session import AcquisitionSession
 from app.models.artifact import Artifact
 from app.models.evidence import Evidence
 from app.models.normalized_event import NormalizedEvent
-from app.normalization.normalizer import build_context, normalize
+from app.normalization.normalizer import (
+    NEGATIVE_SOURCES,
+    NormalizationContext,
+    build_context,
+    negative_facts,
+    normalize,
+)
 from app.parsing.registry import UnknownOperationError, get_parser
+from app.research.coverage import PARTS, CoverageService
 from app.services.artifact_service import ArtifactService
 from app.services.audit_service import AuditService
 from app.services.evidence_storage_service import EvidenceStorageService
@@ -116,6 +123,7 @@ def process_evidence(
                 db.add(NormalizedEvent(case_id=evidence.case_id, artifact_id=row.id, **values))
                 facts += 1
         db.flush()
+        facts += _store_negative_facts(db, evidence, rows, context)
         timezone = _fill_session_timezone(db, evidence, rows)
     db.commit()
     if timezone is not None:
@@ -127,6 +135,41 @@ def process_evidence(
             details={"timezone": timezone, "source": _TIMEZONE_KEY},
         )
     return ProcessResult(evidence.id, len(rows), facts, None)
+
+
+def _store_negative_facts(
+    db: Session, evidence: Evidence, rows: list[Artifact], context: NormalizationContext
+) -> int:
+    """Explicit negative facts for the session subject, only when `CoverageService` says the
+    source of the predicate was acquired and parsed completely (never from absence alone)."""
+    key = (evidence.operation_id, evidence.raw_source)
+    if key not in NEGATIVE_SOURCES:
+        return 0
+    subject = _operation_parameters(db, evidence).get("package_name")
+    if not subject:
+        log.info("no negative facts for evidence %s: the session has no subject", evidence.id)
+        return 0
+    part = next(p for p in PARTS if (p.operation_id, p.raw_source) == key)
+    coverage = CoverageService.for_session(db, evidence.acquisition_session_id, part)
+    if not coverage.can_be_false:
+        log.info("no negative facts for evidence %s: %s", evidence.id, coverage.reason)
+        return 0
+    created = 0
+    for fact, anchor in negative_facts(
+        evidence.operation_id,
+        evidence.raw_source,
+        rows,
+        subject=subject,
+        observed_at=evidence.acquired_at,
+        context=context,
+    ):
+        values: dict[str, Any] = {
+            k: (v.value if isinstance(v, Enum) else v) for k, v in fact.model_dump().items()
+        }
+        db.add(NormalizedEvent(case_id=evidence.case_id, artifact_id=anchor.id, **values))
+        created += 1
+    db.flush()
+    return created
 
 
 def _operation_parameters(db: Session, evidence: Evidence) -> dict[str, str]:

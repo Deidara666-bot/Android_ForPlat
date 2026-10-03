@@ -160,7 +160,16 @@ def test_the_bundle_parts_are_parsed_by_their_own_parsers_and_facts_follow(
     ]
     assert not list(session.scalars(select(Artifact).where(Artifact.parse_status == "failed")))
     facts = _facts(session)
-    assert len(facts) == 1 + 12 + 2 + 4
+    positives = [f for f in facts if f.predicate_value is True]
+    assert len(positives) == 1 + 12 + 2 + 4
+    # BOOT_COMPLETED is declared by a receiver; the other three vocabulary actions are not
+    negatives = [f for f in facts if f.predicate_value is False]
+    assert sorted(f.object_value for f in negatives) == [
+        "android.intent.action.LOCKED_BOOT_COMPLETED",
+        "android.intent.action.PACKAGE_ADDED",
+        "android.intent.action.PACKAGE_REPLACED",
+    ]
+    assert {f.event_type for f in negatives} == {"event_trigger_capability_observed_declared"}
     assert {f.subject_package for f in facts} == {"com.android.stk"}
     assert all(f.event_time is None for f in facts)
     assert {f.epistemic_class for f in facts} <= {"identity_attribute", "capability_state"}
