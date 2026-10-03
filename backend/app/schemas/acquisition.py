@@ -75,3 +75,4 @@ class JobStatusIn(BaseModel):
     error: str | None = None
     availability_status: AvailabilityStatus | None = None
     availability_reason: str | None = Field(default=None, max_length=500)
+    raw_source: str | None = Field(default=None, min_length=1, max_length=200)

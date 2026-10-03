@@ -4,7 +4,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.audit_handlers import audit_http_exception, audit_validation_error
-from app.api.routes import acquisitions, agents, auth, cases, devices, events, evidence, health
+from app.api.routes import (
+    acquisitions,
+    agents,
+    auth,
+    cases,
+    coverage,
+    devices,
+    events,
+    evidence,
+    health,
+)
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.ws import agent_ws, dashboard_ws
@@ -29,6 +39,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api")
     app.include_router(cases.router, prefix="/api")
     app.include_router(events.router, prefix="/api")
+    app.include_router(coverage.router, prefix="/api")
     app.include_router(agents.router, prefix="/api")
     app.include_router(devices.router, prefix="/api")
     app.include_router(acquisitions.router, prefix="/api")

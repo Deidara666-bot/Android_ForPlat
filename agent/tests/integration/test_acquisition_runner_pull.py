@@ -109,6 +109,20 @@ def _run(tmp_path: Path, uploader: _Uploader, **extra: Any) -> list[dict[str, An
     return AcquisitionRunner(uploader, raw_root=tmp_path).run_job_parts(_job(**extra))  # type: ignore[arg-type]
 
 
+_LABELS = ["pm path", "apk file", *[f"static:{name}" for name in BUNDLE_FILES]]
+
+
+def _assert_parts_blocked_by(statuses: list[dict[str, Any]], first: int, prerequisite: int) -> None:
+    """Parts `first`..9 are failed, name their prerequisite and carry their own raw_source."""
+    blocked = [s for s in statuses if s["part"] >= first]
+    assert [s["part"] for s in blocked] == list(range(first, 10))
+    assert {s["availability_status"] for s in blocked} == {"failed"}
+    assert {s["availability_reason"] for s in blocked} == {
+        f"prasyarat part {prerequisite} tidak diperoleh"
+    }
+    assert [s["raw_source"] for s in blocked] == _LABELS[first - 1 :]
+
+
 def test_nine_parts_in_order_with_the_expected_labels_and_files(
     tmp_path: Path, device: _Device, uploader: _Uploader
 ) -> None:
@@ -156,48 +170,51 @@ def test_the_pull_uses_the_path_the_device_reported_and_the_evidence_path_of_par
         b"no package line\n",
     ],
 )
-def test_a_path_that_is_not_one_allowed_apk_stops_before_any_pull(
+def test_a_path_that_is_not_one_allowed_apk_runs_no_pull_and_blocks_the_rest(
     tmp_path: Path, device: _Device, uploader: _Uploader, output: bytes
 ) -> None:
     device.pm_output = output
     statuses = _run(tmp_path, uploader)
-    assert [(s["part"], s["availability_status"]) for s in statuses] == [
+    assert [(s["part"], s["availability_status"]) for s in statuses[:2]] == [
         (1, "acquired"),
         (2, "failed"),
     ]
+    _assert_parts_blocked_by(statuses, 3, 2)
     assert not any(call[0] == "pull" for call in device.calls)
     assert [fields["part"] for fields, _ in uploader.calls] == [1]
 
 
-def test_a_failed_pull_is_classified_and_nothing_after_it_runs(
+def test_a_failed_pull_is_classified_and_blocks_the_bundle_parts(
     tmp_path: Path, device: _Device, uploader: _Uploader
 ) -> None:
     device.pull_result = AdbResult(
         b"", b"adb: error: failed to stat remote object: No such file\n", 1
     )
     statuses = _run(tmp_path, uploader)
-    assert [(s["part"], s["availability_status"]) for s in statuses] == [
+    assert [(s["part"], s["availability_status"]) for s in statuses[:2]] == [
         (1, "acquired"),
         (2, "failed"),
     ]
+    _assert_parts_blocked_by(statuses, 3, 2)
     assert statuses[1]["returncode"] == 1
     assert [fields["part"] for fields, _ in uploader.calls] == [1]
 
 
-def test_a_rejected_apk_upload_stops_the_run_and_keeps_the_local_digest(
+def test_a_rejected_apk_upload_blocks_the_bundle_and_keeps_the_local_digest(
     tmp_path: Path, device: _Device, uploader: _Uploader
 ) -> None:
     uploader.fail_part = 2
     statuses = _run(tmp_path, uploader)
-    assert [(s["part"], s["availability_status"]) for s in statuses] == [
+    assert [(s["part"], s["availability_status"]) for s in statuses[:2]] == [
         (1, "acquired"),
         (2, "failed"),
     ]
+    _assert_parts_blocked_by(statuses, 3, 2)
     assert statuses[1]["error"] == "UploadError"
     assert statuses[1]["sha256_agent"] == hashlib.sha256(_APK_BYTES).hexdigest()
 
 
-def test_an_extractor_error_is_reported_at_part_3_and_nothing_is_uploaded_for_it(
+def test_an_extractor_error_fails_every_bundle_part_and_uploads_none_of_them(
     tmp_path: Path, device: _Device, uploader: _Uploader, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def broken(apk: Path, out_dir: Path) -> list[Path]:
@@ -208,19 +225,22 @@ def test_an_extractor_error_is_reported_at_part_3_and_nothing_is_uploaded_for_it
     assert [(s["part"], s["availability_status"]) for s in statuses] == [
         (1, "acquired"),
         (2, "acquired"),
-        (3, "failed"),
+        *[(n, "failed") for n in range(3, 10)],
     ]
-    assert "aapt2" in statuses[2]["availability_reason"]
+    assert all("aapt2" in s["availability_reason"] for s in statuses[2:])
+    assert [s["raw_source"] for s in statuses] == _LABELS
     assert [fields["part"] for fields, _ in uploader.calls] == [1, 2]
 
 
-def test_a_failing_bundle_upload_stops_after_the_parts_already_sent(
+def test_a_failing_bundle_upload_marks_only_its_part(
     tmp_path: Path, device: _Device, uploader: _Uploader
 ) -> None:
     uploader.fail_part = 5
     statuses = _run(tmp_path, uploader)
-    assert [s["availability_status"] for s in statuses] == ["acquired"] * 4 + ["failed"]
-    assert statuses[-1]["part"] == 5
+    assert [s["availability_status"] for s in statuses] == (
+        ["acquired"] * 4 + ["failed"] + ["acquired"] * 4
+    )
+    assert statuses[4]["part"] == 5 and statuses[4]["raw_source"] == _LABELS[4]
 
 
 def test_an_existing_part_2_file_is_never_overwritten(
@@ -230,7 +250,8 @@ def test_an_existing_part_2_file_is_never_overwritten(
     existing.parent.mkdir(parents=True)
     existing.write_bytes(b"older evidence")
     statuses = _run(tmp_path, uploader)
-    assert [s["availability_status"] for s in statuses] == ["acquired", "failed"]
+    assert [s["availability_status"] for s in statuses[:2]] == ["acquired", "failed"]
+    _assert_parts_blocked_by(statuses, 3, 2)
     assert existing.read_bytes() == b"older evidence"
     assert not any(call[0] == "pull" for call in device.calls)
 
@@ -273,10 +294,11 @@ def test_a_pull_that_exits_zero_but_leaves_no_file_is_not_acquired(
 ) -> None:
     device.writes_file = False
     statuses = _run(tmp_path, uploader)
-    assert [(s["part"], s["availability_status"]) for s in statuses] == [
+    assert [(s["part"], s["availability_status"]) for s in statuses[:2]] == [
         (1, "acquired"),
         (2, "unavailable"),
     ]
+    _assert_parts_blocked_by(statuses, 3, 2)
     assert [fields["part"] for fields, _ in uploader.calls] == [1]
 
 
@@ -292,4 +314,23 @@ def test_an_empty_pulled_file_is_not_acquired(
 
     monkeypatch.setattr(acquisition_runner, "run_adb", empty_pull)
     statuses = _run(tmp_path, uploader)
-    assert [s["availability_status"] for s in statuses] == ["acquired", "unavailable"]
+    assert [s["availability_status"] for s in statuses[:2]] == ["acquired", "unavailable"]
+    _assert_parts_blocked_by(statuses, 3, 2)
+
+
+def test_a_path_query_that_is_not_acquired_blocks_part_2_and_the_bundle(
+    tmp_path: Path, device: _Device, uploader: _Uploader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def denied(args: list[str], serial: str | None = None, **_: object) -> AdbResult:
+        device.calls.append(args)
+        return AdbResult(b"", b"Permission denial: not allowed\n", 255)
+
+    monkeypatch.setattr(acquisition_runner, "run_adb", denied)
+    statuses = _run(tmp_path, uploader)
+    assert [s["part"] for s in statuses] == list(range(1, 10))
+    assert statuses[0]["availability_status"] == "denied"
+    assert statuses[0]["raw_source"] == "pm path"
+    assert [s["availability_reason"] for s in statuses[1:2]] == ["prasyarat part 1 tidak diperoleh"]
+    _assert_parts_blocked_by(statuses, 3, 2)
+    assert len(device.calls) == 1  # only the path query ran
+    assert uploader.calls == []

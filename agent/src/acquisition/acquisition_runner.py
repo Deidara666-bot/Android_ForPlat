@@ -39,9 +39,11 @@ class AcquisitionRunner:
     """Executes jobs one at a time. Evidence goes to disk byte-exact before it is hashed.
 
     The job names its device (`serial`) and its position (`sequence`); the agent chooses neither.
-    An operation with several commands runs them in order, one evidence file and one status per
-    command (`part`), and stops after the first command that is not acquired: the backend marks
-    the operation failed at that point and ignores later statuses for it.
+    An operation with several commands runs every one of them in order, one evidence file and
+    exactly one status per command (`part`), each status naming its `raw_source`. A part whose
+    prerequisite part was not acquired (`pull_subject_apk` only) is not run: it is reported
+    `failed` with a reason naming the prerequisite. The backend completes the operation at the
+    last part and marks it failed if any part was not acquired.
     """
 
     def __init__(
@@ -83,13 +85,10 @@ class AcquisitionRunner:
         if job.operation == _PULL_OPERATION:
             return self._run_pull_subject_apk(job, parts)
 
-        statuses: list[dict[str, Any]] = []
-        for part, (label, args) in enumerate(parts, start=1):
-            status = self._run_part(job, part, len(parts), label, args)
-            statuses.append(status)
-            if status["availability_status"] != AvailabilityStatus.acquired.value:
-                break
-        return statuses
+        return [
+            self._run_part(job, part, len(parts), label, args)
+            for part, (label, args) in enumerate(parts, start=1)
+        ]
 
     def _run_part(
         self, job: AcquisitionJob, part: int, parts_total: int, label: str, args: list[str]
@@ -131,7 +130,13 @@ class AcquisitionRunner:
         except (AgentError, ValueError, OSError, KeyError) as exc:
             # Keep the digest and size when the file exists locally but the upload failed.
             failed = self._job_failed(
-                job, exc, part=part, parts_total=parts_total, digest=digest, size=size
+                job,
+                exc,
+                part=part,
+                parts_total=parts_total,
+                digest=digest,
+                size=size,
+                raw_source=label,
             )
             return failed, None
 
@@ -157,6 +162,7 @@ class AcquisitionRunner:
             returncode=result.returncode,
             availability=availability,
             reason=reason,
+            raw_source=label,
         )
         return status, result
 
@@ -188,7 +194,7 @@ class AcquisitionRunner:
         return digest, size
 
     def _acquired_status(
-        self, job: AcquisitionJob, part: int, digest: str, size: int
+        self, job: AcquisitionJob, part: int, label: str, digest: str, size: int
     ) -> dict[str, Any]:
         audit(
             "job_done",
@@ -211,6 +217,32 @@ class AcquisitionRunner:
             size_bytes=size,
             returncode=0,
             availability=AvailabilityStatus.acquired,
+            raw_source=label,
+        )
+
+    def _prerequisite_unmet(
+        self, job: AcquisitionJob, part: int, label: str, prerequisite: int
+    ) -> dict[str, Any]:
+        """A part that was not run because the part it depends on was not acquired."""
+        reason = f"prasyarat part {prerequisite} tidak diperoleh"
+        audit(
+            "job_prerequisite_unmet",
+            reason,
+            session_id=job.session_id,
+            sequence=job.sequence,
+            part=part,
+            operation=job.operation,
+        )
+        return self._status(
+            job.session_id,
+            job.sequence,
+            job.operation,
+            job.serial,
+            part=part,
+            parts_total=_PULL_PARTS_TOTAL,
+            availability=AvailabilityStatus.failed,
+            reason=reason,
+            raw_source=label,
         )
 
     def _run_pull_subject_apk(
@@ -220,21 +252,33 @@ class AcquisitionRunner:
 
         The APK path never comes from the backend: it is read from the output of part 1, must
         match the allowed shape and must be the only APK reported. The pulled file is evidence
-        part 2; the bundle files are parts 3 onward. Execution stops at the first part that is
-        not acquired.
+        part 2; the bundle files are parts 3 onward. Every part gets one status; parts whose
+        prerequisite was not acquired (part 2 needs part 1, parts 3.. need part 2) are reported
+        failed without being run.
         """
         total = _PULL_PARTS_TOTAL
         (path_label, path_args), (apk_label, pull_args) = parts
+        bundle_labels = [f"static:{name}" for name in BUNDLE_FILES]
+
+        def bundle_unmet() -> list[dict[str, Any]]:
+            return [
+                self._prerequisite_unmet(job, 3 + index, label, 2)
+                for index, label in enumerate(bundle_labels)
+            ]
 
         status, result = self._run_adb_part(job, 1, total, path_label, path_args)
         statuses = [status]
         if result is None or status["availability_status"] != AvailabilityStatus.acquired.value:
-            return statuses
+            return [*statuses, self._prerequisite_unmet(job, 2, apk_label, 1), *bundle_unmet()]
 
         try:
             apk_path = self._apk_path_from(result)
         except AgentError as exc:
-            return [*statuses, self._job_failed(job, exc, part=2, parts_total=total)]
+            return [
+                *statuses,
+                self._job_failed(job, exc, part=2, parts_total=total, raw_source=apk_label),
+                *bundle_unmet(),
+            ]
 
         local = self._evidence_path(job, 2)
         digest: str | None = None
@@ -265,9 +309,10 @@ class AcquisitionRunner:
                         returncode=pulled.returncode,
                         availability=availability,
                         reason=reason,
+                        raw_source=apk_label,
                     )
                 )
-                return statuses
+                return [*statuses, *bundle_unmet()]
             digest, size = self._upload_file(job, 2, apk_label, local, acquired_at)
         except (AgentError, ValueError, OSError, KeyError) as exc:
             kept = local.is_file() and local.stat().st_size > 0
@@ -280,23 +325,46 @@ class AcquisitionRunner:
                     parts_total=total,
                     digest=sha256_file(local) if kept else None,
                     size=local.stat().st_size if kept else None,
+                    raw_source=apk_label,
                 ),
+                *bundle_unmet(),
             ]
-        statuses.append(self._acquired_status(job, 2, digest, size))
+        statuses.append(self._acquired_status(job, 2, apk_label, digest, size))
 
         try:
             with tempfile.TemporaryDirectory(prefix="forplat-bundle-") as workdir:
                 bundle = extract(local, Path(workdir) / "bundle")
                 for part, source in enumerate(bundle, start=3):
-                    evidence = self._evidence_path(job, part)
-                    write_evidence(evidence, source.read_bytes())
-                    digest, size = self._upload_file(
-                        job, part, f"static:{source.name}", evidence, datetime.now(UTC)
-                    )
-                    statuses.append(self._acquired_status(job, part, digest, size))
+                    statuses.append(self._upload_bundle_file(job, part, source, bundle_labels))
         except (AgentError, ValueError, OSError, KeyError) as exc:
-            statuses.append(self._job_failed(job, exc, part=len(statuses) + 1, parts_total=total))
+            # The extractor failed: bundle parts without a status yet were never produced.
+            reported = {item["part"] for item in statuses}
+            for part in range(3, total + 1):
+                if part not in reported:
+                    statuses.append(
+                        self._job_failed(
+                            job,
+                            exc,
+                            part=part,
+                            parts_total=total,
+                            raw_source=bundle_labels[part - 3],
+                        )
+                    )
         return statuses
+
+    def _upload_bundle_file(
+        self, job: AcquisitionJob, part: int, source: Path, labels: list[str]
+    ) -> dict[str, Any]:
+        label = labels[part - 3]
+        try:
+            evidence = self._evidence_path(job, part)
+            write_evidence(evidence, source.read_bytes())
+            digest, size = self._upload_file(job, part, label, evidence, datetime.now(UTC))
+        except (AgentError, ValueError, OSError, KeyError) as exc:
+            return self._job_failed(
+                job, exc, part=part, parts_total=_PULL_PARTS_TOTAL, raw_source=label
+            )
+        return self._acquired_status(job, part, label, digest, size)
 
     @staticmethod
     def _apk_path_from(result: AdbResult) -> str:
@@ -322,6 +390,7 @@ class AcquisitionRunner:
         parts_total: int = 1,
         digest: str | None = None,
         size: int | None = None,
+        raw_source: str | None = None,
     ) -> dict[str, Any]:
         audit(
             "job_failed",
@@ -343,6 +412,7 @@ class AcquisitionRunner:
             error=type(exc).__name__,
             availability=AvailabilityStatus.failed,
             reason=_failure_reason(exc),
+            raw_source=raw_source,
         )
 
     def _context_for(self, serial: str) -> dict[str, Any]:
@@ -391,6 +461,7 @@ class AcquisitionRunner:
         error: str | None = None,
         availability: AvailabilityStatus = AvailabilityStatus.failed,
         reason: str | None = None,
+        raw_source: str | None = None,
     ) -> dict[str, Any]:
         return {
             "type": "job_status",
@@ -406,4 +477,5 @@ class AcquisitionRunner:
             "error": error,
             "availability_status": availability.value,
             "availability_reason": reason,
+            "raw_source": raw_source,
         }

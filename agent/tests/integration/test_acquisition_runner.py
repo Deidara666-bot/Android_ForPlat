@@ -113,6 +113,7 @@ def test_job_runs_adb_writes_bytes_exactly_and_reports_hash(
         "error": None,
         "availability_status": "acquired",
         "availability_reason": None,
+        "raw_source": "pm list packages -U",
     }
 
 

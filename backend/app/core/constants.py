@@ -168,3 +168,23 @@ LABEL_ID: dict[type[StrEnum], dict[str, str]] = {
 
 
 APP_VERSION = "0.10.0"
+
+
+class EvidenceMode(StrEnum):
+    installed_runtime = "installed_runtime"
+    apk_static = "apk_static"
+
+
+class UnknownReason(StrEnum):
+    """Why a condition cannot be decided (REF §ENUM2); only the source-level reasons are
+    produced by the coverage service."""
+
+    availability_unavailable = "availability_unavailable"
+    availability_denied = "availability_denied"
+    availability_unsupported = "availability_unsupported"
+    availability_failed = "availability_failed"
+    not_acquired = "not_acquired"
+    parse_incomplete = "parse_incomplete"
+    coverage_incomplete = "coverage_incomplete"
+    conflicting_evidence = "conflicting_evidence"
+    no_applicable_profile = "no_applicable_profile"

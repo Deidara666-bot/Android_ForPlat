@@ -6,6 +6,10 @@ several contain the name of the tool that produced the file (for example `dumpsy
 live only in this file; the repository's command-string grep excludes it, like `adb_commands.py`.
 """
 
+# collect_package_inventory / collect_package_detail
+PM_LIST_PACKAGES = "pm list packages -U"
+DUMPSYS_PACKAGE = "dumpsys package"
+
 # collect_accessibility_state
 SETTINGS_SECURE_A11Y = "settings secure a11y"
 SETTINGS_SECURE_NLS = "settings secure nls"

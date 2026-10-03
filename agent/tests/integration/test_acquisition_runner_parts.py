@@ -104,7 +104,7 @@ def test_three_parts_write_three_files_and_report_three_statuses(
     assert [on_disk for _, _, on_disk in uploader.calls] == [r.stdout for r in results]
 
 
-def test_stops_after_the_first_part_that_is_not_acquired(
+def test_every_part_runs_and_reports_even_after_a_part_that_is_not_acquired(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, uploader: _FakeUploader
 ) -> None:
     results = [
@@ -114,25 +114,33 @@ def test_stops_after_the_first_part_that_is_not_acquired(
     ]
     calls = _fake_adb(monkeypatch, results)
     statuses = AcquisitionRunner(uploader, raw_root=tmp_path).run_job_parts(_job())  # type: ignore[arg-type]
-    assert [s["availability_status"] for s in statuses] == ["acquired", "denied"]
-    assert len(calls) == 2  # part 3 never ran
-    assert [fields["part"] for _, fields, _ in uploader.calls] == [1]  # only the acquired part
+    assert [s["availability_status"] for s in statuses] == ["acquired", "denied", "acquired"]
+    assert [s["part"] for s in statuses] == [1, 2, 3]
+    assert [s["raw_source"] for s in statuses] == [
+        "settings secure a11y",
+        "settings secure nls",
+        "appops overlay",
+    ]
+    assert len(calls) == 3  # part 3 ran: its source does not depend on part 2
+    assert [fields["part"] for _, fields, _ in uploader.calls] == [1, 3]  # acquired parts only
 
 
-def test_a_failed_upload_stops_the_remaining_parts(
+def test_a_failed_upload_marks_only_its_part_and_the_rest_still_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    class Rejecting(_FakeUploader):
+    class RejectingFirst(_FakeUploader):
         def upload(self, path: Path, **fields: Any) -> None:
             super().upload(path, **fields)
-            raise UploadError("rejected")
+            if fields["part"] == 1:
+                raise UploadError("rejected")
 
     calls = _fake_adb(monkeypatch, [AdbResult(b"null\n", b"", 0)] * 3)
-    uploader = Rejecting()
+    uploader = RejectingFirst()
     statuses = AcquisitionRunner(uploader, raw_root=tmp_path).run_job_parts(_job())  # type: ignore[arg-type]
-    assert [s["availability_status"] for s in statuses] == ["failed"]
+    assert [s["availability_status"] for s in statuses] == ["failed", "acquired", "acquired"]
     assert statuses[0]["part"] == 1 and statuses[0]["error"] == "UploadError"
-    assert len(calls) == 1
+    assert statuses[0]["raw_source"] == "settings secure a11y"
+    assert len(calls) == 3
 
 
 def test_bad_parameter_runs_no_part_at_all(
