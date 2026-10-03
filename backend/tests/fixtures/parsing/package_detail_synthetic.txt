@@ -1,0 +1,38 @@
+Receiver Resolver Table:
+  Non-Data Actions:
+      android.provider.Telephony.SMS_RECEIVED:
+        aaa1111 com.synthetic.alpha/.SmsReceiver filter bbb2222 permission android.permission.BROADCAST_SMS
+          Action: "android.provider.Telephony.SMS_RECEIVED"
+          mPriority=0, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+
+Service Resolver Table:
+  Non-Data Actions:
+      android.accessibilityservice.AccessibilityService:
+        ccc3333 com.synthetic.alpha/.WatchService filter ddd4444 permission android.permission.BIND_ACCESSIBILITY_SERVICE
+          Action: "android.accessibilityservice.AccessibilityService"
+      com.synthetic.alpha.PING:
+        eee5555 com.synthetic.alpha/.PingService filter fff6666
+          Action: "com.synthetic.alpha.PING"
+          Category: "android.intent.category.DEFAULT"
+
+Packages:
+  Package [com.synthetic.alpha] (abc1234):
+    appId=10101
+    pkg=Package{def5678 com.synthetic.alpha}
+    versionCode=7 minSdk=26 targetSdk=34
+    versionName=1.2.3
+    lastUpdateTime=2026-01-02 03:04:05
+    installerPackageName=com.synthetic.store
+    signatures=PackageSignatures{0a0a0a0 version:3, signatures:[0a1b2c3d, 4e5f6a7b], past signatures:[]}
+    requested permissions:
+      android.permission.READ_SMS
+      android.permission.SYSTEM_ALERT_WINDOW
+      android.permission.INTERNET
+    install permissions:
+      android.permission.INTERNET: granted=true
+    User 0: ceDataInode=1 deDataInode=2 installed=true hidden=false
+      installReason=0
+      firstInstallTime=2026-01-02 03:04:05
+      runtime permissions:
+        android.permission.READ_SMS: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED]
+        android.permission.READ_CONTACTS: granted=true, flags=[ ]

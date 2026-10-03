@@ -1,4 +1,5 @@
 import logging
+import re
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -10,7 +11,9 @@ from app.core.constants import (
     ACQUISITION_PROFILES,
     ALLOWED_OPERATIONS,
     MAPPED_OPERATIONS,
+    OPERATION_PARAMETERS,
     OPERATION_SOURCE_GROUP,
+    PACKAGE_NAME_PATTERN,
     AvailabilityStatus,
     SessionStatus,
 )
@@ -36,6 +39,10 @@ class OperationNotMappedError(ValueError):
     """The operation ID is allowlisted but the agent has no command mapped for it yet."""
 
 
+class InvalidParametersError(ValueError):
+    """The parameters do not match the names and shapes the operation allows."""
+
+
 class UnknownProfileError(ValueError):
     """The requested acquisition profile does not exist."""
 
@@ -50,6 +57,16 @@ class AcquisitionService:
             raise OperationNotAllowedError(f"operation {operation!r} is not allowlisted")
         if operation not in MAPPED_OPERATIONS:
             raise OperationNotMappedError(f"operation {operation!r} is not mapped yet")
+
+    @staticmethod
+    def validate_parameters(operation: str, parameters: dict[str, str]) -> None:
+        """Exactly the parameter names the operation lists, each with a valid shape."""
+        required = OPERATION_PARAMETERS.get(operation, ())
+        if set(parameters) != set(required):
+            raise InvalidParametersError(f"operation {operation!r} takes {sorted(required)!r}")
+        for name, value in parameters.items():
+            if name == "package_name" and re.fullmatch(PACKAGE_NAME_PATTERN, value) is None:
+                raise InvalidParametersError(f"parameter {name!r} has an invalid shape")
 
     @staticmethod
     def operations_for(profile: str | None, operation: str | None) -> list[str]:
@@ -74,6 +91,7 @@ class AcquisitionService:
         """Job payload for the agent (REF §API, 8 fields): identities and an operation ID,
         never a command string. `sequence` and `serial` come from the DB rows, not the client."""
         self.validate_operation(operation_row.operation_id)
+        self.validate_parameters(operation_row.operation_id, parameters)
         return {
             "type": "job",
             "session_id": str(session.id),
@@ -92,6 +110,7 @@ class AcquisitionService:
         agent: Agent,
         operations: list[str],
         profile: str | None,
+        parameters: dict[str, str] | None = None,
     ) -> tuple[AcquisitionSession, list[AcquisitionOperation]]:
         assert self._db is not None
         session = AcquisitionSession(
@@ -110,7 +129,12 @@ class AcquisitionService:
         self._db.add(session)
         self._db.flush()
         rows = [
-            AcquisitionOperation(session_id=session.id, sequence=index, operation_id=operation)
+            AcquisitionOperation(
+                session_id=session.id,
+                sequence=index,
+                operation_id=operation,
+                parameters=dict(parameters or {}),
+            )
             for index, operation in enumerate(operations, start=1)
         ]
         self._db.add_all(rows)

@@ -12,6 +12,17 @@ from app.normalization.subject_resolution import (
 from app.normalization.temporal import current_state_times
 
 _METADATA_ARTIFACT_TYPE = "device_build_property"
+# Parsed by `package_state.detail` (v0.45.1); facts for these arrive in v0.45.2. Until then they
+# are stored as artifacts and yield no fact, instead of failing the whole evidence transaction.
+_DETAIL_ARTIFACT_TYPES = frozenset(
+    {
+        "package_identity",
+        "requested_permission",
+        "granted_permission",
+        "component_declared",
+        "intent_filter_action",
+    }
+)
 
 
 class UnsupportedArtifactTypeError(ValueError):
@@ -41,6 +52,8 @@ def normalize(
     if ParseStatus(artifact.parse_status) != ParseStatus.parsed:
         return []
     if artifact.artifact_type == _METADATA_ARTIFACT_TYPE:
+        return []
+    if artifact.artifact_type in _DETAIL_ARTIFACT_TYPES:
         return []
     if artifact.artifact_type != INVENTORY_ARTIFACT_TYPE:
         raise UnsupportedArtifactTypeError(artifact.artifact_type)

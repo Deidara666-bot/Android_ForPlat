@@ -49,11 +49,14 @@ class AcquisitionCreate(BaseModel):
     device_id: uuid.UUID
     profile: str | None = None
     operation: str | None = None
+    parameters: dict[str, str] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _exactly_one_selector(self) -> "AcquisitionCreate":
         if (self.profile is None) == (self.operation is None):
             raise ValueError("provide exactly one of `profile` or `operation`")
+        if self.profile is not None and self.parameters:
+            raise ValueError("`parameters` apply to a single `operation`, not to a `profile`")
         return self
 
 

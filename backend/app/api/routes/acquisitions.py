@@ -19,6 +19,7 @@ from app.schemas.acquisition import (
 from app.schemas.evidence import EvidenceOut
 from app.services.acquisition_service import (
     AcquisitionService,
+    InvalidParametersError,
     OperationNotAllowedError,
     OperationNotMappedError,
     UnknownProfileError,
@@ -59,7 +60,14 @@ async def create_acquisition(
     audit = AuditService(db)
     try:
         operations = service.operations_for(body.profile, body.operation)
-    except (OperationNotMappedError, OperationNotAllowedError, UnknownProfileError) as exc:
+        if body.operation is not None:
+            service.validate_parameters(body.operation, body.parameters)
+    except (
+        OperationNotMappedError,
+        OperationNotAllowedError,
+        UnknownProfileError,
+        InvalidParametersError,
+    ) as exc:
         kind = type(exc).__name__
         requested = body.operation if body.operation is not None else body.profile
         audit.record(
@@ -69,12 +77,17 @@ async def create_acquisition(
             object_type="case",
             object_id=body.case_id,
             reason=kind,
-            details={"requested": (requested or "")[:64]},
+            # Parameter values are never stored in the audit trail, only their names.
+            details={
+                "requested": (requested or "")[:64],
+                "parameter_names": sorted(body.parameters)[:10],
+            },
         )
         messages = {
             "OperationNotMappedError": f"operasi '{body.operation}' belum dipetakan",
             "OperationNotAllowedError": f"operasi '{body.operation}' bukan operasi allowlist",
             "UnknownProfileError": f"profil '{body.profile}' tidak ada",
+            "InvalidParametersError": f"parameter operasi '{body.operation}' tidak valid",
         }
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, detail={"jenis": kind, "pesan": messages[kind]}
@@ -92,9 +105,11 @@ async def create_acquisition(
             status.HTTP_409_CONFLICT, detail="agent for this device is not connected"
         )
 
-    session, rows = service.create_session(body.case_id, device, agent, operations, body.profile)
+    session, rows = service.create_session(
+        body.case_id, device, agent, operations, body.profile, body.parameters
+    )
     for row in rows:
-        job = service.build_job(session, row, device.serial, {})
+        job = service.build_job(session, row, device.serial, dict(row.parameters or {}))
         if not await manager.send(agent.agent_id, job):
             service.mark_failed(session, "agent disconnected before the job was delivered")
             raise HTTPException(status.HTTP_409_CONFLICT, detail="agent disconnected")

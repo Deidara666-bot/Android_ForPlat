@@ -43,7 +43,10 @@ def test_unknown_operation_is_not_allowed_and_audited(operation: str, audit_file
 
 @pytest.mark.parametrize(
     "operation",
-    sorted(ALLOWED_OPERATIONS - {"collect_device_metadata", "collect_package_inventory"}),
+    sorted(
+        ALLOWED_OPERATIONS
+        - {"collect_device_metadata", "collect_package_inventory", "collect_package_detail"}
+    ),
 )
 def test_allowed_but_unmapped_operation_is_not_mapped_and_audited(
     operation: str, audit_file: Path

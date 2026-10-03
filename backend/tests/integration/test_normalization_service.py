@@ -29,6 +29,7 @@ _NOW = datetime(2026, 10, 2, 12, 0, tzinfo=UTC)
 _FIXTURES = Path(__file__).parents[1] / "fixtures" / "parsing"
 _INVENTORY = (_FIXTURES / "package_inventory_synthetic.txt").read_bytes()
 _METADATA = (_FIXTURES / "device_metadata_synthetic.txt").read_bytes()
+_DETAIL = (_FIXTURES / "package_detail_synthetic.txt").read_bytes()
 _METADATA_NO_TZ = b"[ro.build.version.release]: [16]\n[ro.build.version.sdk]: [36]\n"
 
 
@@ -254,3 +255,24 @@ def test_assert_evidence_ready_rejects_missing_or_different(
 
 def test_assert_evidence_ready_is_case_insensitive() -> None:
     assert_evidence_ready("A" * 64, "a" * 64)
+
+
+def test_package_detail_evidence_is_stored_as_artifacts_and_yields_no_fact_yet(
+    session: Session, storage: EvidenceStorageService, acquisition: AcquisitionSession
+) -> None:
+    evidence = _evidence(session, storage, acquisition, "collect_package_detail", _DETAIL)
+    result = process_evidence(session, evidence.id, storage)
+    assert result.skipped_reason is None
+    assert result.artifacts_created == 13
+    assert result.facts_created == 0  # normalization of these artifact types is v0.45.2
+    types = set(
+        session.scalars(select(Artifact.artifact_type).where(Artifact.evidence_id == evidence.id))
+    )
+    assert types == {
+        "package_identity",
+        "requested_permission",
+        "granted_permission",
+        "component_declared",
+        "intent_filter_action",
+    }
+    assert session.scalar(select(func.count()).select_from(NormalizedEvent)) == 0

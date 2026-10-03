@@ -1,0 +1,23 @@
+Receiver Resolver Table:
+  Non-Data Actions:
+      com.synthetic.alpha.PING:
+        aaa1111 com.synthetic.alpha/.PingReceiver filter bbb2222
+          Action: "com.synthetic.alpha.PING"
+        komponen rusak tanpa hash
+          Unknown: "bentuk filter yang tidak dikenal"
+
+Packages:
+  Package [com.synthetic.alpha] (abc1234):
+    appId=10101
+    versionCode=7 minSdk=26 targetSdk=34
+    versionName=1.2.3
+    requested permissions:
+      android.permission.READ_SMS
+      izin rusak dengan spasi
+    install permissions:
+      android.permission.INTERNET: granted=true
+      android.permission.WAKE_LOCK: granted=maybe
+    User 0: ceDataInode=1 installed=true
+      firstInstallTime=2026-01-02 03:04:05
+      runtime permissions:
+        android.permission.READ_SMS: granted=false, flags=[ ]
