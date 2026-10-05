@@ -13,7 +13,7 @@
 | *Increment* aktif | **1 selesai** (irisan tegak minimum, tag `v0.40`). Berikutnya **2** |
 | Milestone aktif | **`v0.45`** berjalan (`feature/v0.45`; `docs/dev/v0.45.md` masih draf, belum `/plan-milestone`). `v0.40` tercapai (tag `v0.40`) |
 | Kartu terakhir | **`v0.45.9`** (2026-10-05) — kartu terakhir milestone `v0.45` |
-| Kartu berikutnya | `/finish-branch` `v0.45` (selesai bila CHECK OK di `main`), lalu persetujuan user untuk `/milestone v0.45`; setelah itu `v0.50` lewat `/plan-milestone` bila drafnya perlu disegarkan |
+| Kartu berikutnya | Persetujuan user untuk `/milestone v0.45` (tag belum dibuat); lalu `v0.50` lewat `/plan-milestone` bila drafnya perlu disegarkan |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30`, `v0.40` (2026-10-02)
@@ -197,6 +197,9 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - [ ] Bentuk deployment final (VPS) dan distribusi agen
 
 ## Sinkronisasi remote
+
+- 2026-10-05 — `/finish-branch v0.45`: `feature/v0.45` digabung `--no-ff` ke `main` (`b9c1a12`), `check.sh all` OK di `main`, push GitHub sukses. Reviewer `claim-auditor` + `forensic-integrity-reviewer`: 0 blocking. Branch `feature/v0.05`–`v0.45` dan `fix/*` belum dihapus (menunggu persetujuan user). Tag `v0.45` belum terbit.
+  Catatan non-blocking review `v0.45`, TIDAK dikerjakan: (1) sisa `.incoming/` bila proses mati + berkas final tanpa baris `evidence` bila commit gagal (tanpa pembersih/rekonsiliasi) · (2) `Content-Length` hanya melindungi klien jujur; `Transfer-Encoding: chunked` tetap di-spool Starlette ke disk dulu · (3) jendela izin sebelum `chmod 0o444` (karantina dibuat dengan izin bawaan) · (4) `write_csv` `os.replace` bisa menimpa hasil dari run paralel · (5) CSV `tier2_g1_avd1-api36.csv` memuat path lokal Windows di kolom `adb_version` (baris "Installed as …") · (6) regex path APK `[^\s]+` longgar (aman karena list argumen) · (7) pull: `exists()` lalu tulis (TOCTOU kecil), berkas agen tak `chmod` read-only · (8) berkas bundel dibaca penuh (kecil) · (9) negatif izin hanya dari blok `User 0:` tanpa mencatat user · (10) paket vs shared-user `granted` bisa bertentangan → negatif keliru mungkin · (11) `native_libs`/`api_refs` di `PARTS` melapor `can_be_false=true` (tak ada fakta yang memakainya; usul bendera context-only) · (12) subjek proses dari bentuk nama (pengikatan v0.60 lewat inventaris) · (13) `EvidenceMode`/`UnknownReason` perlu dipastikan disetujui REF §ENUM2 · (14) `event_time` usage memakai satu zona sesi untuk 24 jam.
 
 - 2026-10-02 — `/finish-branch v0.40`: `feature/v0.40` digabung `--no-ff` ke `main`, `check.sh all` OK di `main`, push GitHub. Branch lama (`feature/v0.05`..`v0.40`, `fix/*`) belum dihapus (menunggu persetujuan user). Tag `v0.40` belum terbit.
 
