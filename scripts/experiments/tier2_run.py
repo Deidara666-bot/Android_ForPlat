@@ -86,7 +86,9 @@ class Tier1:
     artifact_id: str
     name: str
     operation_id: str
-    sources: tuple[str, ...]  # `raw_source` labels of the parts that carry the artifact
+    # `raw_source` labels of the parts that carry the artifact; `<label>:*` = every part whose
+    # label is `<label>` or starts with `<label>:` (one part per APK file for `apk file`)
+    sources: tuple[str, ...]
     temporal: str  # 01_BREAKDOWN §9.1 "temporal semantics" column
     action: str
     check: str  # key of the content check below
@@ -100,8 +102,8 @@ TIER1: tuple[Tier1, ...] = (
           ("pm list packages -U",), "current", "list installed packages with UIDs", "inventory"),
     Tier1("G1-A2", "APK path", "pull_subject_apk", ("pm path",), "current",
           "ask the device for the subject's APK path", "acquired"),
-    Tier1("G1-A3", "APK file + SHA-256", "pull_subject_apk", ("apk file",), "current",
-          "pull the APK the device reported", "acquired"),
+    Tier1("G1-A3", "APK file + SHA-256", "pull_subject_apk", ("apk file:*",), "current",
+          "pull every APK file the device reported", "acquired"),
     Tier1("G1-A4", "firstInstallTime / lastUpdateTime", "collect_package_detail", (_PKG,),
           "historical metadata", "read the subject's package record", "install_times"),
     Tier1("G1-A5", "installer / initiating / originating info", "collect_package_detail",
@@ -255,7 +257,7 @@ def command_text(
 ) -> str:
     texts = []
     for label in sources:
-        args = table.get(label)
+        args = table.get(label.removesuffix(":*"))
         if args is None:
             texts.append(_STATIC_COMMAND)
             continue
@@ -276,6 +278,22 @@ class PartResult:
     privilege_state: str | None
     parse_complete: bool
     artifacts: tuple[dict[str, Any], ...]
+
+
+def expand_source(evidence: Sequence[dict[str, Any]], source: str) -> list[str]:
+    """The part labels a source stands for: itself, or for `<label>:*` every label present in
+    the session's evidence (all APK parts); none present -> the bare label (not acquired)."""
+    if not source.endswith(":*"):
+        return [source]
+    base = source[:-2]
+    found = sorted(
+        {
+            e["raw_source"]
+            for e in evidence
+            if e["raw_source"] == base or e["raw_source"].startswith(base + ":")
+        }
+    )
+    return found or [base]
 
 
 def part_result(
@@ -363,7 +381,11 @@ def artifact_row(
     artifacts: Sequence[dict[str, Any]],
 ) -> dict[str, Any]:
     """Status, reason and a content verdict for one Tier-1 artifact of one session."""
-    parts = [part_result(evidence, artifacts, label) for label in tier1.sources]
+    parts = [
+        part_result(evidence, artifacts, label)
+        for source in tier1.sources
+        for label in expand_source(evidence, source)
+    ]
     broken = next((p for p in parts if p.status != "acquired"), None)
     if broken is not None:
         status, reason, actual = broken.status, broken.reason, broken.status

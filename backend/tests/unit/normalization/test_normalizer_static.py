@@ -22,8 +22,10 @@ from app.parsing.apk_static.manifest import ApkManifestParser
 from app.parsing.apk_static.simple import (
     ApkBadgingParser,
     ApkBundleManifestParser,
+    ApkCodeLoadingReferenceParser,
     ApkEndpointReferenceParser,
     ApkIdentityParser,
+    ApkNativeLibraryParser,
     ApkPermissionsParser,
 )
 from tests.unit.parsing.test_apk_static import _MANIFEST
@@ -112,6 +114,19 @@ def test_real_urls_are_endpoint_reference_identity_facts() -> None:
     assert {f.epistemic_class for f in facts} == {EpistemicClass.identity_attribute}
     assert facts[-1].object_value == "http://www.google.com"
     assert facts[-1].context_json["endpoint_kind"] == "url"
+
+
+def test_native_libraries_and_code_loading_references_make_no_fact_and_no_error() -> None:
+    sha = "a" * 64
+    libs = ApkNativeLibraryParser().parse(f"base.apk\tlib/x86_64/a.so\t3\t{sha}\n".encode(), _STK)
+    refs = ApkCodeLoadingReferenceParser().parse(
+        b"base.apk\tclasses.dex\tLdalvik/system/DexClassLoader;\n", _STK
+    )
+    assert [r.artifact_type for r in [*libs, *refs]] == [
+        "apk_native_library",
+        "apk_code_loading_reference",
+    ]
+    assert _facts([*libs, *refs]) == []  # no UnsupportedArtifactTypeError either
 
 
 def test_badging_certificate_and_bundle_manifest_make_no_fact() -> None:

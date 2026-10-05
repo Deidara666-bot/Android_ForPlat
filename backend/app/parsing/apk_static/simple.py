@@ -9,26 +9,53 @@ from app.parsing.apk_static._common import BundleParser
 from app.parsing.base import ParsedArtifact
 
 _SHA256 = re.compile(r"[0-9a-f]{64}")
+_APK_NAME = re.compile(r"[A-Za-z0-9_.\-]{1,100}\.apk")
+_SHA_LINE = re.compile(r"(?P<sha>[0-9a-f]{64})(?:  (?P<name>\S+))?")
 
 
 class ApkIdentityParser(BundleParser):
-    """`apk.sha256`: one line, the lowercase hex SHA-256 of the APK."""
+    """`apk.sha256`: one `<sha256>  <file name>` line per APK, the base APK first (extractor 2);
+    a single bare `<sha256>` line is the extractor 1 form. The identity is the first line's hash,
+    the other lines are the splits."""
 
     parser_name = "apk_static.identity"
+    parser_version = "2"
     raw_source = raw_sources.STATIC_APK_SHA256
     artifact_type = "apk_identity"
 
     def parse_text(
         self, text: str, lines: list[tuple[int, str]], package: str
     ) -> list[ParsedArtifact]:
-        if len(lines) != 1 or _SHA256.fullmatch(lines[0][1].strip()) is None:
+        rows = [_SHA_LINE.fullmatch(line.strip()) for _, line in lines]
+        if any(row is None for row in rows):
             return self.whole_failure(
-                package, lines[0][1], "isi bukan satu baris SHA-256 heksadesimal"
+                package, lines[0][1], "linha bukan '<sha256>  <nama berkas apk>'"
             )
-        digest = lines[0][1].strip()
+        parsed = [(row["sha"], row["name"]) for row in rows if row is not None]
+        if len(parsed) > 1 and any(name is None for _, name in parsed):
+            return self.whole_failure(
+                package, lines[0][1], "beberapa APK tetapi ada baris tanpa nama"
+            )
+        names = [name for _, name in parsed if name is not None]
+        if any(_APK_NAME.fullmatch(name) is None for name in names) or len(set(names)) != len(
+            names
+        ):
+            return self.whole_failure(
+                package, lines[0][1], "nama berkas APK tidak valid atau ganda"
+            )
+        digest, base_name = parsed[0]
+        splits = [{"name": name, "sha256": sha} for sha, name in parsed[1:]]
         return [
             self.artifact(
-                self.artifact_type, package, digest, {"package_name": package, "sha256": digest}
+                self.artifact_type,
+                package,
+                digest,
+                {
+                    "package_name": package,
+                    "sha256": digest,
+                    "apk_name": base_name,
+                    "splits": splits,
+                },
             )
         ]
 
@@ -185,13 +212,15 @@ class ApkEndpointReferenceParser(BundleParser):
         return rows
 
 
-_MANIFEST_KEYS = {"apk_sha256", "extractor_version", "tool_versions", "created_at", "files"}
+_MANIFEST_KEYS_V1 = {"apk_sha256", "extractor_version", "tool_versions", "created_at", "files"}
+_MANIFEST_KEYS_V2 = _MANIFEST_KEYS_V1 | {"apks", "scan"}
 
 
 class ApkBundleManifestParser(BundleParser):
     """`bundle.json`: the extractor's own record; strict keys and value shapes."""
 
     parser_name = "apk_static.bundle"
+    parser_version = "2"
     raw_source = raw_sources.STATIC_BUNDLE_JSON
     artifact_type = "apk_bundle_manifest"
 
@@ -210,7 +239,7 @@ class ApkBundleManifestParser(BundleParser):
 
     @staticmethod
     def _problem(data: object) -> str | None:
-        if not isinstance(data, dict) or set(data) != _MANIFEST_KEYS:
+        if not isinstance(data, dict) or set(data) not in (_MANIFEST_KEYS_V1, _MANIFEST_KEYS_V2):
             return "kunci bundle.json tidak sama dengan yang diharapkan"
         if not isinstance(data["apk_sha256"], str) or not _SHA256.fullmatch(data["apk_sha256"]):
             return "apk_sha256 bukan SHA-256 heksadesimal"
@@ -232,4 +261,117 @@ class ApkBundleManifestParser(BundleParser):
             isinstance(v, str) and _SHA256.fullmatch(v) for v in files.values()
         ):
             return "files bukan peta nama ke SHA-256"
+        if "apks" in data:
+            apks = data["apks"]
+            if (
+                not isinstance(apks, dict)
+                or not apks
+                or not all(isinstance(v, str) and _SHA256.fullmatch(v) for v in apks.values())
+            ):
+                return "apks bukan peta nama APK ke SHA-256"
+            if data["apk_sha256"] != next(iter(apks.values())):
+                return "apk_sha256 bukan hash APK pertama (base)"
+            scan = data["scan"]
+            if (
+                not isinstance(scan, dict)
+                or set(scan) != {"entri_terpotong"}
+                or not isinstance(scan["entri_terpotong"], list)
+                or not all(isinstance(item, dict) for item in scan["entri_terpotong"])
+            ):
+                return "scan bukan {entri_terpotong: [..]}"
         return None
+
+
+_NATIVE_ENTRY = re.compile(r"lib/(?P<abi>[^/\s]+)/[^/\s]+\.so")
+_DEX_ENTRY = re.compile(r"classes[0-9]*\.dex")
+_DESCRIPTORS = frozenset(
+    {
+        "Ldalvik/system/DexClassLoader;",
+        "Ldalvik/system/InMemoryDexClassLoader;",
+        "Ldalvik/system/PathClassLoader;",
+        "Ldalvik/system/DelegateLastClassLoader;",
+    }
+)
+
+
+class ApkNativeLibraryParser(BundleParser):
+    """`native_libs.txt`: `<apk>\t<lib/abi/name.so>\t<size>\t<sha256>` per native library. Context
+    for the examiner: the APK contains the library, nothing about what it does or whether it ran."""
+
+    parser_name = "apk_static.native_libs"
+    raw_source = raw_sources.STATIC_NATIVE_LIBS
+    artifact_type = "apk_native_library"
+
+    def parse_text(
+        self, text: str, lines: list[tuple[int, str]], package: str
+    ) -> list[ParsedArtifact]:
+        rows: list[ParsedArtifact] = []
+        for number, line in lines:
+            fields = line.rstrip("\r").split("\t")
+            entry = _NATIVE_ENTRY.fullmatch(fields[1]) if len(fields) == 4 else None
+            if (
+                entry is None
+                or _APK_NAME.fullmatch(fields[0]) is None
+                or not fields[2].isdecimal()
+                or _SHA256.fullmatch(fields[3]) is None
+            ):
+                rows.append(
+                    self.failed_line(
+                        self.artifact_type,
+                        package,
+                        number,
+                        line,
+                        "baris bukan '<apk>\\t<lib/abi/nama.so>\\t<ukuran>\\t<sha256>'",
+                    )
+                )
+                continue
+            value: dict[str, object] = {
+                "apk": fields[0],
+                "entry": fields[1],
+                "abi": entry["abi"],
+                "size": int(fields[2]),
+                "sha256": fields[3],
+                "line_no": number,
+            }
+            rows.append(self.artifact(self.artifact_type, package, line, value))
+        return rows
+
+
+class ApkCodeLoadingReferenceParser(BundleParser):
+    """`api_refs.txt`: `<apk>\t<classes*.dex>\t<descriptor>` for the closed set of class-loader
+    descriptors. A reference in a dex file is not evidence that code was loaded or run."""
+
+    parser_name = "apk_static.api_refs"
+    raw_source = raw_sources.STATIC_API_REFS
+    artifact_type = "apk_code_loading_reference"
+
+    def parse_text(
+        self, text: str, lines: list[tuple[int, str]], package: str
+    ) -> list[ParsedArtifact]:
+        rows: list[ParsedArtifact] = []
+        for number, line in lines:
+            fields = line.rstrip("\r").split("\t")
+            if (
+                len(fields) != 3
+                or _APK_NAME.fullmatch(fields[0]) is None
+                or _DEX_ENTRY.fullmatch(fields[1]) is None
+                or fields[2] not in _DESCRIPTORS
+            ):
+                rows.append(
+                    self.failed_line(
+                        self.artifact_type,
+                        package,
+                        number,
+                        line,
+                        "baris bukan '<apk>\\t<classes.dex>\\t<descriptor tertutup>'",
+                    )
+                )
+                continue
+            value: dict[str, object] = {
+                "apk": fields[0],
+                "entry": fields[1],
+                "descriptor": fields[2],
+                "line_no": number,
+            }
+            rows.append(self.artifact(self.artifact_type, package, line, value))
+        return rows

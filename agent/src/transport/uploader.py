@@ -9,7 +9,8 @@ from src.exceptions import UploadError
 from src.security.auth import BearerAuth
 from src.state.audit_logger import audit
 
-_TIMEOUT_SECONDS = 60.0
+# The backend answers only after it has received, hashed and stored the whole file.
+_TIMEOUT = httpx.Timeout(60.0, read=1800.0)
 
 
 class EvidenceUploader:
@@ -17,7 +18,7 @@ class EvidenceUploader:
         self, base_url: str, token: str, *, transport: httpx.BaseTransport | None = None
     ) -> None:
         self._client = httpx.Client(
-            base_url=base_url, auth=BearerAuth(token), timeout=_TIMEOUT_SECONDS, transport=transport
+            base_url=base_url, auth=BearerAuth(token), timeout=_TIMEOUT, transport=transport
         )
 
     def close(self) -> None:

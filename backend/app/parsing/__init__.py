@@ -8,8 +8,10 @@ from app.parsing.apk_static.manifest import ApkManifestParser
 from app.parsing.apk_static.simple import (
     ApkBadgingParser,
     ApkBundleManifestParser,
+    ApkCodeLoadingReferenceParser,
     ApkEndpointReferenceParser,
     ApkIdentityParser,
+    ApkNativeLibraryParser,
     ApkPermissionsParser,
 )
 from app.parsing.package_state.detail import PackageDetailParser
@@ -38,6 +40,8 @@ for _parser in (
     ApkManifestParser(),
     ApkCertificateParser(),
     ApkEndpointReferenceParser(),
+    ApkNativeLibraryParser(),
+    ApkCodeLoadingReferenceParser(),
     ApkBundleManifestParser(),
 ):
     register(_parser)

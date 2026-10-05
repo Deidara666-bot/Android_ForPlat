@@ -1,4 +1,4 @@
-"""`pull_subject_apk`: nine evidence files, seven parsers, two parts without a parser."""
+"""`pull_subject_apk`: eleven evidence files (one APK), nine parsers, two parts without a parser."""
 
 import hashlib
 from datetime import UTC, datetime
@@ -28,17 +28,19 @@ _DIR = Path(__file__).parents[1] / "fixtures" / "parsing" / "apk_static_stk"
 _APK = b"PK\x03\x04 pretend apk bytes"
 _APK_SHA = hashlib.sha256(_APK).hexdigest()
 _BUNDLE = [
-    (rs.STATIC_APK_SHA256, (_APK_SHA + "\n").encode()),
+    (rs.STATIC_APK_SHA256, f"{_APK_SHA}  Stk.apk\n".encode()),
     (rs.STATIC_BADGING, (_DIR / "badging.txt").read_bytes()),
     (rs.STATIC_PERMISSIONS, (_DIR / "permissions.txt").read_bytes()),
     (rs.STATIC_MANIFEST, (_DIR / "manifest.txt").read_bytes()),
     (rs.STATIC_CERTS, (_DIR / "certs.txt").read_bytes()),
     (rs.STATIC_STRINGS_URLS, (_DIR / "strings_urls.txt").read_bytes()),
+    (rs.STATIC_NATIVE_LIBS, f"Stk.apk\tlib/x86_64/a.so\t3\t{_APK_SHA}\n".encode()),
+    (rs.STATIC_API_REFS, b"Stk.apk\tclasses.dex\tLdalvik/system/DexClassLoader;\n"),
     (rs.STATIC_BUNDLE_JSON, (_DIR / "bundle.json").read_bytes()),
 ]
 _PARTS = [
     (rs.PM_PATH, b"package:/system/app/Stk/Stk.apk\n"),
-    (rs.APK_FILE, _APK),
+    (f"{rs.APK_FILE}:Stk.apk", _APK),
     *_BUNDLE,
 ]
 
@@ -140,7 +142,7 @@ def test_the_bundle_parts_are_parsed_by_their_own_parsers_and_facts_follow(
 ) -> None:
     rows = _evidence(session, storage, acquisition)
     results = [process_evidence(session, row.id, storage) for row in rows[2:]]
-    assert [r.skipped_reason for r in results] == [None] * 7
+    assert [r.skipped_reason for r in results] == [None] * 9
     parser_names = [
         sorted(
             session.scalars(
@@ -156,6 +158,8 @@ def test_the_bundle_parts_are_parsed_by_their_own_parsers_and_facts_follow(
         ["apk_static.manifest"],
         ["apk_static.certs"],
         ["apk_static.strings"],
+        ["apk_static.native_libs"],
+        ["apk_static.api_refs"],
         ["apk_static.bundle"],
     ]
     assert not list(session.scalars(select(Artifact).where(Artifact.parse_status == "failed")))
@@ -243,3 +247,38 @@ def test_a_non_acquired_bundle_part_makes_no_artifact_and_no_fact(
     session.commit()
     result = process_evidence(session, rows[3].id, storage)
     assert result.artifacts_created == 0 and result.facts_created == 0
+
+
+def test_native_libraries_and_code_loading_references_are_artifacts_without_any_fact(
+    session: Session, storage: EvidenceStorageService, acquisition: AcquisitionSession
+) -> None:
+    rows = _evidence(session, storage, acquisition)
+    by_source = {row.raw_source: row for row in rows}
+    for label in (rs.STATIC_NATIVE_LIBS, rs.STATIC_API_REFS):
+        result = process_evidence(session, by_source[label].id, storage)
+        assert result.skipped_reason is None and result.artifacts_created == 1
+        assert result.facts_created == 0
+    types = sorted(session.scalars(select(Artifact.artifact_type)))
+    assert types == ["apk_code_loading_reference", "apk_native_library"]
+    assert not list(session.scalars(select(Artifact).where(Artifact.parse_status == "failed")))
+    assert _facts(session) == []
+
+
+def test_the_identity_fact_of_a_split_set_is_the_base_hash_with_the_splits_in_its_context(
+    session: Session, storage: EvidenceStorageService, acquisition: AcquisitionSession
+) -> None:
+    split_sha = hashlib.sha256(b"split").hexdigest()
+    parts = [
+        (rs.PM_PATH, b"package:/data/app/x/base.apk\npackage:/data/app/x/split_a.apk\n"),
+        (f"{rs.APK_FILE}:base.apk", _APK),
+        (f"{rs.APK_FILE}:split_a.apk", b"split"),
+        (rs.STATIC_APK_SHA256, f"{_APK_SHA}  base.apk\n{split_sha}  split_a.apk\n".encode()),
+    ]
+    rows = _evidence(session, storage, acquisition, parts)
+    process_evidence(session, rows[3].id, storage)
+    (fact,) = _facts(session)
+    assert fact.object_value == _APK_SHA  # identity = the base APK
+    assert fact.context_json["apk_name"] == "base.apk"
+    assert fact.context_json["splits"] == [{"name": "split_a.apk", "sha256": split_sha}]
+    for row in rows[:3]:  # the path query and each pulled APK have no parser
+        assert process_evidence(session, row.id, storage).skipped_reason is not None

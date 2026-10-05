@@ -1,4 +1,4 @@
-"""`pull_subject_apk`: path from the device's own output, pull, then the static bundle as parts."""
+"""`pull_subject_apk`: paths from the device's own output, one pull per APK, then the bundle."""
 
 import hashlib
 from pathlib import Path
@@ -9,7 +9,8 @@ import pytest
 from src.acquisition import acquisition_runner
 from src.acquisition.acquisition_runner import AcquisitionRunner
 from src.acquisition.command_allowlist import resolve_operation_parts
-from src.device.adb_controller import AdbResult
+from src.device import adb_commands
+from src.device.adb_controller import AdbResult, run_adb
 from src.device.device_detection import DetectedDevice
 from src.exceptions import UploadError
 from src.static_analysis.extractor import BUNDLE_FILES, ExtractorError
@@ -17,6 +18,19 @@ from src.static_analysis.extractor import BUNDLE_FILES, ExtractorError
 _SESSION = "0f8b3c9e-6a4d-4b53-9c1e-2d7a5e8b1f60"
 _APK_BYTES = b"PK\x03\x04 pretend apk bytes"
 _PATH = "/system/app/Stk/Stk.apk"
+_BUNDLE = len(BUNDLE_FILES)
+_BUNDLE_LABELS = [f"static:{name}" for name in BUNDLE_FILES]
+
+
+def _pm(*paths: str) -> bytes:
+    return b"".join(f"package:{path}\r\n".encode() for path in paths)
+
+
+_SPLITS = (
+    "/data/app/~~x==/com.x-y==/split_config.xxhdpi.apk",
+    "/data/app/~~x==/com.x-y==/base.apk",
+    "/data/app/~~x==/com.x-y==/split_config.arm64_v8a.apk",
+)
 
 
 def _job(**extra: Any) -> dict[str, Any]:
@@ -45,12 +59,13 @@ class _Uploader:
 
 
 class _Device:
-    """Fake adb: answers `pm path` and writes the pulled file like `adb pull` does."""
+    """Fake adb: answers `pm path` and writes the pulled files like `adb pull` does."""
 
-    def __init__(self, pm_output: bytes = b"package:" + _PATH.encode() + b"\r\n") -> None:
-        self.pm_output = pm_output
+    def __init__(self) -> None:
+        self.pm_output = _pm(_PATH)
         # like the real tool: the summary goes to stderr, stdout stays empty
         self.pull_result = AdbResult(b"", b"/x.apk: 1 file pulled, 0 skipped.\n", 0)
+        self.fail_pull_of: str | None = None  # device path whose pull fails
         self.writes_file = True
         self.calls: list[list[str]] = []
 
@@ -59,8 +74,10 @@ class _Device:
         if args[:2] == ["shell", "pm"]:
             return AdbResult(self.pm_output, b"", 0)
         if args[0] == "pull":
+            if args[1] == self.fail_pull_of:
+                return AdbResult(b"", b"adb: error: failed to stat remote object\n", 1)
             if self.pull_result.returncode == 0 and self.writes_file:
-                Path(args[2]).write_bytes(_APK_BYTES)
+                Path(args[2]).write_bytes(_APK_BYTES + args[1].encode())
             return self.pull_result
         raise AssertionError(f"unexpected adb call {args}")
 
@@ -71,7 +88,14 @@ def uploader() -> _Uploader:
 
 
 @pytest.fixture
-def device(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _Device:
+def extract_calls() -> list[list[tuple[str, Path]]]:
+    return []
+
+
+@pytest.fixture
+def device(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, extract_calls: list[list[tuple[str, Path]]]
+) -> _Device:
     fake = _Device()
     monkeypatch.setattr("src.state.audit_logger.AUDIT_LOG", tmp_path / "audit.log")
     monkeypatch.setattr(acquisition_runner, "run_adb", fake)
@@ -91,8 +115,9 @@ def device(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _Device:
         lambda _adb=None: [DetectedDevice("emulator-5554", "device")],
     )
 
-    def fake_extract(apk: Path, out_dir: Path) -> list[Path]:
-        assert apk.read_bytes() == _APK_BYTES
+    def fake_extract(apks: list[tuple[str, Path]], out_dir: Path) -> list[Path]:
+        extract_calls.append(list(apks))
+        assert all(path.is_file() for _, path in apks)
         out_dir.mkdir(parents=True)
         paths = []
         for name in BUNDLE_FILES:
@@ -109,77 +134,111 @@ def _run(tmp_path: Path, uploader: _Uploader, **extra: Any) -> list[dict[str, An
     return AcquisitionRunner(uploader, raw_root=tmp_path).run_job_parts(_job(**extra))  # type: ignore[arg-type]
 
 
-_LABELS = ["pm path", "apk file", *[f"static:{name}" for name in BUNDLE_FILES]]
+def _labels(*apk_names: str) -> list[str]:
+    return ["pm path", *[f"apk file:{name}" for name in apk_names], *_BUNDLE_LABELS]
 
 
-def _assert_parts_blocked_by(statuses: list[dict[str, Any]], first: int, prerequisite: int) -> None:
-    """Parts `first`..9 are failed, name their prerequisite and carry their own raw_source."""
+def _assert_blocked_by(statuses: list[dict[str, Any]], first: int, prerequisite: int) -> None:
+    """Parts `first`.. are failed, name their prerequisite and carry their own raw_source."""
     blocked = [s for s in statuses if s["part"] >= first]
-    assert [s["part"] for s in blocked] == list(range(first, 10))
+    assert [s["part"] for s in blocked] == list(range(first, len(statuses) + 1))
     assert {s["availability_status"] for s in blocked} == {"failed"}
     assert {s["availability_reason"] for s in blocked} == {
         f"prasyarat part {prerequisite} tidak diperoleh"
     }
-    assert [s["raw_source"] for s in blocked] == _LABELS[first - 1 :]
 
 
-def test_nine_parts_in_order_with_the_expected_labels_and_files(
-    tmp_path: Path, device: _Device, uploader: _Uploader
+def test_a_single_apk_gives_part_1_one_pull_and_the_bundle_parts(
+    tmp_path: Path, device: _Device, uploader: _Uploader, extract_calls: list[Any]
 ) -> None:
     statuses = _run(tmp_path, uploader)
-    assert [(s["part"], s["parts_total"]) for s in statuses] == [(n, 9) for n in range(1, 10)]
-    assert {s["availability_status"] for s in statuses} == {"acquired"}
-    assert [fields["part"] for fields, _ in uploader.calls] == list(range(1, 10))
-    assert [fields["raw_source"] for fields, _ in uploader.calls] == [
-        "pm path",
-        "apk file",
-        *[f"static:{name}" for name in BUNDLE_FILES],
+    total = 2 + _BUNDLE
+    assert [(s["part"], s["parts_total"]) for s in statuses] == [
+        (n, total) for n in range(1, total + 1)
     ]
+    assert {s["availability_status"] for s in statuses} == {"acquired"}
+    assert [s["raw_source"] for s in statuses] == _labels("Stk.apk")
+    assert [fields["part"] for fields, _ in uploader.calls] == list(range(1, total + 1))
     names = sorted(p.name for p in (tmp_path / _SESSION).iterdir())
-    assert names == sorted(f"2-pull_subject_apk-{n}.bin" for n in range(1, 10))
+    assert names == sorted(f"2-pull_subject_apk-{n}.bin" for n in range(1, total + 1))
     for fields, data in uploader.calls:  # every part hashed from the bytes that were uploaded
         assert fields["sha256_agent"] == hashlib.sha256(data).hexdigest()
         assert fields["sequence"] == 2 and fields["size_bytes"] == len(data)
-    assert uploader.calls[1][1] == _APK_BYTES  # part 2 is the APK itself
-    assert uploader.calls[2][1] == b"content of apk.sha256\n"
+    assert uploader.calls[1][1] == _APK_BYTES + _PATH.encode()  # part 2 is the APK itself
+    assert uploader.calls[2][1] == f"content of {BUNDLE_FILES[0]}\n".encode()
+    assert [name for name, _ in extract_calls[0]] == ["Stk.apk"]
 
 
-def test_the_pull_uses_the_path_the_device_reported_and_the_evidence_path_of_part_2(
+def test_three_apk_lines_give_three_apk_parts_base_first_then_the_bundle(
+    tmp_path: Path, device: _Device, uploader: _Uploader, extract_calls: list[Any]
+) -> None:
+    device.pm_output = _pm(*_SPLITS)
+    statuses = _run(tmp_path, uploader)
+    total = 1 + 3 + _BUNDLE
+    assert [(s["part"], s["parts_total"]) for s in statuses] == [
+        (n, total) for n in range(1, total + 1)
+    ]
+    assert {s["availability_status"] for s in statuses} == {"acquired"}
+    assert [s["raw_source"] for s in statuses] == _labels(
+        "base.apk", "split_config.arm64_v8a.apk", "split_config.xxhdpi.apk"
+    )
+    pulls = [call[1] for call in device.calls if call[0] == "pull"]
+    assert [path.rsplit("/", 1)[-1] for path in pulls] == [
+        "base.apk",
+        "split_config.arm64_v8a.apk",
+        "split_config.xxhdpi.apk",
+    ]
+    assert [name for name, _ in extract_calls[0]] == [
+        "base.apk",
+        "split_config.arm64_v8a.apk",
+        "split_config.xxhdpi.apk",
+    ]
+    assert extract_calls[0][0][1] == tmp_path / _SESSION / "2-pull_subject_apk-2.bin"
+
+
+def test_each_pull_uses_a_path_the_device_reported_and_its_own_evidence_path(
     tmp_path: Path, device: _Device, uploader: _Uploader
 ) -> None:
+    device.pm_output = _pm(*_SPLITS)
     _run(tmp_path, uploader)
     assert device.calls[0] == ["shell", "pm", "path", "com.android.stk"]
-    pull = device.calls[1]
-    assert pull[:2] == ["pull", _PATH]
-    assert Path(pull[2]) == tmp_path / _SESSION / "2-pull_subject_apk-2.bin"
+    pulls = [call for call in device.calls if call[0] == "pull"]
+    assert {call[1] for call in pulls} == set(_SPLITS)
+    for index, call in enumerate(pulls):
+        assert Path(call[2]) == tmp_path / _SESSION / f"2-pull_subject_apk-{2 + index}.bin"
     assert all("{" not in arg for call in device.calls for arg in call)
 
 
 @pytest.mark.parametrize(
     "output",
     [
-        b"package:/sdcard/evil.apk\n",
-        b"package:/data/local/tmp/x.apk\n",
-        b"package:/system/app/a b/x.apk\n",
-        b"package:/system/app/Stk/Stk.txt\n",
-        b"package:relative/x.apk\n",
-        b"package:/system/../data/x.apk\n",
-        b"package:/system/app/../../data/app/x/base.apk\n",
-        b"package:/system/a.apk\npackage:/system/b.apk\n",
+        _pm("/sdcard/evil.apk"),
+        _pm("/data/local/tmp/x.apk"),
+        _pm("/system/app/a b/x.apk"),
+        _pm("/system/app/Stk/Stk.txt"),
+        _pm("relative/x.apk"),
+        _pm("/system/../data/x.apk"),
+        _pm("/system/app/../../data/app/x/base.apk"),
+        _pm("/system/a.apk", "/system/../b.apk"),  # one bad line refuses the whole list
+        _pm("/data/app/a/base.apk", "/data/app/b/base.apk"),  # two files with the same name
+        _pm("/system/app/we ird.apk"),
         b"/system/a.apk\n",
         b"no package line\n",
     ],
 )
-def test_a_path_that_is_not_one_allowed_apk_runs_no_pull_and_blocks_the_rest(
+def test_a_list_that_is_not_all_allowed_apks_runs_no_pull_and_blocks_the_rest(
     tmp_path: Path, device: _Device, uploader: _Uploader, output: bytes
 ) -> None:
     device.pm_output = output
     statuses = _run(tmp_path, uploader)
+    total = 2 + _BUNDLE
+    assert [s["part"] for s in statuses] == list(range(1, total + 1))
     assert [(s["part"], s["availability_status"]) for s in statuses[:2]] == [
         (1, "acquired"),
         (2, "failed"),
     ]
-    _assert_parts_blocked_by(statuses, 3, 2)
+    assert statuses[1]["raw_source"] == "apk file"  # S is unknown: one generic APK part
+    _assert_blocked_by(statuses, 3, 2)
     assert not any(call[0] == "pull" for call in device.calls)
     assert [fields["part"] for fields, _ in uploader.calls] == [1]
 
@@ -195,9 +254,29 @@ def test_a_failed_pull_is_classified_and_blocks_the_bundle_parts(
         (1, "acquired"),
         (2, "failed"),
     ]
-    _assert_parts_blocked_by(statuses, 3, 2)
+    _assert_blocked_by(statuses, 3, 2)
     assert statuses[1]["returncode"] == 1
     assert [fields["part"] for fields, _ in uploader.calls] == [1]
+
+
+def test_one_failed_split_still_pulls_the_others_but_blocks_the_bundle(
+    tmp_path: Path, device: _Device, uploader: _Uploader, extract_calls: list[Any]
+) -> None:
+    device.pm_output = _pm(*_SPLITS)
+    device.fail_pull_of = "/data/app/~~x==/com.x-y==/split_config.arm64_v8a.apk"
+    statuses = _run(tmp_path, uploader)
+    assert [s["availability_status"] for s in statuses[:4]] == [
+        "acquired",
+        "acquired",  # base.apk
+        "failed",  # split_config.arm64_v8a.apk (part 3)
+        "acquired",  # split_config.xxhdpi.apk is still pulled
+    ]
+    _assert_blocked_by(statuses, 5, 3)
+    assert [s["raw_source"] for s in statuses] == _labels(
+        "base.apk", "split_config.arm64_v8a.apk", "split_config.xxhdpi.apk"
+    )
+    assert [fields["part"] for fields, _ in uploader.calls] == [1, 2, 4]
+    assert extract_calls == []  # no bundle without every APK part
 
 
 def test_a_rejected_apk_upload_blocks_the_bundle_and_keeps_the_local_digest(
@@ -209,15 +288,15 @@ def test_a_rejected_apk_upload_blocks_the_bundle_and_keeps_the_local_digest(
         (1, "acquired"),
         (2, "failed"),
     ]
-    _assert_parts_blocked_by(statuses, 3, 2)
+    _assert_blocked_by(statuses, 3, 2)
     assert statuses[1]["error"] == "UploadError"
-    assert statuses[1]["sha256_agent"] == hashlib.sha256(_APK_BYTES).hexdigest()
+    assert statuses[1]["sha256_agent"] == hashlib.sha256(_APK_BYTES + _PATH.encode()).hexdigest()
 
 
 def test_an_extractor_error_fails_every_bundle_part_and_uploads_none_of_them(
     tmp_path: Path, device: _Device, uploader: _Uploader, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def broken(apk: Path, out_dir: Path) -> list[Path]:
+    def broken(apks: list[tuple[str, Path]], out_dir: Path) -> list[Path]:
         raise ExtractorError("aapt2 badging failed with exit code 1")
 
     monkeypatch.setattr(acquisition_runner, "extract", broken)
@@ -225,10 +304,10 @@ def test_an_extractor_error_fails_every_bundle_part_and_uploads_none_of_them(
     assert [(s["part"], s["availability_status"]) for s in statuses] == [
         (1, "acquired"),
         (2, "acquired"),
-        *[(n, "failed") for n in range(3, 10)],
+        *[(n, "failed") for n in range(3, 3 + _BUNDLE)],
     ]
     assert all("aapt2" in s["availability_reason"] for s in statuses[2:])
-    assert [s["raw_source"] for s in statuses] == _LABELS
+    assert [s["raw_source"] for s in statuses] == _labels("Stk.apk")
     assert [fields["part"] for fields, _ in uploader.calls] == [1, 2]
 
 
@@ -238,12 +317,12 @@ def test_a_failing_bundle_upload_marks_only_its_part(
     uploader.fail_part = 5
     statuses = _run(tmp_path, uploader)
     assert [s["availability_status"] for s in statuses] == (
-        ["acquired"] * 4 + ["failed"] + ["acquired"] * 4
+        ["acquired"] * 4 + ["failed"] + ["acquired"] * (_BUNDLE - 3)
     )
-    assert statuses[4]["part"] == 5 and statuses[4]["raw_source"] == _LABELS[4]
+    assert statuses[4]["part"] == 5 and statuses[4]["raw_source"] == _labels("Stk.apk")[4]
 
 
-def test_an_existing_part_2_file_is_never_overwritten(
+def test_an_existing_apk_evidence_file_is_never_overwritten(
     tmp_path: Path, device: _Device, uploader: _Uploader
 ) -> None:
     existing = tmp_path / _SESSION / "2-pull_subject_apk-2.bin"
@@ -251,7 +330,7 @@ def test_an_existing_part_2_file_is_never_overwritten(
     existing.write_bytes(b"older evidence")
     statuses = _run(tmp_path, uploader)
     assert [s["availability_status"] for s in statuses[:2]] == ["acquired", "failed"]
-    _assert_parts_blocked_by(statuses, 3, 2)
+    _assert_blocked_by(statuses, 3, 2)
     assert existing.read_bytes() == b"older evidence"
     assert not any(call[0] == "pull" for call in device.calls)
 
@@ -298,7 +377,7 @@ def test_a_pull_that_exits_zero_but_leaves_no_file_is_not_acquired(
         (1, "acquired"),
         (2, "unavailable"),
     ]
-    _assert_parts_blocked_by(statuses, 3, 2)
+    _assert_blocked_by(statuses, 3, 2)
     assert [fields["part"] for fields, _ in uploader.calls] == [1]
 
 
@@ -315,10 +394,10 @@ def test_an_empty_pulled_file_is_not_acquired(
     monkeypatch.setattr(acquisition_runner, "run_adb", empty_pull)
     statuses = _run(tmp_path, uploader)
     assert [s["availability_status"] for s in statuses[:2]] == ["acquired", "unavailable"]
-    _assert_parts_blocked_by(statuses, 3, 2)
+    _assert_blocked_by(statuses, 3, 2)
 
 
-def test_a_path_query_that_is_not_acquired_blocks_part_2_and_the_bundle(
+def test_a_path_query_that_is_not_acquired_blocks_the_apk_part_and_the_bundle(
     tmp_path: Path, device: _Device, uploader: _Uploader, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def denied(args: list[str], serial: str | None = None, **_: object) -> AdbResult:
@@ -327,10 +406,40 @@ def test_a_path_query_that_is_not_acquired_blocks_part_2_and_the_bundle(
 
     monkeypatch.setattr(acquisition_runner, "run_adb", denied)
     statuses = _run(tmp_path, uploader)
-    assert [s["part"] for s in statuses] == list(range(1, 10))
+    assert [s["part"] for s in statuses] == list(range(1, 3 + _BUNDLE))
     assert statuses[0]["availability_status"] == "denied"
     assert statuses[0]["raw_source"] == "pm path"
-    assert [s["availability_reason"] for s in statuses[1:2]] == ["prasyarat part 1 tidak diperoleh"]
-    _assert_parts_blocked_by(statuses, 3, 2)
+    assert statuses[1]["raw_source"] == "apk file"
+    assert statuses[1]["availability_reason"] == "prasyarat part 1 tidak diperoleh"
+    _assert_blocked_by(statuses, 3, 2)
     assert len(device.calls) == 1  # only the path query ran
     assert uploader.calls == []
+
+
+# --- timeouts (REF §OPS2: pull 1800 s, other commands 60 s) -----------------------------------
+
+
+def test_pull_gets_the_long_timeout_and_other_commands_the_short_one() -> None:
+    assert adb_commands.timeout_for(["pull", "/a.apk", "/b"]) == 1800
+    assert adb_commands.timeout_for(["shell", "pm", "path", "x"]) == 60
+    assert adb_commands.timeout_for(["shell", "getprop"]) == 60
+
+
+def test_run_adb_passes_the_timeout_for_the_command(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[float] = []
+
+    class _Done:
+        stdout = b""
+        stderr = b""
+        returncode = 0
+
+    def fake_run(command: list[str], **kwargs: Any) -> _Done:
+        seen.append(kwargs["timeout"])
+        assert kwargs["shell"] is False
+        return _Done()
+
+    monkeypatch.setattr("src.device.adb_controller.subprocess.run", fake_run)
+    run_adb(["pull", "/a.apk", "/b"], "emulator-5554", adb_path="adb")
+    run_adb(["shell", "pm", "path", "x"], "emulator-5554", adb_path="adb")
+    run_adb(["shell", "pm", "path", "x"], "emulator-5554", adb_path="adb", timeout=5)
+    assert seen == [1800, 60, 5]

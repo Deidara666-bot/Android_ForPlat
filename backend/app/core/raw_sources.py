@@ -20,13 +20,16 @@ DUMPSYS_USAGESTATS = "dumpsys usagestats"
 DUMPSYS_ACTIVITY = "dumpsys activity"
 PS = "ps"
 
-# pull_subject_apk: the pulled file itself and the seven bundle files of the static extractor
+# pull_subject_apk: the pulled files themselves (`apk file:<name>`, one per APK) and the nine
+# bundle files of the static extractor
 PM_PATH = "pm path"
-APK_FILE = "apk file"
+APK_FILE = "apk file"  # prefix; the part label is `apk file:<file name>`
 STATIC_APK_SHA256 = "static:apk.sha256"
 STATIC_BADGING = "static:badging.txt"
 STATIC_PERMISSIONS = "static:permissions.txt"
 STATIC_MANIFEST = "static:manifest.txt"
 STATIC_CERTS = "static:certs.txt"
 STATIC_STRINGS_URLS = "static:strings_urls.txt"
+STATIC_NATIVE_LIBS = "static:native_libs.txt"
+STATIC_API_REFS = "static:api_refs.txt"
 STATIC_BUNDLE_JSON = "static:bundle.json"

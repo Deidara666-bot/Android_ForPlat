@@ -20,8 +20,10 @@ from app.parsing.apk_static.manifest import ApkManifestParser
 from app.parsing.apk_static.simple import (
     ApkBadgingParser,
     ApkBundleManifestParser,
+    ApkCodeLoadingReferenceParser,
     ApkEndpointReferenceParser,
     ApkIdentityParser,
+    ApkNativeLibraryParser,
     ApkPermissionsParser,
 )
 
@@ -41,7 +43,7 @@ def _failed(rows) -> list:  # noqa: ANN001
 # --- registry wiring ---
 
 
-def test_the_seven_parsers_are_registered_under_their_static_labels() -> None:
+def test_the_nine_parsers_are_registered_under_their_static_labels() -> None:
     import app.parsing  # noqa: F401
 
     labels = [
@@ -51,6 +53,8 @@ def test_the_seven_parsers_are_registered_under_their_static_labels() -> None:
         rs.STATIC_MANIFEST,
         rs.STATIC_CERTS,
         rs.STATIC_STRINGS_URLS,
+        rs.STATIC_NATIVE_LIBS,
+        rs.STATIC_API_REFS,
         rs.STATIC_BUNDLE_JSON,
     ]
     assert labels == [
@@ -62,19 +66,21 @@ def test_the_seven_parsers_are_registered_under_their_static_labels() -> None:
             "manifest.txt",
             "certs.txt",
             "strings_urls.txt",
+            "native_libs.txt",
+            "api_refs.txt",
             "bundle.json",
         )
     ]
     parsers = [registry.get_parser("pull_subject_apk", label) for label in labels]
     assert [p.raw_source for p in parsers] == labels
     assert all(p.uses_parameters and p.operation_id == "pull_subject_apk" for p in parsers)
-    assert len({p.parser_name for p in parsers}) == 7
+    assert len({p.parser_name for p in parsers}) == 9
 
 
 def test_the_pm_path_and_apk_file_parts_have_no_parser() -> None:
     import app.parsing  # noqa: F401
 
-    for label in (rs.PM_PATH, rs.APK_FILE):
+    for label in (rs.PM_PATH, rs.APK_FILE, f"{rs.APK_FILE}:base.apk", f"{rs.APK_FILE}:split_x.apk"):
         with pytest.raises(registry.UnknownOperationError):
             registry.get_parser("pull_subject_apk", label)
 
@@ -102,7 +108,12 @@ def test_real_bundle_parses_without_a_failed_row() -> None:
 def test_real_identity_hash_is_the_sha256_of_the_apk() -> None:
     (row,) = ApkIdentityParser().parse(_file("apk.sha256"), _PKG)
     assert row.artifact_type == "apk_identity"
-    assert row.parsed_value_json == {"package_name": "com.android.stk", "sha256": _SHA}
+    assert row.parsed_value_json == {
+        "package_name": "com.android.stk",
+        "sha256": _SHA,
+        "apk_name": None,  # extractor 1: one bare hash line
+        "splits": [],
+    }
     bundle = json.loads(_file("bundle.json"))
     assert bundle["apk_sha256"] == _SHA
 
@@ -169,7 +180,7 @@ def test_real_certificate_and_urls_and_manifest() -> None:
     urls = ApkEndpointReferenceParser().parse(_file("strings_urls.txt"), _PKG)
     assert [u.parsed_value_json["kind"] for u in urls] == ["url"] * 4
     (bundle,) = ApkBundleManifestParser().parse(_file("bundle.json"), _PKG)
-    assert bundle.parsed_value_json["extractor_version"] == "1"
+    assert bundle.parsed_value_json["extractor_version"] == "1"  # fixture from extractor 1
 
 
 # --- subject binding ---
@@ -472,3 +483,160 @@ def test_bundle_json_with_unexpected_structure_is_failed_whole(raw: bytes) -> No
     assert (
         len(rows) == 1 and rows[0].parse_status == ParseStatus.failed and rows[0].parse_note.strip()
     )
+
+
+# --- extractor 2: split APKs, native libraries, code-loading references ---
+
+_SHA_B = "b" * 64
+_SHA_C = "c" * 64
+
+
+def test_identity_of_a_split_set_is_the_base_hash_and_lists_the_splits() -> None:
+    raw = (
+        f"{_SHA}  base.apk\n{_SHA_B}  split_config.arm64_v8a.apk\n{_SHA_C}  split_x.apk\n".encode()
+    )
+    (row,) = ApkIdentityParser().parse(raw, _PKG)
+    assert row.parse_status == ParseStatus.parsed
+    assert row.parsed_value_json == {
+        "package_name": "com.android.stk",
+        "sha256": _SHA,
+        "apk_name": "base.apk",
+        "splits": [
+            {"name": "split_config.arm64_v8a.apk", "sha256": _SHA_B},
+            {"name": "split_x.apk", "sha256": _SHA_C},
+        ],
+    }
+    assert row.parser_version == "2"
+
+
+def test_identity_of_one_named_apk_has_no_splits() -> None:
+    (row,) = ApkIdentityParser().parse(f"{_SHA}  Stk.apk\n".encode(), _PKG)
+    assert row.parsed_value_json["apk_name"] == "Stk.apk" and row.parsed_value_json["splits"] == []
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        f"{_SHA}  base.apk\n{_SHA_B}\n".encode(),  # several APKs, one without a name
+        f"{_SHA}  base.apk\n{_SHA_B}  base.apk\n".encode(),  # duplicate name
+        f"{_SHA}  ../evil.apk\n".encode(),
+        f"{_SHA}  base.txt\n".encode(),
+        f"{_SHA}  a b.apk\n".encode(),
+        f"{_SHA} base.apk\n".encode(),  # one space
+    ],
+)
+def test_a_bad_identity_line_set_is_failed_whole(raw: bytes) -> None:
+    (row,) = ApkIdentityParser().parse(raw, _PKG)
+    assert row.parse_status == ParseStatus.failed
+
+
+_NATIVE = f"base.apk\tlib/x86_64/liba.so\t1234\t{_SHA}\nsplit_config.arm64_v8a.apk\tlib/arm64-v8a/libb.so\t9\t{_SHA_B}\n"
+
+
+def test_native_libraries_become_context_artifacts() -> None:
+    rows = ApkNativeLibraryParser().parse(_NATIVE.encode(), _PKG)
+    assert [r.artifact_type for r in rows] == ["apk_native_library"] * 2
+    assert not _failed(rows)
+    assert rows[0].parsed_value_json == {
+        "apk": "base.apk",
+        "entry": "lib/x86_64/liba.so",
+        "abi": "x86_64",
+        "size": 1234,
+        "sha256": _SHA,
+        "line_no": 1,
+    }
+    assert rows[1].parsed_value_json["abi"] == "arm64-v8a"
+    assert {r.subject_key for r in rows} == {"com.android.stk"}
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        f"base.apk\tassets/liba.so\t1\t{_SHA}",  # not under lib/<abi>/
+        f"base.apk\tlib/x86_64/liba.txt\t1\t{_SHA}",
+        f"base.apk\tlib/x86_64/liba.so\tmany\t{_SHA}",
+        "base.apk\tlib/x86_64/liba.so\t1\tshort",
+        f"base.apk\tlib/x86_64/liba.so\t{_SHA}",  # three fields
+        f"base.txt\tlib/x86_64/liba.so\t1\t{_SHA}",
+    ],
+)
+def test_a_bad_native_library_line_is_failed_on_its_own(line: str) -> None:
+    rows = ApkNativeLibraryParser().parse((_NATIVE + line + "\n").encode(), _PKG)
+    assert [r.parse_status for r in rows] == [ParseStatus.parsed] * 2 + [ParseStatus.failed]
+    assert rows[2].raw_value == line
+
+
+def test_an_empty_native_library_file_is_empty_not_absent() -> None:
+    (row,) = ApkNativeLibraryParser().parse(b"", _PKG)
+    assert row.parse_status == ParseStatus.empty
+
+
+_REFS = (
+    "base.apk\tclasses.dex\tLdalvik/system/DexClassLoader;\n"
+    "base.apk\tclasses2.dex\tLdalvik/system/InMemoryDexClassLoader;\n"
+)
+
+
+def test_code_loading_references_become_context_artifacts() -> None:
+    rows = ApkCodeLoadingReferenceParser().parse(_REFS.encode(), _PKG)
+    assert [r.artifact_type for r in rows] == ["apk_code_loading_reference"] * 2
+    assert not _failed(rows)
+    assert rows[1].parsed_value_json == {
+        "apk": "base.apk",
+        "entry": "classes2.dex",
+        "descriptor": "Ldalvik/system/InMemoryDexClassLoader;",
+        "line_no": 2,
+    }
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "base.apk\tclasses.dex\tLdalvik/system/BaseDexClassLoader;",  # outside the closed set
+        "base.apk\tassets/x\tLdalvik/system/DexClassLoader;",
+        "base.apk\tclasses.dex",
+        "base.apk\tclasses.dex\tLdalvik/system/DexClassLoader;\textra",
+    ],
+)
+def test_a_bad_code_loading_reference_line_is_failed_on_its_own(line: str) -> None:
+    rows = ApkCodeLoadingReferenceParser().parse((_REFS + line + "\n").encode(), _PKG)
+    assert [r.parse_status for r in rows] == [ParseStatus.parsed] * 2 + [ParseStatus.failed]
+
+
+def _bundle_v2(**changes) -> bytes:  # noqa: ANN003
+    data = {
+        "apk_sha256": _SHA,
+        "apks": {"base.apk": _SHA, "split_x.apk": _SHA_B},
+        "extractor_version": "2",
+        "tool_versions": {"aapt2": "x"},
+        "created_at": "2026-10-05T10:00:00+00:00",
+        "files": {"apk.sha256": _SHA_C},
+        "scan": {"entri_terpotong": [{"apk": "base.apk", "entry": "e", "size": 3, "scanned": 1}]},
+    }
+    data.update(changes)
+    return json.dumps(data).encode()
+
+
+def test_a_version_2_bundle_manifest_is_parsed_with_apks_and_scan() -> None:
+    (row,) = ApkBundleManifestParser().parse(_bundle_v2(), _PKG)
+    assert row.parse_status == ParseStatus.parsed and row.parser_version == "2"
+    assert row.parsed_value_json["apks"]["split_x.apk"] == _SHA_B
+    assert row.parsed_value_json["scan"]["entri_terpotong"][0]["entry"] == "e"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        _bundle_v2(apks={}),
+        _bundle_v2(apks={"base.apk": "short"}),
+        _bundle_v2(apks=["base.apk"]),
+        _bundle_v2(apk_sha256=_SHA_B),  # not the first APK's hash
+        _bundle_v2(scan={}),
+        _bundle_v2(scan={"entri_terpotong": "none"}),
+        _bundle_v2(scan={"entri_terpotong": ["x"]}),
+        _bundle_v2(scan={"entri_terpotong": [], "extra": 1}),
+    ],
+)
+def test_a_malformed_version_2_manifest_is_failed_whole(raw: bytes) -> None:
+    (row,) = ApkBundleManifestParser().parse(raw, _PKG)
+    assert row.parse_status == ParseStatus.failed and row.parse_note.strip()

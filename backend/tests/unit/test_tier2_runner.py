@@ -30,7 +30,8 @@ _LABELS = {
     "dumpsys activity": ("collect_usage_state", None),
     "ps": ("collect_usage_state", None),
     "pm path": ("pull_subject_apk", None),
-    "apk file": ("pull_subject_apk", None),
+    "apk file:base.apk": ("pull_subject_apk", None),
+    "apk file:split_config.x86_64.apk": ("pull_subject_apk", None),
 }
 
 
@@ -347,3 +348,41 @@ def test_the_reset_script_refuses_an_unknown_environment_before_touching_adb(lab
     )
     assert result.returncode == 2
     assert "unknown environment" in result.stderr
+
+
+def _g1_a3(tmp_path: Path, api: FakeApi) -> dict[str, str]:
+    code, output = _run(tmp_path, api, Recorder())
+    assert code == 0
+    return next(r for r in _rows(output) if r["artifact_id"] == "G1-A3")
+
+
+def test_g1_a3_is_observed_only_when_every_apk_part_is_acquired(tmp_path: Path) -> None:
+    row = _g1_a3(tmp_path, FakeApi())
+    assert (row["availability_status"], row["actual_result"]) == ("acquired", "observed")
+    assert len(row["raw_output_ref"].split(";")) == 2  # both APK parts are referenced
+
+
+def test_one_failed_apk_part_makes_g1_a3_failed_with_its_reason(tmp_path: Path) -> None:
+    api = FakeApi()
+    api.status_overrides = {"apk file:split_config.x86_64.apk": "failed"}
+    row = _g1_a3(tmp_path, api)
+    assert (row["availability_status"], row["actual_result"]) == ("failed", "failed")
+    assert row["availability_reason"] == "uji"
+
+
+def test_g1_a3_without_any_apk_part_is_not_acquired(tmp_path: Path) -> None:
+    api = FakeApi()
+    api.drop_sources = {"apk file:base.apk", "apk file:split_config.x86_64.apk"}
+    row = _g1_a3(tmp_path, api)
+    assert (row["availability_status"], row["actual_result"]) == ("not_acquired", "not_acquired")
+
+
+def test_the_generic_apk_file_part_of_a_failed_path_query_counts_for_g1_a3(
+    tmp_path: Path,
+) -> None:
+    runner_labels = runner.expand_source(
+        [{"raw_source": "apk file"}, {"raw_source": "pm path"}], "apk file:*"
+    )
+    assert runner_labels == ["apk file"]
+    assert runner.expand_source([], "apk file:*") == ["apk file"]
+    assert runner.expand_source([{"raw_source": "apk file:b.apk"}], "pm path") == ["pm path"]

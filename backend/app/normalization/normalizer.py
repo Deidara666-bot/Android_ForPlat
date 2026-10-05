@@ -54,7 +54,16 @@ STATIC_ARTIFACT_TYPES = frozenset(
     {_APK_IDENTITY, _APK_PERMISSION, _APK_COMPONENT, _APK_ACTION, _APK_ENDPOINT}
 )
 # Static-bundle files whose artifacts record the file itself, not a claim about the package.
-_STATIC_NO_FACT = frozenset({"apk_badging", "apk_certificate", "apk_bundle_manifest"})
+_STATIC_NO_FACT = frozenset(
+    {
+        "apk_badging",
+        "apk_certificate",
+        "apk_bundle_manifest",
+        # Context for the examiner only (REF §STATIC): never a fact, never read by the rules.
+        "apk_native_library",
+        "apk_code_loading_reference",
+    }
+)
 
 
 class UnsupportedArtifactTypeError(ValueError):
@@ -415,6 +424,7 @@ def _normalize_static(
 
     if kind == _APK_IDENTITY:
         claims = [("apk_identity_observed", "apk_sha256", _text(value, "sha256"))]
+        extras = {"apk_name": value.get("apk_name"), "splits": value.get("splits") or []}
     elif kind == _APK_PERMISSION:
         if value.get("role") == "requested":
             claims = _requested_claims(_text(value, "name"))

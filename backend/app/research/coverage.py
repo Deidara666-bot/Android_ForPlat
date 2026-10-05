@@ -61,6 +61,8 @@ _STATIC_BUNDLE = tuple(
         src.STATIC_MANIFEST,
         src.STATIC_CERTS,
         src.STATIC_STRINGS_URLS,
+        src.STATIC_NATIVE_LIBS,
+        src.STATIC_API_REFS,
         src.STATIC_BUNDLE_JSON,
     )
 )

@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from src.acquisition.availability import classify_failure, is_acquired
 from src.acquisition.command_allowlist import resolve_operation_parts
 from src.acquisition.evidence_writer import write_evidence
-from src.device.adb_commands import APK_PATH_PATTERN
+from src.device.adb_commands import APK_NAME_PATTERN, APK_PATH_PATTERN
 from src.device.adb_controller import AdbResult, adb_version, run_adb
 from src.device.device_detection import collect_safe_metadata, detect_devices
 from src.exceptions import AgentError
@@ -25,7 +25,6 @@ from src.transport.uploader import EvidenceUploader
 
 RAW_ROOT = Path(__file__).resolve().parents[2] / "var" / "raw"
 _PULL_OPERATION = "pull_subject_apk"
-_PULL_PARTS_TOTAL = 2 + len(BUNDLE_FILES)  # path query, pulled file, bundle files
 _PM_PATH_PREFIX = "package:"
 
 
@@ -194,7 +193,7 @@ class AcquisitionRunner:
         return digest, size
 
     def _acquired_status(
-        self, job: AcquisitionJob, part: int, label: str, digest: str, size: int
+        self, job: AcquisitionJob, part: int, parts_total: int, label: str, digest: str, size: int
     ) -> dict[str, Any]:
         audit(
             "job_done",
@@ -212,7 +211,7 @@ class AcquisitionRunner:
             job.operation,
             job.serial,
             part=part,
-            parts_total=_PULL_PARTS_TOTAL,
+            parts_total=parts_total,
             sha256_agent=digest,
             size_bytes=size,
             returncode=0,
@@ -221,7 +220,7 @@ class AcquisitionRunner:
         )
 
     def _prerequisite_unmet(
-        self, job: AcquisitionJob, part: int, label: str, prerequisite: int
+        self, job: AcquisitionJob, part: int, parts_total: int, label: str, prerequisite: int
     ) -> dict[str, Any]:
         """A part that was not run because the part it depends on was not acquired."""
         reason = f"prasyarat part {prerequisite} tidak diperoleh"
@@ -239,7 +238,7 @@ class AcquisitionRunner:
             job.operation,
             job.serial,
             part=part,
-            parts_total=_PULL_PARTS_TOTAL,
+            parts_total=parts_total,
             availability=AvailabilityStatus.failed,
             reason=reason,
             raw_source=label,
@@ -248,41 +247,104 @@ class AcquisitionRunner:
     def _run_pull_subject_apk(
         self, job: AcquisitionJob, parts: list[tuple[str, list[str]]]
     ) -> list[dict[str, Any]]:
-        """Path query -> pull of the path the device itself reported -> static bundle.
+        """Path query -> one pull per APK the device itself reported -> static bundle.
 
-        The APK path never comes from the backend: it is read from the output of part 1, must
-        match the allowed shape and must be the only APK reported. The pulled file is evidence
-        part 2; the bundle files are parts 3 onward. Every part gets one status; parts whose
-        prerequisite was not acquired (part 2 needs part 1, parts 3.. need part 2) are reported
-        failed without being run.
+        Parts: 1 = path query; 2..1+S = one pulled APK each (`base.apk` first); 2+S.. = the bundle
+        files. The APK paths never come from the backend: they are read from the output of part 1
+        and every line must match the allowed shape. A part whose prerequisite was not acquired
+        is reported failed without being run (APK parts need part 1; the bundle needs every APK
+        part). When part 1 does not yield a usable list, S is unknown and one generic `apk file`
+        part stands for the APK parts.
         """
-        total = _PULL_PARTS_TOTAL
         (path_label, path_args), (apk_label, pull_args) = parts
         bundle_labels = [f"static:{name}" for name in BUNDLE_FILES]
 
-        def bundle_unmet() -> list[dict[str, Any]]:
-            return [
-                self._prerequisite_unmet(job, 3 + index, label, 2)
+        status, result = self._run_adb_part(job, 1, 1, path_label, path_args)
+        entries: list[tuple[str, str]] = []
+        problem: AgentError | None = None
+        if (
+            result is not None
+            and status["availability_status"] == AvailabilityStatus.acquired.value
+        ):
+            try:
+                entries = self._apk_entries_from(result)
+            except AgentError as exc:
+                problem = exc
+
+        if not entries:  # S unknown: one generic APK part, then the bundle
+            total = 2 + len(bundle_labels)
+            blocked: list[dict[str, Any]] = [
+                self._job_failed(job, problem, part=2, parts_total=total, raw_source=apk_label)
+                if problem is not None
+                else self._prerequisite_unmet(job, 2, total, apk_label, 1)
+            ]
+            blocked += [
+                self._prerequisite_unmet(job, 3 + index, total, label, 2)
                 for index, label in enumerate(bundle_labels)
             ]
+            return self._with_total([status, *blocked], total)
 
-        status, result = self._run_adb_part(job, 1, total, path_label, path_args)
+        total = 1 + len(entries) + len(bundle_labels)
         statuses = [status]
-        if result is None or status["availability_status"] != AvailabilityStatus.acquired.value:
-            return [*statuses, self._prerequisite_unmet(job, 2, apk_label, 1), *bundle_unmet()]
+        pulled: list[tuple[str, Path]] = []
+        first_missing: int | None = None
+        for index, (name, apk_path) in enumerate(entries):
+            part = 2 + index
+            label = f"{apk_label}:{name}"
+            pull_status, local = self._pull_one(job, part, total, label, pull_args, apk_path)
+            statuses.append(pull_status)
+            if local is None:
+                first_missing = first_missing or part
+            else:
+                pulled.append((name, local))
+
+        bundle_start = 2 + len(entries)
+        if first_missing is not None:
+            statuses += [
+                self._prerequisite_unmet(job, bundle_start + index, total, label, first_missing)
+                for index, label in enumerate(bundle_labels)
+            ]
+            return self._with_total(statuses, total)
 
         try:
-            apk_path = self._apk_path_from(result)
-        except AgentError as exc:
-            return [
-                *statuses,
-                self._job_failed(job, exc, part=2, parts_total=total, raw_source=apk_label),
-                *bundle_unmet(),
-            ]
+            with tempfile.TemporaryDirectory(prefix="forplat-bundle-") as workdir:
+                bundle = extract(pulled, Path(workdir) / "bundle")
+                for index, source in enumerate(bundle):
+                    statuses.append(
+                        self._upload_bundle_file(
+                            job, bundle_start + index, total, source, bundle_labels[index]
+                        )
+                    )
+        except (AgentError, ValueError, OSError, KeyError) as exc:
+            # The extractor failed: bundle parts without a status yet were never produced.
+            reported = {item["part"] for item in statuses}
+            for index, label in enumerate(bundle_labels):
+                part = bundle_start + index
+                if part not in reported:
+                    statuses.append(
+                        self._job_failed(job, exc, part=part, parts_total=total, raw_source=label)
+                    )
+        return self._with_total(statuses, total)
 
-        local = self._evidence_path(job, 2)
-        digest: str | None = None
-        size: int | None = None
+    @staticmethod
+    def _with_total(statuses: list[dict[str, Any]], total: int) -> list[dict[str, Any]]:
+        """The size of the operation is known only after part 1; every status carries it."""
+        for item in statuses:
+            item["parts_total"] = total
+        return statuses
+
+    def _pull_one(
+        self,
+        job: AcquisitionJob,
+        part: int,
+        total: int,
+        label: str,
+        pull_args: list[str],
+        apk_path: str,
+    ) -> tuple[dict[str, Any], Path | None]:
+        """Pull one APK to its evidence path and upload it. Returns (status, local path), the
+        path being None unless the part was acquired."""
+        local = self._evidence_path(job, part)
         try:
             if local.exists():
                 raise AgentError("evidence file already exists")
@@ -298,88 +360,73 @@ class AcquisitionRunner:
             pulled_ok = pulled.returncode == 0 and local.is_file() and local.stat().st_size > 0
             if not pulled_ok:
                 availability, reason = classify_failure(pulled)
-                statuses.append(
-                    self._status(
-                        job.session_id,
-                        job.sequence,
-                        job.operation,
-                        job.serial,
-                        part=2,
-                        parts_total=total,
-                        returncode=pulled.returncode,
-                        availability=availability,
-                        reason=reason,
-                        raw_source=apk_label,
-                    )
+                status = self._status(
+                    job.session_id,
+                    job.sequence,
+                    job.operation,
+                    job.serial,
+                    part=part,
+                    parts_total=total,
+                    returncode=pulled.returncode,
+                    availability=availability,
+                    reason=reason,
+                    raw_source=label,
                 )
-                return [*statuses, *bundle_unmet()]
-            digest, size = self._upload_file(job, 2, apk_label, local, acquired_at)
+                return status, None
+            digest, size = self._upload_file(job, part, label, local, acquired_at)
         except (AgentError, ValueError, OSError, KeyError) as exc:
             kept = local.is_file() and local.stat().st_size > 0
-            return [
-                *statuses,
-                self._job_failed(
-                    job,
-                    exc,
-                    part=2,
-                    parts_total=total,
-                    digest=sha256_file(local) if kept else None,
-                    size=local.stat().st_size if kept else None,
-                    raw_source=apk_label,
-                ),
-                *bundle_unmet(),
-            ]
-        statuses.append(self._acquired_status(job, 2, apk_label, digest, size))
-
-        try:
-            with tempfile.TemporaryDirectory(prefix="forplat-bundle-") as workdir:
-                bundle = extract(local, Path(workdir) / "bundle")
-                for part, source in enumerate(bundle, start=3):
-                    statuses.append(self._upload_bundle_file(job, part, source, bundle_labels))
-        except (AgentError, ValueError, OSError, KeyError) as exc:
-            # The extractor failed: bundle parts without a status yet were never produced.
-            reported = {item["part"] for item in statuses}
-            for part in range(3, total + 1):
-                if part not in reported:
-                    statuses.append(
-                        self._job_failed(
-                            job,
-                            exc,
-                            part=part,
-                            parts_total=total,
-                            raw_source=bundle_labels[part - 3],
-                        )
-                    )
-        return statuses
+            failed = self._job_failed(
+                job,
+                exc,
+                part=part,
+                parts_total=total,
+                digest=sha256_file(local) if kept else None,
+                size=local.stat().st_size if kept else None,
+                raw_source=label,
+            )
+            return failed, None
+        return self._acquired_status(job, part, total, label, digest, size), local
 
     def _upload_bundle_file(
-        self, job: AcquisitionJob, part: int, source: Path, labels: list[str]
+        self, job: AcquisitionJob, part: int, total: int, source: Path, label: str
     ) -> dict[str, Any]:
-        label = labels[part - 3]
         try:
             evidence = self._evidence_path(job, part)
             write_evidence(evidence, source.read_bytes())
             digest, size = self._upload_file(job, part, label, evidence, datetime.now(UTC))
         except (AgentError, ValueError, OSError, KeyError) as exc:
-            return self._job_failed(
-                job, exc, part=part, parts_total=_PULL_PARTS_TOTAL, raw_source=label
-            )
-        return self._acquired_status(job, part, label, digest, size)
+            return self._job_failed(job, exc, part=part, parts_total=total, raw_source=label)
+        return self._acquired_status(job, part, total, label, digest, size)
 
     @staticmethod
-    def _apk_path_from(result: AdbResult) -> str:
-        """The single APK path the path query reported, validated; anything else is an error."""
+    def _apk_entries_from(result: AdbResult) -> list[tuple[str, str]]:
+        """`(file name, device path)` of every APK the path query reported, `base.apk` first and
+        the rest by name. Every line is validated; one bad line refuses the whole list."""
         lines = [
             line.strip()
             for line in result.stdout.decode("utf-8", errors="replace").splitlines()
             if line.strip()
         ]
-        if len(lines) != 1 or not lines[0].startswith(_PM_PATH_PREFIX):
-            raise AgentError("the device did not report exactly one APK (split APKs not supported)")
-        path = lines[0][len(_PM_PATH_PREFIX) :]
-        if re.fullmatch(APK_PATH_PATTERN, path) is None or ".." in path.split("/"):
-            raise AgentError("the reported APK path is not in an allowed location")
-        return path
+        if not lines:
+            raise AgentError("the device did not report any APK path")
+        entries: list[tuple[str, str]] = []
+        for line in lines:
+            if not line.startswith(_PM_PATH_PREFIX):
+                raise AgentError("the device reported a line that is not an APK path")
+            path = line[len(_PM_PATH_PREFIX) :]
+            if re.fullmatch(APK_PATH_PATTERN, path) is None or ".." in path.split("/"):
+                raise AgentError("a reported APK path is not in an allowed location")
+            name = path.rsplit("/", 1)[-1]
+            if re.fullmatch(APK_NAME_PATTERN, name) is None:
+                raise AgentError("a reported APK file name has an unexpected shape")
+            entries.append((name, path))
+        if len({name for name, _ in entries}) != len(entries):
+            raise AgentError("the device reported two APK files with the same name")
+        # The device lists the base APK first; keep that one in front, the rest by name.
+        first = next((e for e in entries if e[0] == "base.apk"), entries[0])
+        rest = sorted((e for e in entries if e is not first), key=lambda e: e[0])
+        return [first, *rest]
 
     def _job_failed(
         self,

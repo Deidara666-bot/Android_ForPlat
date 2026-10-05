@@ -32,9 +32,10 @@ OPERATION_PARTS: dict[str, list[tuple[str, list[str]]]] = {
         ("dumpsys activity", ["shell", "dumpsys", "activity", "activities"]),
         ("ps", ["shell", "ps", "-A", "-o", "PID,UID,USER,NAME"]),
     ],
-    # Parts 3.. of this operation are the static extractor's bundle files, not adb commands.
-    # `{apk_path}` and `{local_path}` are filled by the runner (never from job parameters):
-    # the first from the output of part 1, the second from the evidence path of part 2.
+    # Parts after the pulls are the static extractor's bundle files, not adb commands. The `pull`
+    # entry is a template run once per APK the device reports (label `apk file:<name>`);
+    # `{apk_path}` and `{local_path}` are filled by the runner (never from job parameters): the
+    # first from the output of part 1, the second from that part's evidence path.
     "pull_subject_apk": [
         ("pm path", ["shell", "pm", "path", "{package_name}"]),
         ("apk file", ["pull", "{apk_path}", "{local_path}"]),
@@ -43,6 +44,17 @@ OPERATION_PARTS: dict[str, list[tuple[str, list[str]]]] = {
 
 # Where a pulled APK may live on the device (REF §OPS2); anything else is refused.
 APK_PATH_PATTERN = r"^/(data/app|system|product|system_ext)/[^\s]+\.apk$"
+# File name of one APK (the last path segment); it becomes part of the `apk file:<name>` label.
+APK_NAME_PATTERN = r"^[A-Za-z0-9_.\-]{1,100}\.apk$"
+
+# Seconds an adb call may run: `pull` moves whole APKs, everything else is a short query.
+DEFAULT_TIMEOUT_SECONDS = 60
+PULL_TIMEOUT_SECONDS = 1800
+
+
+def timeout_for(args: list[str]) -> int:
+    return PULL_TIMEOUT_SECONDS if args[:1] == ["pull"] else DEFAULT_TIMEOUT_SECONDS
+
 
 # Operation ID -> the exact parameter names the job must carry (none for the others).
 OPERATION_PARAMETERS: dict[str, tuple[str, ...]] = {

@@ -1,4 +1,4 @@
-"""Extract the static bundle of one APK: `extract_apk.py <apk> <output folder>`.
+"""Extract the static bundle of an APK set: `extract_apk.py <out folder> <base.apk> [splits…]`.
 
 Wrapper around `agent/src/static_analysis/extractor.py` for machines that do not run the agent
 (for example the isolated VM that analyzes real samples). It only reads the APK.
@@ -14,12 +14,12 @@ from src.static_analysis.extractor import ExtractorError, extract  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Write the static bundle of an APK.")
-    parser.add_argument("apk", type=Path)
+    parser = argparse.ArgumentParser(description="Write the static bundle of an APK set.")
     parser.add_argument("out_dir", type=Path)
+    parser.add_argument("apks", type=Path, nargs="+", help="base APK first, then the splits")
     args = parser.parse_args(argv)
     try:
-        written = extract(args.apk, args.out_dir)
+        written = extract([(apk.name, apk) for apk in args.apks], args.out_dir)
     except ExtractorError as exc:
         sys.stderr.write(f"extract_apk: {exc}\n")
         return 2
