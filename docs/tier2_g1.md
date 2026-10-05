@@ -16,7 +16,7 @@ lintas lingkungan. Lintas lingkungan (AVD #2, Galaxy A10) dicatat di Tier-2 konf
 | Kode | commit `b3b79da`; Android Debug Bridge 1.0.41 (Platform-Tools 37.0.1) |
 | Data mentah | `experiments/feasibility_tier2/results/tier2_g1_avd1-api36.csv` (96 baris = 16 artefak × 2 subjek × 3 ulangan) |
 
-## Status per artefak (14 artefak dinilai)
+## Status per artefak (15 artefak dinilai)
 
 Pemetaan `actual_result` → status §11.1 mengikuti REF §TIER2: `observed` 3/3 = konsisten; `not_observed` → `unavailable`
 (sumber terakses, datum tidak muncul).
@@ -27,7 +27,7 @@ Pemetaan `actual_result` → status §11.1 mengikuti REF §TIER2: `observed` 3/3
 | G1-A2 path APK | `pull_subject_apk` | 3/3 | 3/3 | konsisten |
 | G1-A3 berkas APK + SHA-256 | `pull_subject_apk` | 3/3 | 3/3 | konsisten |
 | G1-A4 firstInstallTime / lastUpdateTime | `collect_package_detail` | 3/3 | 3/3 | konsisten |
-| **G1-A5 installer / initiating / originating** | `collect_package_detail` | **0/3** | **0/3** | **`unavailable`** |
+| **G1-A5 installer / initiating / originating** | `collect_package_detail` | **0/3** | **0/3** | **`unavailable`** (pada 2 paket sistem; installer `null`) |
 | G1-A6 tanda tangan / sertifikat | `collect_package_detail` | 3/3 | 3/3 | konsisten |
 | G1-A7 komponen terdeklarasi | `collect_package_detail` | 3/3 | 3/3 | konsisten |
 | G1-A8 izin diminta | `collect_package_detail` | 3/3 | 3/3 | konsisten |
