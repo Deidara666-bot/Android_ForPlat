@@ -308,17 +308,85 @@ def test_finished_session_does_not_accept_evidence(
     assert _upload(client, agent_headers, acquisition).status_code == 404
 
 
-def test_file_over_the_limit_is_413(
+def test_file_over_the_limit_is_413_without_final_file_or_quarantine_leftover(
     client: TestClient,
+    session: Session,
     agent_headers: dict[str, str],
     acquisition: AcquisitionSession,
     root: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(constants, "MAX_UPLOAD_BYTES", 10)
+    # Framing allowance large enough that this passes the Content-Length check and reaches
+    # the streaming limit.
+    monkeypatch.setattr(constants, "UPLOAD_FRAMING_ALLOWANCE_BYTES", 1024 * 1024)
+    response = _upload(client, agent_headers, acquisition)
+    assert response.status_code == 413
+    assert _files(root) == []  # no final file and nothing left in `.incoming/`
+    assert session.scalar(select(func.count()).select_from(Evidence)) == 0
+
+
+def test_declared_content_length_over_the_limit_is_413_before_the_body_is_read(
+    client: TestClient,
+    session: Session,
+    agent_headers: dict[str, str],
+    acquisition: AcquisitionSession,
+    root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(constants, "MAX_UPLOAD_BYTES", 10)
+    monkeypatch.setattr(constants, "UPLOAD_FRAMING_ALLOWANCE_BYTES", 0)
+
+    def must_not_run(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("the body was read although Content-Length was over the limit")
+
+    monkeypatch.setattr(EvidenceStorageService, "receive", must_not_run)
     response = _upload(client, agent_headers, acquisition)
     assert response.status_code == 413
     assert _files(root) == []
+    assert session.scalar(select(func.count()).select_from(Evidence)) == 0
+
+
+def test_large_file_is_hashed_while_streamed_and_never_held_whole(
+    client: TestClient,
+    agent_headers: dict[str, str],
+    acquisition: AcquisitionSession,
+    root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    blocks: list[int] = []
+    original = EvidenceStorageService.receive
+
+    def spy(self: EvidenceStorageService, read: Any, max_bytes: int) -> Any:
+        def counting(size: int) -> bytes:
+            block = read(size)
+            blocks.append(len(block))
+            return block
+
+        return original(self, counting, max_bytes)
+
+    monkeypatch.setattr(EvidenceStorageService, "receive", spy)
+    data = bytes(range(256)) * 20_000  # ~5 MB, several 1 MiB blocks
+    response = _upload(client, agent_headers, acquisition, data=data)
+    assert response.status_code == 201
+    assert max(blocks) <= 1024 * 1024 and len([b for b in blocks if b]) > 1
+    stored = root / str(acquisition.id) / f"1-{_OPERATION}-1.bin"
+    assert hashlib.sha256(stored.read_bytes()).hexdigest() == hashlib.sha256(data).hexdigest()
+    assert stat.S_IMODE(stored.stat().st_mode) & 0o222 == 0
+    assert [p for p in (root / ".incoming").iterdir()] == []
+
+
+def test_final_move_never_replaces_an_existing_file(tmp_path: Path) -> None:
+    storage = EvidenceStorageService(tmp_path / "root")
+    session_id = uuid.uuid4()
+    storage.store(session_id, 1, "collect_device_metadata", 1, b"first")
+    chunks = iter([b"second", b""])
+    quarantined = storage.receive(lambda _n: next(chunks), 100)
+    with pytest.raises(FileExistsError):
+        storage.store_file(session_id, 1, "collect_device_metadata", 1, quarantined)
+    final = tmp_path / "root" / str(session_id) / "1-collect_device_metadata-1.bin"
+    assert final.read_bytes() == b"first"
+    assert not quarantined.path.exists()
 
 
 def test_storage_refuses_a_key_that_could_escape_the_root(tmp_path: Path) -> None:

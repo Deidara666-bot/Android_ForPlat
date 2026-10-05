@@ -132,8 +132,10 @@ OPERATION_SOURCE_GROUP: dict[str, str | None] = {
     "pull_subject_apk": SourceGroup.APP_SYSTEM_STATE.value,
 }
 
-# Largest evidence file the upload endpoint accepts.
-MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+# Largest evidence file the upload endpoint accepts (8 GiB, streamed to disk).
+MAX_UPLOAD_BYTES = 8 * 1024**3
+# Multipart framing and form fields on top of the file in `Content-Length`.
+UPLOAD_FRAMING_ALLOWANCE_BYTES = 16 * 1024
 
 # Named operation sequences a session may request (the agent keeps the same profile table).
 _G1_OPERATIONS = (
