@@ -4,7 +4,7 @@ import subprocess
 from dataclasses import dataclass
 
 from src.config import get_settings
-from src.device.adb_commands import VERSION
+from src.device.adb_commands import VERSION, timeout_for
 from src.exceptions import AdbError
 
 
@@ -16,16 +16,25 @@ class AdbResult:
 
 
 def run_adb(
-    args: list[str], serial: str | None = None, *, adb_path: str | None = None
+    args: list[str],
+    serial: str | None = None,
+    *,
+    adb_path: str | None = None,
+    timeout: float | None = None,
 ) -> AdbResult:
-    """Run `adb [-s serial] *args` without a shell. Output stays as raw bytes."""
+    """Run `adb [-s serial] *args` without a shell. Output stays as raw bytes. The timeout is
+    1800 s for `pull` and 60 s otherwise unless given."""
     command = [adb_path or get_settings().adb_path]
     if serial is not None:
         command += ["-s", serial]
     command += args
     try:
         completed = subprocess.run(  # noqa: S603
-            command, shell=False, capture_output=True, timeout=60, check=False
+            command,
+            shell=False,
+            capture_output=True,
+            timeout=timeout if timeout is not None else timeout_for(args),
+            check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise AdbError(f"cannot run adb: {type(exc).__name__}") from exc

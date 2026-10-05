@@ -5,7 +5,7 @@ import json
 import logging
 import sys
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from enum import Enum
 from typing import Any
 
@@ -14,12 +14,20 @@ from sqlalchemy.orm import Session
 
 import app.parsing  # noqa: F401  (importing the package fills the parser registry)
 from app.core.constants import ActorType, AuditEventType, AvailabilityStatus, ParseStatus
+from app.models.acquisition_operation import AcquisitionOperation
 from app.models.acquisition_session import AcquisitionSession
 from app.models.artifact import Artifact
 from app.models.evidence import Evidence
 from app.models.normalized_event import NormalizedEvent
-from app.normalization.normalizer import normalize
+from app.normalization.normalizer import (
+    NEGATIVE_SOURCES,
+    NormalizationContext,
+    build_context,
+    negative_facts,
+    normalize,
+)
 from app.parsing.registry import UnknownOperationError, get_parser
+from app.research.coverage import PARTS, CoverageService
 from app.services.artifact_service import ArtifactService
 from app.services.audit_service import AuditService
 from app.services.evidence_storage_service import EvidenceStorageService
@@ -76,7 +84,7 @@ def process_evidence(
         return _skip(db, evidence, f"availability_status={evidence.availability_status}")
     assert_evidence_ready(evidence.sha256_agent, evidence.sha256_server)
     try:
-        parser = get_parser(evidence.operation_id)
+        parser = get_parser(evidence.operation_id, evidence.raw_source)
     except UnknownOperationError:
         return _skip(db, evidence, f"tidak ada pengurai untuk {evidence.operation_id}")
     already = db.scalar(
@@ -94,14 +102,20 @@ def process_evidence(
         raise EvidenceNotReadyError("acquired evidence has no stored file")
 
     raw = ArtifactService().read_evidence_bytes(storage.resolve(evidence.stored_path))
+    if getattr(parser, "uses_parameters", False):
+        parsed = parser.parse(raw, parameters=_operation_parameters(db, evidence))  # type: ignore[call-arg]
+    else:
+        parsed = parser.parse(raw)
     with db.begin_nested():
-        rows = ArtifactService().store_artifacts(db, evidence.id, parser.parse(raw))
+        rows = ArtifactService().store_artifacts(db, evidence.id, parsed)
         facts = 0
+        context = replace(build_context(rows), session_timezone=_session_timezone(db, evidence))
         for row in rows:
             for fact in normalize(
                 row,
                 observed_at=evidence.acquired_at,
                 availability_status=evidence.availability_status,
+                context=context,
             ):
                 values: dict[str, Any] = {
                     k: (v.value if isinstance(v, Enum) else v) for k, v in fact.model_dump().items()
@@ -109,6 +123,7 @@ def process_evidence(
                 db.add(NormalizedEvent(case_id=evidence.case_id, artifact_id=row.id, **values))
                 facts += 1
         db.flush()
+        facts += _store_negative_facts(db, evidence, rows, context)
         timezone = _fill_session_timezone(db, evidence, rows)
     db.commit()
     if timezone is not None:
@@ -120,6 +135,68 @@ def process_evidence(
             details={"timezone": timezone, "source": _TIMEZONE_KEY},
         )
     return ProcessResult(evidence.id, len(rows), facts, None)
+
+
+def _store_negative_facts(
+    db: Session, evidence: Evidence, rows: list[Artifact], context: NormalizationContext
+) -> int:
+    """Explicit negative facts for the session subject, only when `CoverageService` says the
+    source of the predicate was acquired and parsed completely (never from absence alone)."""
+    key = (evidence.operation_id, evidence.raw_source)
+    if key not in NEGATIVE_SOURCES:
+        return 0
+    subject = _operation_parameters(db, evidence).get("package_name")
+    if not subject:
+        log.info("no negative facts for evidence %s: the session has no subject", evidence.id)
+        return 0
+    part = next(p for p in PARTS if (p.operation_id, p.raw_source) == key)
+    coverage = CoverageService.for_session(db, evidence.acquisition_session_id, part)
+    if not coverage.can_be_false:
+        log.info("no negative facts for evidence %s: %s", evidence.id, coverage.reason)
+        return 0
+    created = 0
+    for fact, anchor in negative_facts(
+        evidence.operation_id,
+        evidence.raw_source,
+        rows,
+        subject=subject,
+        observed_at=evidence.acquired_at,
+        context=context,
+    ):
+        values: dict[str, Any] = {
+            k: (v.value if isinstance(v, Enum) else v) for k, v in fact.model_dump().items()
+        }
+        db.add(NormalizedEvent(case_id=evidence.case_id, artifact_id=anchor.id, **values))
+        created += 1
+    db.flush()
+    return created
+
+
+def _operation_parameters(db: Session, evidence: Evidence) -> dict[str, str]:
+    """Parameters the operation was requested with (the output may not name its own subject).
+
+    Evidence carries no sequence, so the operation row is matched by (session, operation_id);
+    a session holds one row per operation id today.
+    """
+    row = db.scalar(
+        select(AcquisitionOperation)
+        .where(
+            AcquisitionOperation.session_id == evidence.acquisition_session_id,
+            AcquisitionOperation.operation_id == evidence.operation_id,
+        )
+        .order_by(AcquisitionOperation.sequence)
+        .limit(1)
+    )
+    if row is None or not isinstance(row.parameters, dict):
+        return {}
+    return {str(k): v for k, v in row.parameters.items() if isinstance(v, str)}
+
+
+def _session_timezone(db: Session, evidence: Evidence) -> str | None:
+    """Device timezone recorded for the evidence's session (`unknown` until a metadata artifact
+    of that session set it)."""
+    session = db.get(AcquisitionSession, evidence.acquisition_session_id)
+    return session.timezone if session is not None else None
 
 
 def _fill_session_timezone(db: Session, evidence: Evidence, rows: list[Artifact]) -> str | None:

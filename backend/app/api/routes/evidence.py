@@ -1,26 +1,24 @@
 import uuid
+from collections.abc import Callable, Coroutine
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, UploadFile, status
+from fastapi.routing import APIRoute
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_agent, get_current_user, get_db
 from app.core import constants
 from app.core.config import get_settings
-from app.core.constants import ActorType, AuditEventType
 from app.models.agent import Agent
 from app.schemas.acquisition import AcquisitionOperationOut, AcquisitionSessionOut
 from app.schemas.case import CaseOut
 from app.schemas.device import DeviceOut
 from app.schemas.evidence import EvidenceOut, EvidenceUploadForm
 from app.schemas.provenance import EvidenceDetailOut
-from app.services.audit_service import AuditService
 from app.services.evidence_service import EvidenceReadService, EvidenceService, UploadRejectedError
 from app.services.evidence_storage_service import EvidenceStorageService
 from app.services.normalization_service import process_evidence_safely
-
-router = APIRouter(prefix="/evidence", tags=["evidence"])
 
 _BACKEND_DIR = Path(__file__).resolve().parents[3]
 
@@ -36,34 +34,44 @@ def get_evidence_storage() -> EvidenceStorageService:
     return EvidenceStorageService(root if root.is_absolute() else _BACKEND_DIR / root)
 
 
+class _UploadRoute(APIRoute):
+    """Refuses an oversized upload from `Content-Length` before the body is read."""
+
+    def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
+        handler = super().get_route_handler()
+
+        async def guarded(request: Request) -> Response:
+            declared = request.headers.get("content-length", "")
+            limit = constants.MAX_UPLOAD_BYTES + constants.UPLOAD_FRAMING_ALLOWANCE_BYTES
+            if declared.isdecimal() and int(declared) > limit:
+                raise HTTPException(
+                    status.HTTP_413_CONTENT_TOO_LARGE, detail="evidence file too large"
+                )
+            return await handler(request)
+
+        return guarded
+
+
+router = APIRouter(prefix="/evidence", tags=["evidence"], route_class=_UploadRoute)
+
+
 @router.post(
     "/upload",
     response_model=EvidenceOut,
     status_code=status.HTTP_201_CREATED,
     summary="Upload raw evidence (agent token)",
 )
-async def upload_evidence(
+def upload_evidence(
     agent: Annotated[Agent, Depends(get_current_agent)],
     db: Annotated[Session, Depends(get_db)],
     storage: Annotated[EvidenceStorageService, Depends(get_evidence_storage)],
     request: Annotated[_UploadRequest, Form()],
 ) -> EvidenceOut:
-    # The client's file name is ignored; the stored name is built by the server.
-    data = await request.file.read(constants.MAX_UPLOAD_BYTES + 1)
+    # The client's file name is ignored; the stored name is built by the server. Sync handler:
+    # the file is streamed to disk in a worker thread, one block at a time.
     form = EvidenceUploadForm(**request.model_dump(exclude={"file"}))
-    if len(data) > constants.MAX_UPLOAD_BYTES:
-        AuditService(db).record(
-            AuditEventType.upload_validation_failed,
-            ActorType.agent,
-            actor_id=agent.id,
-            object_type="acquisition_session",
-            object_id=form.session_id,
-            reason="evidence file too large",
-            details={"http_status": 413, "operation": form.operation_id, "sequence": form.sequence},
-        )
-        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, detail="evidence file too large")
     try:
-        evidence, matches = EvidenceService(db, storage).ingest(agent, form, data)
+        evidence, matches = EvidenceService(db, storage).ingest(agent, form, request.file.file.read)
     except UploadRejectedError as exc:
         raise HTTPException(exc.status_code, detail=exc.detail) from None
     if not matches:

@@ -1,0 +1,83 @@
+Flags:
+    android.app.usage.user_interaction_type_api: true
+    android.app.usage.use_parceled_list: true
+    android.app.usage.filter_based_event_query_api: true
+    android.app.usage.disable_idle_check: true
+user=0 
+  Last 24 hour events (timeRange="10/2/2026, 8:22 PM – 10/3/2026, 8:22 PM" )
+    time="2026-10-03 11:59:18" type=CONFIGURATION_CHANGE package=android config=v36 flags=0x0 
+    time="2026-10-03 11:59:18" type=CONFIGURATION_CHANGE package=android config=notnight-v36 flags=0x0 
+    time="2026-10-03 11:59:18" type=SCREEN_INTERACTIVE package=android flags=0x0 
+    time="2026-10-03 11:59:18" type=CONFIGURATION_CHANGE package=android config=v36 flags=0x0 
+    time="2026-10-03 11:59:18" type=ACTIVITY_RESUMED package=com.google.android.apps.nexuslauncher class=com.google.android.apps.nexuslauncher.NexusLauncherActivity instanceId=164573070 taskRootPackage=com.google.android.apps.nexuslauncher taskRootClass=com.google.android.apps.nexuslauncher.NexusLauncherActivity flags=0x0 
+    time="2026-10-03 11:59:18" type=NOTIFICATION_INTERRUPTION package=android channelId=safety_center_recommendation flags=0x0 
+    time="2026-10-03 11:59:18" type=NOTIFICATION_INTERRUPTION package=android channelId=DEVELOPER flags=0x0 
+    time="2026-10-03 11:59:18" type=USER_UNLOCKED package=android flags=0x0 
+    time="2026-10-03 11:59:19" type=DEVICE_STARTUP package=android flags=0x0 
+    time="2026-10-03 11:59:22" type=CONFIGURATION_CHANGE package=android config=v36 flags=0x0 
+    time="2026-10-03 11:59:29" type=NOTIFICATION_INTERRUPTION package=com.android.systemui channelId=DSK flags=0x0 
+    time="2026-10-03 11:59:34" type=CONFIGURATION_CHANGE package=android config=mcc310-mnc260-v36 flags=0x0 
+    time="2026-10-03 11:59:37" type=CONFIGURATION_CHANGE package=android config=v36 flags=0x0 
+    time="2026-10-03 11:59:48" type=ACTIVITY_PAUSED package=com.google.android.apps.nexuslauncher class=com.google.android.apps.nexuslauncher.NexusLauncherActivity instanceId=164573070 taskRootPackage=com.google.android.apps.nexuslauncher taskRootClass=com.google.android.apps.nexuslauncher.NexusLauncherActivity flags=0x0 
+    time="2026-10-03 11:59:51" type=ACTIVITY_RESUMED package=com.google.android.gms class=com.google.android.gms.setupservices.CoverSheetWelcomeActivity instanceId=73440637 taskRootPackage=com.google.android.gms taskRootClass=com.google.android.gms.setupservices.CoverSheetWelcomeActivity flags=0x0 
+    time="2026-10-03 11:59:51" type=FOREGROUND_SERVICE_START package=com.google.android.apps.messaging class=com.google.apps.tiktok.concurrent.InternalForegroundService flags=0x0 
+    time="2026-10-03 11:59:52" type=ACTIVITY_PAUSED package=com.google.android.gms class=com.google.android.gms.setupservices.CoverSheetWelcomeActivity instanceId=73440637 taskRootPackage=com.google.android.gms taskRootClass=com.google.android.gms.setupservices.CoverSheetWelcomeActivity flags=0x0 
+    time="2026-10-03 11:59:52" type=ACTIVITY_RESUMED package=com.google.android.apps.nexuslauncher class=com.google.android.apps.nexuslauncher.NexusLauncherActivity instanceId=164573070 taskRootPackage=com.google.android.apps.nexuslauncher taskRootClass=com.google.android.apps.nexuslauncher.NexusLauncherActivity flags=0x0 
+    time="2026-10-03 11:59:52" type=ACTIVITY_STOPPED package=com.google.android.gms class=com.google.android.gms.setupservices.CoverSheetWelcomeActivity instanceId=73440637 taskRootPackage=com.google.android.gms taskRootClass=com.google.android.gms.setupservices.CoverSheetWelcomeActivity flags=0x0 
+    time="2026-10-03 11:59:52" type=FOREGROUND_SERVICE_STOP package=com.google.android.apps.messaging class=com.google.apps.tiktok.concurrent.InternalForegroundService flags=0x0 
+    time="2026-10-03 12:00:42" type=SLICE_PINNED package=com.android.settings flags=0x0 
+    time="2026-10-03 12:00:42" type=SLICE_PINNED package=com.android.settings flags=0x0 
+    time="2026-10-03 12:00:42" type=SLICE_PINNED package=com.android.settings flags=0x0 
+    time="2026-10-03 12:00:42" type=SLICE_PINNED package=com.android.settings flags=0x0 
+    time="2026-10-03 12:00:42" type=SLICE_PINNED package=com.android.settings flags=0x0 
+    time="2026-10-03 12:00:42" type=SLICE_PINNED package=com.android.settings flags=0x0 
+    time="2026-10-03 12:00:42" type=SLICE_PINNED package=com.android.settings flags=0x0 
+    time="2026-10-03 12:00:42" type=SLICE_PINNED package=com.android.settings flags=0x0 
+    time="2026-10-03 12:00:42" type=SLICE_PINNED package=com.android.settings flags=0x0 
+    time="2026-10-03 12:00:42" type=SLICE_PINNED package=com.android.settings flags=0x0 
+    time="2026-10-03 12:00:42" type=SLICE_PINNED package=com.android.settings flags=0x0 
+    time="2026-10-03 12:00:42" type=SLICE_PINNED package=com.android.settings flags=0x0 
+    time="2026-10-03 12:00:42" type=SLICE_PINNED package=com.android.settings flags=0x0 
+    time="2026-10-03 12:00:42" type=SLICE_PINNED package=com.android.settings flags=0x0 
+    time="2026-10-03 12:03:35" type=FOREGROUND_SERVICE_START package=com.google.android.apps.wellbeing class=com.google.apps.tiktok.concurrent.InternalForegroundService flags=0x0 
+    time="2026-10-03 12:03:37" type=FOREGROUND_SERVICE_STOP package=com.google.android.apps.wellbeing class=com.google.apps.tiktok.concurrent.InternalForegroundService flags=0x0 
+    time="2026-10-03 12:24:03" type=FOREGROUND_SERVICE_START package=com.google.android.apps.wellbeing class=com.google.apps.tiktok.concurrent.InternalForegroundService flags=0x0 
+    time="2026-10-03 12:24:09" type=FOREGROUND_SERVICE_STOP package=com.google.android.apps.wellbeing class=com.google.apps.tiktok.concurrent.InternalForegroundService flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.youtube standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.apps.accessibility.voiceaccess standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.android.camera2 standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.deskclock standbyBucket=20 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.gm standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.android.virtualization.terminal standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.dialer standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.apps.docs standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.apps.maps standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.contacts standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.android.chrome standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.apps.photos standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.calendar standbyBucket=20 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.documentsui standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.projection.gearhead standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.odad standbyBucket=20 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.android.systemui standbyBucket=20 reason=u-at flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.apps.youtube.music standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:05" type=STANDBY_BUCKET_CHANGED package=com.google.android.inputmethod.latin standbyBucket=50 reason=t flags=0x0 
+    time="2026-10-03 15:51:06" type=FOREGROUND_SERVICE_START package=com.google.android.apps.wellbeing class=com.google.apps.tiktok.concurrent.InternalForegroundService flags=0x0 
+    time="2026-10-03 15:51:09" type=FOREGROUND_SERVICE_STOP package=com.google.android.apps.wellbeing class=com.google.apps.tiktok.concurrent.InternalForegroundService flags=0x0 
+    time="2026-10-03 17:32:24" type=STANDBY_BUCKET_CHANGED package=com.google.android.googlequicksearchbox standbyBucket=30 reason=t flags=0x0 
+    time="2026-10-03 17:32:24" type=STANDBY_BUCKET_CHANGED package=com.google.android.apps.wellbeing standbyBucket=20 reason=t flags=0x0 
+    time="2026-10-03 17:32:24" type=STANDBY_BUCKET_CHANGED package=com.google.android.apps.wellbeing standbyBucket=10 reason=u-si flags=0x0 
+    time="2026-10-03 17:32:27" type=STANDBY_BUCKET_CHANGED package=com.google.android.googlequicksearchbox standbyBucket=10 reason=u-si flags=0x0 
+    time="2026-10-03 17:32:30" type=FOREGROUND_SERVICE_START package=com.google.android.apps.wellbeing class=com.google.apps.tiktok.concurrent.InternalForegroundService flags=0x0 
+    time="2026-10-03 17:32:35" type=FOREGROUND_SERVICE_STOP package=com.google.android.apps.wellbeing class=com.google.apps.tiktok.concurrent.InternalForegroundService flags=0x0 
+    time="2026-10-03 17:51:58" type=FOREGROUND_SERVICE_START package=com.google.android.apps.wellbeing class=com.google.apps.tiktok.concurrent.InternalForegroundService flags=0x0 
+    time="2026-10-03 17:52:06" type=STANDBY_BUCKET_CHANGED package=com.google.android.deskclock standbyBucket=10 reason=u-si flags=0x0 
+    time="2026-10-03 17:52:06" type=FOREGROUND_SERVICE_STOP package=com.google.android.apps.wellbeing class=com.google.apps.tiktok.concurrent.InternalForegroundService flags=0x0 
+    time="2026-10-03 17:52:07" type=STANDBY_BUCKET_CHANGED package=com.android.chrome standbyBucket=10 reason=u-si flags=0x0 
+    time="2026-10-03 18:02:06" type=STANDBY_BUCKET_CHANGED package=com.google.android.deskclock standbyBucket=20 reason=t flags=0x0 
+    time="2026-10-03 20:20:53" type=ACTIVITY_PAUSED package=com.google.android.apps.nexuslauncher class=com.google.android.apps.nexuslauncher.NexusLauncherActivity instanceId=164573070 taskRootPackage=com.google.android.apps.nexuslauncher taskRootClass=com.google.android.apps.nexuslauncher.NexusLauncherActivity flags=0x0 
+    time="2026-10-03 20:20:53" type=STANDBY_BUCKET_CHANGED package=com.android.systemui standbyBucket=10 reason=u-si flags=0x0 
+    time="2026-10-03 20:20:53" type=ACTIVITY_RESUMED package=com.android.settings class=com.android.settings.homepage.SettingsHomepageActivity instanceId=81404491 taskRootPackage=com.android.settings taskRootClass=com.android.settings.homepage.SettingsHomepageActivity flags=0x0 
+    time="2026-10-03 20:20:57" type=ACTIVITY_PAUSED package=com.android.settings class=com.android.settings.homepage.SettingsHomepageActivity instanceId=81404491 taskRootPackage=com.android.settings taskRootClass=com.android.settings.homepage.SettingsHomepageActivity flags=0x0 
+    time="2026-10-03 20:20:57" type=ACTIVITY_RESUMED package=com.google.android.apps.nexuslauncher class=com.google.android.apps.nexuslauncher.NexusLauncherActivity instanceId=164573070 taskRootPackage=com.google.android.apps.nexuslauncher taskRootClass=com.google.android.apps.nexuslauncher.NexusLauncherActivity flags=0x0 
+    time="2026-10-03 20:20:58" type=ACTIVITY_STOPPED package=com.android.settings class=com.android.settings.homepage.SettingsHomepageActivity instanceId=81404491 taskRootPackage=com.android.settings taskRootClass=com.android.settings.homepage.SettingsHomepageActivity flags=0x0 

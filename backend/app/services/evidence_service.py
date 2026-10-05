@@ -1,10 +1,12 @@
 import logging
 import uuid
+from collections.abc import Callable
 from typing import NoReturn
 
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
+from app.core import constants
 from app.core.constants import (
     OPERATION_SOURCE_GROUP,
     ActorType,
@@ -20,7 +22,7 @@ from app.models.device import Device
 from app.models.evidence import Evidence
 from app.schemas.evidence import EvidenceUploadForm
 from app.services.audit_service import AuditService
-from app.services.evidence_storage_service import EvidenceStorageService
+from app.services.evidence_storage_service import EvidenceStorageService, UploadTooLargeError
 from app.services.integrity_service import IntegrityService
 
 log = logging.getLogger(__name__)
@@ -64,8 +66,11 @@ class EvidenceService:
         )
         raise UploadRejectedError(status_code, detail)
 
-    def ingest(self, agent: Agent, form: EvidenceUploadForm, data: bytes) -> tuple[Evidence, bool]:
-        """Order (§W): validate -> server SHA-256 -> compare -> store immutable -> record.
+    def ingest(
+        self, agent: Agent, form: EvidenceUploadForm, read: Callable[[int], bytes]
+    ) -> tuple[Evidence, bool]:
+        """Order (§W): validate -> stream to quarantine + server SHA-256 -> compare -> store
+        immutable -> record. `read(n)` yields the file in blocks; it is never held whole.
 
         Returns (evidence, hashes_match). On a mismatch the file is NOT stored; a `failed`
         evidence row keeps both digests so the discrepancy stays traceable.
@@ -85,23 +90,32 @@ class EvidenceService:
         )
         if operation is None or operation.operation_id != form.operation_id:
             self.reject(agent, form, 422, "sequence and operation_id do not match the session")
-        if form.size_bytes != len(data):
+        already = "evidence already stored for this session, sequence and part"
+        if self._storage.already_stored(session.id, form.sequence, form.operation_id, form.part):
+            self.reject(agent, form, 409, already)  # refuse before receiving gigabytes
+
+        try:
+            quarantined = self._storage.receive(read, constants.MAX_UPLOAD_BYTES)
+        except UploadTooLargeError:
+            self.reject(agent, form, 413, "evidence file too large")
+        if form.size_bytes != quarantined.size_bytes:
+            self._storage.discard(quarantined)
             self.reject(agent, form, 422, "size_bytes does not match the uploaded length")
 
-        server_digest = self._integrity.sha256_bytes(data)  # computed here, never copied
+        server_digest = quarantined.sha256  # computed here while writing, never copied
         agent_digest = form.sha256_agent.lower()
         matches = self._integrity.matches(server_digest, agent_digest)
 
         stored_path: str | None = None
         if matches:
             try:
-                stored_path = self._storage.store(
-                    session.id, form.sequence, form.operation_id, form.part, data
+                stored_path = self._storage.store_file(
+                    session.id, form.sequence, form.operation_id, form.part, quarantined
                 )
             except FileExistsError:
-                self.reject(
-                    agent, form, 409, "evidence already stored for this session, sequence and part"
-                )
+                self.reject(agent, form, 409, already)
+        else:
+            self._storage.discard(quarantined)
 
         evidence = Evidence(
             case_id=session.case_id,
@@ -114,7 +128,7 @@ class EvidenceService:
             stored_path=stored_path,
             sha256_agent=agent_digest,
             sha256_server=server_digest,
-            size_bytes=len(data),
+            size_bytes=quarantined.size_bytes,
             acquired_at=form.acquired_at,
             availability_status=(
                 AvailabilityStatus.acquired.value if matches else AvailabilityStatus.failed.value
@@ -135,7 +149,7 @@ class EvidenceService:
                 actor_id=agent.id,
                 object_type="evidence",
                 object_id=evidence.id,
-                details={**details, "size_bytes": len(data)},
+                details={**details, "size_bytes": quarantined.size_bytes},
             )
         else:
             log.warning("evidence upload rejected: sha256 mismatch (session %s)", session.id)

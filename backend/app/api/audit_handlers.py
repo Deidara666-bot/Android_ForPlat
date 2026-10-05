@@ -87,6 +87,13 @@ async def audit_http_exception(request: Request, exc: StarletteHTTPException) ->
             "invalid or missing credentials",
             {"http_status": 401},
         )
+    if exc.status_code == 413 and _is_audited(request):
+        _record(
+            request,
+            AuditEventType.upload_validation_failed,
+            "evidence file too large",
+            {"http_status": 413, "declared_by": "content-length"},
+        )
     return await http_exception_handler(request, exc)
 
 

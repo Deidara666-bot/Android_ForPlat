@@ -1,0 +1,19 @@
+{
+  "apk_sha256": "7cc16381e659602c839572052af51529dbf073313f5dac56f2b63a7eeee8cf88",
+  "created_at": "2026-10-03T14:35:40.177550+00:00",
+  "extractor_version": "1",
+  "files": {
+    "apk.sha256": "a37f95c2fec1a00bf98cc16300eade2173e984a49af809f52ea6000177698a8f",
+    "badging.txt": "2173d8513b5d2dd2f32dfcfab6e55884e2329cb609b922fe2c7089ab796041ad",
+    "certs.txt": "63a441abec23257cac3b18ed0aac574088cce053a28273142d2586c8cbb9110e",
+    "manifest.txt": "2f3f3ff746eea2ebebbad938304cdb0588d71eced8d270aed8e03d16aaddaa4c",
+    "permissions.txt": "1ace300122321548698feb3f439e04bfd966159a61952990e9eb2d9fd2fbfd2e",
+    "strings_urls.txt": "2baa3b515128f0318795ba43c0a13dc0ea85e78b00c3e14acef31853fec80695"
+  },
+  "tool_versions": {
+    "aapt2": "Android Asset Packaging Tool (aapt) 2.20-13193326",
+    "apksigner": "0.9",
+    "build_tools": "36.0.0",
+    "java": "openjdk version \"25.0.3\" 2026-04-21"
+  }
+}

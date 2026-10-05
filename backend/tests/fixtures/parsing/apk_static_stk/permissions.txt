@@ -1,0 +1,14 @@
+package: com.android.stk
+uses-permission: name='android.permission.RECEIVE_BOOT_COMPLETED'
+uses-permission: name='android.permission.REAL_GET_TASKS'
+uses-permission: name='android.permission.RECEIVE_STK_COMMANDS'
+uses-permission: name='android.permission.SET_ACTIVITY_WATCHER'
+uses-permission: name='android.permission.QUERY_ALL_PACKAGES'
+uses-permission: name='android.permission.START_ACTIVITIES_FROM_BACKGROUND'
+uses-permission: name='android.permission.USER_ACTIVITY'
+uses-permission: name='android.permission.VIBRATE'
+uses-permission: name='android.permission.WAKE_LOCK'
+uses-permission: name='android.permission.POST_NOTIFICATIONS'
+uses-permission: name='android.permission.HIDE_NON_SYSTEM_OVERLAY_WINDOWS'
+permission: com.android.stk.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+uses-permission: name='com.android.stk.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'

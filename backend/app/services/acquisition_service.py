@@ -1,4 +1,5 @@
 import logging
+import re
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -10,7 +11,10 @@ from app.core.constants import (
     ACQUISITION_PROFILES,
     ALLOWED_OPERATIONS,
     MAPPED_OPERATIONS,
+    OPERATION_PARAMETERS,
     OPERATION_SOURCE_GROUP,
+    PACKAGE_NAME_PATTERN,
+    SESSION_FIRST_OPERATION,
     AvailabilityStatus,
     SessionStatus,
 )
@@ -36,6 +40,10 @@ class OperationNotMappedError(ValueError):
     """The operation ID is allowlisted but the agent has no command mapped for it yet."""
 
 
+class InvalidParametersError(ValueError):
+    """The parameters do not match the names and shapes the operation allows."""
+
+
 class UnknownProfileError(ValueError):
     """The requested acquisition profile does not exist."""
 
@@ -52,8 +60,35 @@ class AcquisitionService:
             raise OperationNotMappedError(f"operation {operation!r} is not mapped yet")
 
     @staticmethod
+    def validate_parameters(operation: str, parameters: dict[str, str]) -> None:
+        """Exactly the parameter names the operation lists, each with a valid shape."""
+        required = OPERATION_PARAMETERS.get(operation, ())
+        if set(parameters) != set(required):
+            raise InvalidParametersError(f"operation {operation!r} takes {sorted(required)!r}")
+        for name, value in parameters.items():
+            if name == "package_name" and re.fullmatch(PACKAGE_NAME_PATTERN, value) is None:
+                raise InvalidParametersError(f"parameter {name!r} has an invalid shape")
+
+    @staticmethod
+    def validate_session_parameters(operations: list[str], parameters: dict[str, str]) -> None:
+        """The session's parameters are the union of what its operations take: all of them
+        present, none extra, each with a valid shape. Operations without parameters get none."""
+        needed = {name for item in operations for name in OPERATION_PARAMETERS.get(item, ())}
+        if set(parameters) != needed:
+            raise InvalidParametersError(f"this session takes {sorted(needed)!r}")
+        for name, value in parameters.items():
+            if name == "package_name" and re.fullmatch(PACKAGE_NAME_PATTERN, value) is None:
+                raise InvalidParametersError(f"parameter {name!r} has an invalid shape")
+
+    @staticmethod
+    def parameters_for(operation: str, parameters: dict[str, str]) -> dict[str, str]:
+        """The part of the session's parameters one operation takes (`{}` for most)."""
+        return {name: parameters[name] for name in OPERATION_PARAMETERS.get(operation, ())}
+
+    @staticmethod
     def operations_for(profile: str | None, operation: str | None) -> list[str]:
-        """Operation IDs to run, validated. Exactly one of `profile` / `operation` is expected."""
+        """Operation IDs to run, validated. Exactly one of `profile` / `operation` is expected.
+        `collect_device_metadata` is added as the first operation when the request lacks it."""
         if profile is not None:
             if profile not in ACQUISITION_PROFILES:
                 raise UnknownProfileError(f"profile {profile!r} does not exist")
@@ -62,6 +97,8 @@ class AcquisitionService:
             operations = [str(operation)]
         for item in operations:
             AcquisitionService.validate_operation(item)
+        if SESSION_FIRST_OPERATION not in operations:
+            operations.insert(0, SESSION_FIRST_OPERATION)
         return operations
 
     def build_job(
@@ -74,6 +111,7 @@ class AcquisitionService:
         """Job payload for the agent (REF §API, 8 fields): identities and an operation ID,
         never a command string. `sequence` and `serial` come from the DB rows, not the client."""
         self.validate_operation(operation_row.operation_id)
+        self.validate_parameters(operation_row.operation_id, parameters)
         return {
             "type": "job",
             "session_id": str(session.id),
@@ -92,6 +130,7 @@ class AcquisitionService:
         agent: Agent,
         operations: list[str],
         profile: str | None,
+        parameters: dict[str, str] | None = None,
     ) -> tuple[AcquisitionSession, list[AcquisitionOperation]]:
         assert self._db is not None
         session = AcquisitionSession(
@@ -110,7 +149,12 @@ class AcquisitionService:
         self._db.add(session)
         self._db.flush()
         rows = [
-            AcquisitionOperation(session_id=session.id, sequence=index, operation_id=operation)
+            AcquisitionOperation(
+                session_id=session.id,
+                sequence=index,
+                operation_id=operation,
+                parameters=self.parameters_for(operation, parameters or {}),
+            )
             for index, operation in enumerate(operations, start=1)
         ]
         self._db.add_all(rows)
@@ -176,13 +220,14 @@ class AcquisitionService:
         device = self._db.get(Device, session.device_id)
         serial_ok = device is not None and status.serial == device.serial
         not_acquired = status.availability_status not in (None, AvailabilityStatus.acquired)
-        if status.returncode != 0 or not_acquired or not serial_ok:
-            operation.status = _FAILED
-        elif status.part >= status.parts_total:
-            operation.status = _COMPLETED  # only the last part completes a multi-part operation
-
-        if operation.status == _FAILED:
+        part_failed = status.returncode != 0 or not_acquired or not serial_ok
+        if part_failed:
             self._record_unavailable_evidence(session, operation, status)
+        if status.part >= status.parts_total:
+            # Every part reports; only the last one ends the operation. A part that was not
+            # acquired leaves a non-acquired evidence row, which is what marks it failed.
+            ended_failed = part_failed or self._has_unavailable_evidence(session, operation)
+            operation.status = _FAILED if ended_failed else _COMPLETED
 
         operations = self.list_operations(session.id)
         if all(item.status != _PENDING for item in operations):
@@ -196,14 +241,33 @@ class AcquisitionService:
         self._db.commit()
         return True
 
+    def _has_unavailable_evidence(
+        self, session: AcquisitionSession, operation: AcquisitionOperation
+    ) -> bool:
+        assert self._db is not None
+        return (
+            self._db.scalar(
+                select(Evidence.id)
+                .where(
+                    Evidence.acquisition_session_id == session.id,
+                    Evidence.operation_id == operation.operation_id,
+                    Evidence.availability_status != AvailabilityStatus.acquired.value,
+                )
+                .limit(1)
+            )
+            is not None
+        )
+
     def _record_unavailable_evidence(
         self, session: AcquisitionSession, operation: AcquisitionOperation, status: JobStatusIn
     ) -> None:
         """A non-acquired outcome is evidence too: a row without a file, with status and reason.
 
         Unknown or missing agent status falls back to `failed`; the reason is never invented
-        beyond saying that the agent gave none. A row for the same operation and status
-        (e.g. the SHA-256 mismatch row made by the upload) is not duplicated."""
+        beyond saying that the agent gave none. The row carries the part's `raw_source`
+        (the operation ID when the agent sent none). A non-acquired row for the same session,
+        operation and `raw_source` (e.g. the SHA-256 mismatch row made by the upload) is not
+        duplicated; without a `raw_source`, any non-acquired row of the operation counts."""
         assert self._db is not None
         reported = status.availability_status
         availability = (
@@ -211,13 +275,15 @@ class AcquisitionService:
             if reported is not None and reported != AvailabilityStatus.acquired
             else AvailabilityStatus.failed
         )
-        existing = self._db.scalar(
-            select(Evidence.id).where(
-                Evidence.acquisition_session_id == session.id,
-                Evidence.operation_id == operation.operation_id,
-                Evidence.availability_status == availability.value,
-            )
+        raw_source = status.raw_source or operation.operation_id
+        duplicate = select(Evidence.id).where(
+            Evidence.acquisition_session_id == session.id,
+            Evidence.operation_id == operation.operation_id,
+            Evidence.availability_status != AvailabilityStatus.acquired.value,
         )
+        if status.raw_source is not None:  # an agent that names no part can only be matched
+            duplicate = duplicate.where(Evidence.raw_source == raw_source)  # by operation
+        existing = self._db.scalar(duplicate.limit(1))
         if existing is not None:
             return
         self._db.add(
@@ -228,7 +294,7 @@ class AcquisitionService:
                 operation_id=operation.operation_id,
                 source_group=OPERATION_SOURCE_GROUP.get(operation.operation_id),
                 source_name=operation.operation_id,
-                raw_source=operation.operation_id,
+                raw_source=raw_source,
                 acquired_at=datetime.now(UTC),  # when the backend learned of the outcome
                 availability_status=availability.value,
                 availability_reason=status.availability_reason or "reason not reported by agent",

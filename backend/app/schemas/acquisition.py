@@ -41,7 +41,10 @@ class AcquisitionDetailOut(AcquisitionSessionOut):
 
 
 class AcquisitionCreate(BaseModel):
-    """Request a session by `profile` or by a single `operation` (exactly one of them)."""
+    """Request a session by `profile` or by a single `operation` (exactly one of them).
+
+    `parameters` are the session subject: every operation that takes parameters gets them,
+    the others get none."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -49,6 +52,7 @@ class AcquisitionCreate(BaseModel):
     device_id: uuid.UUID
     profile: str | None = None
     operation: str | None = None
+    parameters: dict[str, str] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _exactly_one_selector(self) -> "AcquisitionCreate":
@@ -72,3 +76,4 @@ class JobStatusIn(BaseModel):
     error: str | None = None
     availability_status: AvailabilityStatus | None = None
     availability_reason: str | None = Field(default=None, max_length=500)
+    raw_source: str | None = Field(default=None, min_length=1, max_length=200)

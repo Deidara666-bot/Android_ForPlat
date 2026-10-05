@@ -102,24 +102,57 @@ ALLOWED_OPERATIONS: frozenset[str] = frozenset(
         "pull_subject_apk",
     }
 )
-# Operations the agent can run today; the other six are rejected as not mapped yet.
+# Operations the agent can run today; the others are rejected as not mapped yet.
 MAPPED_OPERATIONS: frozenset[str] = frozenset(
-    {"collect_device_metadata", "collect_package_inventory"}
+    {
+        "collect_device_metadata",
+        "collect_package_inventory",
+        "collect_package_detail",
+        "collect_accessibility_state",
+        "collect_usage_state",
+        "pull_subject_apk",
+    }
 )
+
+# Parameter names each operation requires (none for the others); values are validated by shape.
+OPERATION_PARAMETERS: dict[str, tuple[str, ...]] = {
+    "collect_package_detail": ("package_name",),
+    "collect_accessibility_state": ("package_name",),
+    "pull_subject_apk": ("package_name",),
+}
+PACKAGE_NAME_PATTERN = r"^[A-Za-z0-9_.]{1,200}$"
 
 # Source group per operation (REF §OPS). NULL = context evidence that belongs to no group.
 OPERATION_SOURCE_GROUP: dict[str, str | None] = {
     "collect_device_metadata": None,
     "collect_package_inventory": SourceGroup.APP_SYSTEM_STATE.value,
+    "collect_package_detail": SourceGroup.APP_SYSTEM_STATE.value,
+    "collect_accessibility_state": SourceGroup.APP_SYSTEM_STATE.value,
+    "collect_usage_state": SourceGroup.APP_SYSTEM_STATE.value,
+    "pull_subject_apk": SourceGroup.APP_SYSTEM_STATE.value,
 }
 
-# Largest evidence file the upload endpoint accepts.
-MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+# Largest evidence file the upload endpoint accepts (8 GiB, streamed to disk).
+MAX_UPLOAD_BYTES = 8 * 1024**3
+# Multipart framing and form fields on top of the file in `Content-Length`.
+UPLOAD_FRAMING_ALLOWANCE_BYTES = 16 * 1024
 
 # Named operation sequences a session may request (the agent keeps the same profile table).
+_G1_OPERATIONS = (
+    "collect_device_metadata",
+    "collect_package_inventory",
+    "collect_package_detail",
+    "collect_accessibility_state",
+    "collect_usage_state",
+    "pull_subject_apk",
+)
 ACQUISITION_PROFILES: dict[str, tuple[str, ...]] = {
     "baseline_v030": ("collect_device_metadata", "collect_package_inventory"),
+    "g1_full": _G1_OPERATIONS,
+    "tier2_g1": _G1_OPERATIONS,  # the Tier-2 name of the same sequence (REF §TIER2)
 }
+# Every session starts with this operation: the session timezone comes only from its own evidence.
+SESSION_FIRST_OPERATION = "collect_device_metadata"
 
 # Order in which a failed acquisition is classified (first match wins, remainder is `failed`).
 AVAILABILITY_CHECK_ORDER = (
@@ -149,3 +182,23 @@ LABEL_ID: dict[type[StrEnum], dict[str, str]] = {
 
 
 APP_VERSION = "0.10.0"
+
+
+class EvidenceMode(StrEnum):
+    installed_runtime = "installed_runtime"
+    apk_static = "apk_static"
+
+
+class UnknownReason(StrEnum):
+    """Why a condition cannot be decided (REF §ENUM2); only the source-level reasons are
+    produced by the coverage service."""
+
+    availability_unavailable = "availability_unavailable"
+    availability_denied = "availability_denied"
+    availability_unsupported = "availability_unsupported"
+    availability_failed = "availability_failed"
+    not_acquired = "not_acquired"
+    parse_incomplete = "parse_incomplete"
+    coverage_incomplete = "coverage_incomplete"
+    conflicting_evidence = "conflicting_evidence"
+    no_applicable_profile = "no_applicable_profile"

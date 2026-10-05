@@ -5,16 +5,72 @@ DEVICE_LIST: list[str] = ["devices", "-l"]
 VERSION: list[str] = ["version"]
 PRIVILEGE_PROBE: list[str] = ["shell", "id"]
 
-# Operation ID -> adb arguments (after `-s <serial>`). Only the first two are mapped (v0.30.3).
+# Operation ID -> adb arguments (after `-s <serial>`). `{name}` tokens are filled from the job's
+# validated parameters (see OPERATION_PARAMETERS); no other substitution exists.
 OPERATION_ARGS: dict[str, list[str]] = {
     "collect_device_metadata": ["shell", "getprop"],
     "collect_package_inventory": ["shell", "pm", "list", "packages", "-U"],
+    "collect_package_detail": ["shell", "dumpsys", "package", "{package_name}"],
 }
+
+# Multi-command operations: ordered `(raw_source label, adb arguments)`, one evidence file per
+# command (`part` 1..n). Same `{name}` substitution rules as OPERATION_ARGS.
+OPERATION_PARTS: dict[str, list[tuple[str, list[str]]]] = {
+    "collect_accessibility_state": [
+        (
+            "settings secure a11y",
+            ["shell", "settings", "get", "secure", "enabled_accessibility_services"],
+        ),
+        (
+            "settings secure nls",
+            ["shell", "settings", "get", "secure", "enabled_notification_listeners"],
+        ),
+        ("appops overlay", ["shell", "appops", "get", "{package_name}", "SYSTEM_ALERT_WINDOW"]),
+    ],
+    "collect_usage_state": [
+        ("dumpsys usagestats", ["shell", "dumpsys", "usagestats"]),
+        ("dumpsys activity", ["shell", "dumpsys", "activity", "activities"]),
+        ("ps", ["shell", "ps", "-A", "-o", "PID,UID,USER,NAME"]),
+    ],
+    # Parts after the pulls are the static extractor's bundle files, not adb commands. The `pull`
+    # entry is a template run once per APK the device reports (label `apk file:<name>`);
+    # `{apk_path}` and `{local_path}` are filled by the runner (never from job parameters): the
+    # first from the output of part 1, the second from that part's evidence path.
+    "pull_subject_apk": [
+        ("pm path", ["shell", "pm", "path", "{package_name}"]),
+        ("apk file", ["pull", "{apk_path}", "{local_path}"]),
+    ],
+}
+
+# Where a pulled APK may live on the device (REF §OPS2); anything else is refused.
+APK_PATH_PATTERN = r"^/(data/app|system|product|system_ext)/[^\s]+\.apk$"
+# File name of one APK (the last path segment); it becomes part of the `apk file:<name>` label.
+APK_NAME_PATTERN = r"^[A-Za-z0-9_.\-]{1,100}\.apk$"
+
+# Seconds an adb call may run: `pull` moves whole APKs, everything else is a short query.
+DEFAULT_TIMEOUT_SECONDS = 60
+PULL_TIMEOUT_SECONDS = 1800
+
+
+def timeout_for(args: list[str]) -> int:
+    return PULL_TIMEOUT_SECONDS if args[:1] == ["pull"] else DEFAULT_TIMEOUT_SECONDS
+
+
+# Operation ID -> the exact parameter names the job must carry (none for the others).
+OPERATION_PARAMETERS: dict[str, tuple[str, ...]] = {
+    "collect_package_detail": ("package_name",),
+    "collect_accessibility_state": ("package_name",),
+    "pull_subject_apk": ("package_name",),
+}
+
+# Shape of a package name accepted as a parameter (REF §OPS2); no '-', so never an adb option.
+PACKAGE_NAME_PATTERN = r"^[A-Za-z0-9_.]{1,200}$"
 
 # Human-readable evidence source per operation, sent with the upload (a label, not a command).
 RAW_SOURCE_LABEL: dict[str, str] = {
     "collect_device_metadata": "getprop",
     "collect_package_inventory": "pm list packages -U",
+    "collect_package_detail": "dumpsys package",
 }
 
 # Read-only build properties reported with a device. Not evidence: no hash, no file.

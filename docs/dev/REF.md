@@ -176,6 +176,11 @@ Tepat 8, tertutup: `collect_device_metadata` · `collect_package_inventory` · `
 
 - ID di luar 8 → `OperationNotAllowedError`. Dua galat **berbeda tipe**.
 - String perintah ADB hanya boleh ada di `agent/src/device/adb_commands.py`, sebagai `list[str]`.
+- Label `raw_source` (§OPS2) di backend hanya di `backend/app/core/raw_sources.py`. Grep larangan mengecualikan
+  berkas itu dan `adb_commands.py` (v0.45.5).
+- Setiap sesi diawali `collect_device_metadata`: backend menambahkannya sebagai `sequence` 1 bila profil/operasi tidak
+  memuatnya (v0.45.8). Zona waktu sesi hanya dari bukti sesi itu.
+- Satu sesi = paling banyak satu subjek: `parameters.package_name` dipakai semua operasi berparameter di sesi itu (v0.45.8).
 - Deteksi perangkat (`adb devices -l`) dan `adb version` **bukan** operasi allowlist.
 
 ## §ENT — entitas & kolom (tabel snake_case jamak `[plan]`: hindari kata tercadang `user`, `case`)
@@ -236,8 +241,12 @@ backend→agent `job` = `{type, session_id, sequence, operation, case_id, device
 - `sequence` = `acquisition_operations.sequence`; `serial` = `devices.serial`, pola `^[A-Za-z0-9._:-]{1,64}$`, ⛔ awalan `-`.
   Agen menjalankan hanya bila `serial` ada di daftar perangkat `device`; ⛔ agen memilih perangkat atau menghitung urutan sendiri.
 - `job_status` = `{type, session_id, sequence, part, parts_total, operation, serial, sha256_agent, size_bytes, returncode, error}`
-  (+ `availability_status`, `availability_reason` mulai v0.30.6). Backend mencocokkan lewat `(session_id, sequence)`.
+  (+ `availability_status`, `availability_reason` mulai v0.30.6; + `raw_source` mulai v0.45.6). Backend mencocokkan lewat `(session_id, sequence)`.
 - `part` = urutan perintah dalam satu operasi (REF §OPS2), mulai 1; v0.30: `part = parts_total = 1`.
+- Mulai v0.45.6: semua part dijalankan, masing-masing tepat satu status. Part yang bergantung pada part sebelumnya
+  (`pull_subject_apk`: part APK butuh part 1; part bundel butuh **semua** part APK) tanpa prasyarat `acquired` → `failed`,
+  alasan `prasyarat part <n> tidak diperoleh`, perintahnya tidak dijalankan. Operasi selesai saat `part == parts_total`;
+  `failed` bila ada part bukan `acquired`. `parts_total` boleh berbeda per sesi (`pull_subject_apk`: jumlah split).
 Bita bukti **selalu** lewat `POST /api/evidence/upload`, tidak pernah WebSocket.
 
 ## §SVC — nama layanan (§X)
@@ -258,6 +267,8 @@ Bita bukti **selalu** lewat `POST /api/evidence/upload`, tidak pernah WebSocket.
 
 `backend/var/evidence/` (EVIDENCE_ROOT) · `agent/var/raw/` (bukti mentah sisi agen sebelum unggah).
 Nama berkas bukti disusun server/agen dari `<session_id>/<sequence>-<operation_id>-<part>.bin`, ⛔ bukan dari input.
+Unggah: batas per berkas `MAX_UPLOAD_BYTES` = 8 GiB (`backend/app/core/constants.py`); streaming ke karantina
+`EVIDENCE_ROOT/.incoming/` → banding hash → pindah tanpa menimpa (v0.30.5 revisi).
 
 ## §FIX — fixture sintetis (dipakai test; aman di-commit)
 
@@ -303,8 +314,8 @@ Satu operasi boleh menjalankan beberapa perintah berurutan → satu berkas bukti
 | | 2 | `shell dumpsys activity activities` | `dumpsys activity` | |
 | | 3 | `shell ps -A -o PID,UID,USER,NAME` | `ps` | |
 | `pull_subject_apk` | 1 | `shell pm path <pkg>` | `pm path` | v0.45 |
-| | 2 | `pull <path> <berkas lokal agen>` — `<path>` dari keluaran part 1 milik agen sendiri, regex `^/(data/app\|system\|product\|system_ext)/[^\s]+\.apk$`; ⛔ path dari backend | `apk file` | |
-| | 3..n | ekstraktor §STATIC atas APK hasil part 2 (dijalankan agen) | `static:<nama berkas>` | |
+| | 2..1+S | `pull <path> <berkas lokal agen>`, satu part per baris `pm path` (S = jumlah berkas APK; `base.apk` dulu, lalu split urut nama) — `<path>` dari keluaran part 1 milik agen sendiri, regex `^/(data/app\|system\|product\|system_ext)/[^\s]+\.apk$`, ⛔ segmen `..`; ⛔ path dari backend | `apk file:<nama berkas>` | |
+| | 2+S.. | 9 berkas ekstraktor §STATIC atas set APK part 2..1+S (dijalankan agen) | `static:<nama berkas>` | |
 | `collect_sensitive_provider_data` | 1 | `shell content query --uri content://sms` | `content sms` | v0.70 |
 | | 2 | `shell content query --uri content://contacts/phones` | `content contacts` | |
 | | 3 | `shell content query --uri content://call_log/calls` | `content call_log` | |
@@ -315,22 +326,55 @@ Satu operasi boleh menjalankan beberapa perintah berurutan → satu berkas bukti
 
 ## §STATIC — ekstraktor APK statis `[plan]` (K2 di MAP)
 
-`scripts/static/extract_apk.py <apk> <folder_keluar>` — Python stdlib + alat SDK, ⛔ tanpa menjalankan APK.
+Logika: `agent/src/static_analysis/extractor.py` `extract(apks, out_dir) -> list[Path]` (`apks` = `base.apk` dulu lalu split;
+urutan tabel di bawah); CLI pembungkus untuk VM S-C: `scripts/static/extract_apk.py <apk…> <folder_keluar>`. Python stdlib +
+alat SDK (list argumen, ⛔ shell), ⛔ memasang/menjalankan APK. Berkas dibaca bertahap (⛔ seluruh entri ke memori).
 Build-tools dicari dari `ANDROID_SDK_ROOT` → `ANDROID_HOME` → `%LOCALAPPDATA%/Android/Sdk`, versi 36.x.
+Di `pull_subject_apk`, 9 berkas ini = part `2+S..`, `raw_source` `static:<nama>`. Timeout per part: `adb pull` dan alat SDK
+1800 s, perintah lain 60 s (`agent/src/device/adb_commands.py`).
 
 | Berkas bundel | Isi |
 |---|---|
-| `apk.sha256` | SHA-256 APK (hex) |
-| `badging.txt` | `aapt2 dump badging <apk>` |
-| `permissions.txt` | `aapt2 dump permissions <apk>` |
-| `manifest.txt` | `aapt2 dump xmltree --file AndroidManifest.xml <apk>` |
-| `certs.txt` | `apksigner verify --print-certs <apk>` (gagal verifikasi tetap dicatat) |
-| `strings_urls.txt` | URL/domain/IP dari `classes*.dex` + `res/`, regex, urut unik, maks 5000 baris |
-| `bundle.json` | `{apk_sha256, extractor_version, tool_versions, created_at, files:{nama: sha256}}` |
+| `apk.sha256` | baris `<sha256>  <nama berkas>` per APK, `base.apk` dulu; identitas = `base.apk` |
+| `badging.txt` | `aapt2 dump badging <base.apk>` |
+| `permissions.txt` | `aapt2 dump permissions <base.apk>` |
+| `manifest.txt` | `aapt2 dump xmltree --file AndroidManifest.xml <base.apk>` |
+| `certs.txt` | `apksigner verify --print-certs <base.apk>` (gagal verifikasi tetap dicatat) |
+| `strings_urls.txt` | URL/IP dari **semua entri** semua APK (dex, `lib/*.so`, `assets/`, `res/`, …), regex, urut unik, maks 5000 baris; tiap entri dipindai maks 256 MiB pertama |
+| `native_libs.txt` | baris `<apk>\t<entri lib/<abi>/*.so>\t<ukuran>\t<sha256>` — artefak konteks, tanpa fakta |
+| `api_refs.txt` | baris `<apk>\t<entri dex>\t<descriptor>` untuk descriptor tertutup: `Ldalvik/system/DexClassLoader;`, `Ldalvik/system/InMemoryDexClassLoader;`, `Ldalvik/system/PathClassLoader;`, `Ldalvik/system/DelegateLastClassLoader;` — artefak konteks, tanpa fakta |
+| `bundle.json` | `{apk_sha256 (base), apks:{nama: sha256}, extractor_version, tool_versions, created_at, files:{nama: sha256}, scan:{entri_terpotong:[…]}}` |
 
-- S-A/S-B: dijalankan agen setelah `pull_subject_apk` (keluaran jadi bukti part 3..n).
+- Artefak `native_libs`/`api_refs` = "APK memuat/mereferensikan …" (konteks untuk pemeriksa). ⛔ Fakta, ⛔ dipakai mesin aturan,
+  ⛔ dibaca sebagai "kode diunduh/dijalankan". Menjadikannya fakta = kandidat amandemen (`docs/core_deviations.md`).
+- S-A/S-B: dijalankan agen setelah `pull_subject_apk`. Berkas APK > `MAX_UPLOAD_BYTES` → unggah ditolak (413) → `failed`, apa adanya.
 - S-C: dijalankan **di VM terisolasi** oleh user; hanya folder bundel (tanpa APK) yang diimpor lewat
   `POST /api/static-bundles` (v0.90). Keluaran `evidence_mode = apk_static`.
+
+## §COV — cakupan fakta → sumber (v0.45.6–.7) `[plan]`
+
+Cakupan dinilai per part `(operation_id, raw_source)`, bukan per operasi. Lingkup **perangkat** = berlaku untuk tiap subjek
+di sesi itu; **subjek** = hanya `parameters.package_name` sesi itu. Sumber = sesi terbaru di kasus yang memuat part itu
+(lingkup subjek: sesi dengan subjek itu).
+
+| event_type (object_value) | Operasi · `raw_source` | Lingkup | Negatif (v0.45.7) |
+|---|---|---|---|
+| `package_observed_installed`, `uid_observed` | `collect_package_inventory` · `pm list packages -U` | perangkat | — |
+| `sensitive_communication_capability_observed_granted` | `collect_package_detail` · `dumpsys package` | subjek | izin vocab tidak granted |
+| `event_trigger_capability_observed_declared` | `collect_package_detail` · `dumpsys package` | subjek | action vocab tidak dideklarasikan |
+| fakta deklaratif lain `collect_package_detail` | `collect_package_detail` · `dumpsys package` | subjek | — |
+| `special_access_capability_observed_enabled` (`accessibility_service`) | `collect_accessibility_state` · `settings secure a11y` | perangkat | subjek tak ada di daftar |
+| … (`notification_listener`) | `collect_accessibility_state` · `settings secure nls` | perangkat | subjek tak ada di daftar |
+| … (`draw_over_other_apps`) | `collect_accessibility_state` · `appops overlay` | subjek | mode `ignore`/`deny` saja (`default` → tanpa fakta) |
+| `app_usage_observed` | `collect_usage_state` · `dumpsys usagestats` | perangkat | — |
+| `activity_observed_resumed` | `collect_usage_state` · `dumpsys activity` | perangkat | — |
+| `process_observed_running` | `collect_usage_state` · `ps` | perangkat | — |
+| fakta dari bundel statis | `pull_subject_apk` · `static:<nama>` | subjek | action vocab tidak dideklarasikan |
+| — (artefak konteks saja) | `pull_subject_apk` · `static:native_libs.txt`, `static:api_refs.txt` | subjek | — |
+
+- Tanpa baris `evidence` untuk part itu → `not_acquired`; status bukan `acquired` → `availability_<status>`;
+  ada artefak `failed` → `parse_incomplete`. FALSE hanya bila `acquired` + semua artefak `parsed`/`empty`.
+- Fakta negatif hanya untuk subjek sesi, ⛔ untuk paket inventaris lain.
 
 ## §TIER2 — protokol Tier-2 lewat agen (§11.1) `[plan]`
 
@@ -345,9 +389,17 @@ Build-tools dicari dari `ANDROID_SDK_ROOT` → `ANDROID_HOME` → `%LOCALAPPDATA
 - Label lingkungan: `avd1-api36`, `avd2-api<N>`, `a10-api<N>` (N = `ro.build.version.sdk` Galaxy A10, dibaca di v0.90.7).
   Runner memverifikasi `api` label = sdk perangkat yang tersambung; beda atau perangkat tidak ada → berhenti sebelum reset.
 - CSV `experiments/feasibility_tier2/results/<profile>_<env>.csv`, kolom:
-  `artifact_id,env,rep,android_version,api,build,device_or_emulator,operation_id,command,privilege_state,test_action,expected_evidence,actual_result,availability_status,availability_reason,raw_output_ref,temporal_semantics,git_commit,adb_version,acquired_at`.
-- Status per artefak per lingkungan: 3/3 = konsisten · 1–2/3 = `CONDITIONAL` · 0/3 = status non-acquired
-  dominan + alasan (⛔ tidak diciutkan). Ringkasan di `docs/tier2_<profile>.md`.
+  `artifact_id,env,subject,rep,android_version,api,build,device_or_emulator,operation_id,command,privilege_state,test_action,expected_evidence,actual_result,availability_status,availability_reason,raw_output_ref,temporal_semantics,git_commit,adb_version,acquired_at`.
+- `actual_result` (per baris): `observed` (sumber terurai penuh + datum Tier-1 ada; nilai `null` setting terbaca utuh juga
+  `observed`) · `not_observed` (sumber terurai, datum kosong) · `not_evaluated` (Tier-2 belum bisa menilai artefak ini) ·
+  `parse_incomplete` · status non-acquired · `not_acquired`.
+- Status per artefak per lingkungan (per subjek): hitung ulangan `observed` → 3/3 = konsisten · 1–2/3 = `CONDITIONAL` ·
+  0/3 = dipilah §11.1 `unavailable`/`denied`/`unsupported`/`failed` + alasan (⛔ tidak diciutkan, ⛔ label lain):
+  `not_observed` → `unavailable` (sumber terakses, datum tidak muncul); `parse_incomplete` → `failed`.
+  Batas platform (mis. unggah > `MAX_UPLOAD_BYTES`, HTTP 413) → `failed` + alasan "batas platform", bukan sifat perangkat; artefak dinilai
+  dari subjek lain bila ada. Ringkasan di `docs/tier2_<profile>.md`.
+- `not_evaluated` tidak masuk hitungan 3/3–0/3; dilaporkan terpisah dengan alasan dan kartu yang menilainya.
+  G1-B8 = `not_evaluated` sampai atribusi boot/package-event divalidasi (v0.80, simulator); ketersediaan sumbernya = G1-A10.
 - Pemetaan artefak Tier-1 → operasi: G1-A1/A2 `collect_package_inventory`/`pull_subject_apk` · G1-A3 `pull_subject_apk` ·
   G1-A4..A9, G1-B7 `collect_package_detail` · G1-A10, A11, B8 `collect_usage_state` · G1-B1..B3 `collect_accessibility_state` ·
   G2-C1, C3, C4 `collect_sensitive_provider_data` · G3-D1 `collect_network_stats`.

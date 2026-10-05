@@ -122,7 +122,7 @@ def test_job_issued_is_audited_for_each_operation(
 def test_rejected_operation_id_is_audited_even_though_the_request_fails(
     client: TestClient, session: Session, auth_headers: dict[str, str], setup: dict[str, Any]
 ) -> None:
-    for operation in ("collect_usage_state", "collect_everything"):
+    for operation in ("collect_network_stats", "collect_everything"):
         assert _start(client, auth_headers, setup, operation=operation).status_code == 422
     rows = list(
         session.scalars(select(AuditLog).where(AuditLog.event_type == "operation_rejected"))
@@ -205,7 +205,7 @@ def test_audit_details_never_hold_command_text(
     agent_token: str,
     running_session: AcquisitionSession,
 ) -> None:
-    _start(client, auth_headers, setup, operation="collect_usage_state")
+    _start(client, auth_headers, setup, operation="collect_network_stats")
     _upload(client, agent_token, str(running_session.id))
     _upload(client, agent_token, str(running_session.id), size_bytes="1")
     text = json.dumps([row.details for row in session.scalars(select(AuditLog))])
