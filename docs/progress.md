@@ -13,7 +13,7 @@
 | *Increment* aktif | **1 selesai** (irisan tegak minimum, tag `v0.40`). Berikutnya **2** |
 | Milestone aktif | **`v0.45`** berjalan (`feature/v0.45`; `docs/dev/v0.45.md` masih draf, belum `/plan-milestone`). `v0.40` tercapai (tag `v0.40`) |
 | Kartu terakhir | **`v0.45.8`** (2026-10-04) |
-| Kartu berikutnya | Commit `fix` G1-B8 → `not_evaluated` [v0.45.8], lalu `/card v0.45.9` (Tier-2 G1 formatif 3 ulangan; AVD #1 + snapshot `clean`; kartu terakhir milestone → `/finish-branch`, lalu persetujuan `/milestone v0.45`). Satu kartu per "mulai" |
+| Kartu berikutnya | **Sesi baru, di `feature/v0.45`, berurutan:** revisi `v0.30.5` → revisi `v0.45.5` → commit `fix` G1-B8 [v0.45.8] → `/card v0.45.9` (Tier-2 G1 formatif 3 ulangan; AVD #1 + snapshot `clean`; kartu terakhir milestone → `/finish-branch`, lalu persetujuan `/milestone v0.45`). Satu kartu per "mulai" |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30`, `v0.40` (2026-10-02)
@@ -146,6 +146,10 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - 2026-10-04 — REF §TIER2: kosakata `actual_result` + pemetaan ke status §11.1 (`not_observed` → `unavailable`, batas platform
   413 → `failed` + alasan, `not_evaluated` di luar hitungan). G1-B8 `not_evaluated` sampai v0.80 (atribusi); runner `.8` diperbaiki
   lewat commit `fix [v0.45.8]` sebelum `.9`. `v0.80.9`: S-B utamakan APK ≤ 50 MiB.
+- 2026-10-05 — APK besar & Play Store: unggah streaming, batas 8 GiB per berkas (revisi `v0.30.5`); split APK, timeout per part,
+  pindai string semua entri, artefak konteks `native_libs`/`api_refs` tanpa fakta (revisi `v0.45.5`). Baris 50 MiB `v0.80.9` dicabut;
+  laporan `v1.00.1` memuat artefak konteks terpisah. Fakta dari indikator statis (AMD-01) dan obfuskasi/string terenkripsi (AMD-02) =
+  kandidat amandemen di `docs/core_deviations.md`. RE & analisis dinamis berinstrumen tidak ditambahkan (S-C statis saja, tanpa akar).
 
 ## Keputusan / aksi user yang tertunda
 
@@ -212,4 +216,6 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 
 ## Catatan diagram / naskah
 
-- (kosong)
+- BAB III (batasan): analisis statis tidak membaca isi kode native, string terenkripsi, kode yang diunduh saat berjalan, dan konten
+  unduhan game di luar APK → `UNKNOWN`, tidak pernah `FALSE`; keberadaan library native & API pemuat kode hanya artefak konteks.
+- BAB V (saran): reverse engineering mendalam dan analisis dinamis berinstrumen (di luar batas tanpa akar & S-C statis saja).

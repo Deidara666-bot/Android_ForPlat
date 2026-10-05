@@ -32,3 +32,12 @@ REF disinkronkan di `/plan-milestone` berikutnya; sampai itu entri ini yang berl
 | DEV-03 | §S.1 vs §R | password `DATABASE_URL` = `password` | `local-dev-only` | tidak cocok dengan role §R | — | 2026-09-26 |
 | DEV-04 | §E, §G.5 | Platform-Tools `37.0.0` | `37.0.1` | terpasang; `docs/smoke/v0.05.md` | 3.3: versi terpasang | 2026-10-01 |
 | DEV-05 | contoh core vs §Y.3.1a | `permission_observed_granted`, `accessibility_service_observed_enabled`, `overlay_permission_observed_active` | katalog §Y.3.1a (REF §EVT) | contoh ilustratif; katalog normatif | — | 2026-09-26 |
+
+## Kandidat amandemen (substansi, belum disetujui)
+
+Dikumpulkan untuk satu amandemen core sebelum BAB III final atau freeze `v0.90.2`; bahas dengan pembimbing.
+
+| ID | Usul | Menyentuh | Catatan | Dicatat |
+|---|---|---|---|---|
+| AMD-01 | Fakta dari artefak konteks statis: library native, referensi API pemuat kode dinamis | katalog `event_type` §Y.3.1a, YAML APKF, KB (mis. MITRE ATT&CK Mobile "Download New Code at Runtime", "Native API") | artefak sudah ada (`v0.45.5` revisi), belum dipakai aturan | 2026-10-05 |
+| AMD-02 | Indikator obfuskasi & string terenkripsi | katalog `event_type`, `D-6` | butuh heuristik berambang → bertentangan `D-6` kecuali dibuka | 2026-10-05 |

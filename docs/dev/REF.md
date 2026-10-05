@@ -244,8 +244,9 @@ backend→agent `job` = `{type, session_id, sequence, operation, case_id, device
   (+ `availability_status`, `availability_reason` mulai v0.30.6; + `raw_source` mulai v0.45.6). Backend mencocokkan lewat `(session_id, sequence)`.
 - `part` = urutan perintah dalam satu operasi (REF §OPS2), mulai 1; v0.30: `part = parts_total = 1`.
 - Mulai v0.45.6: semua part dijalankan, masing-masing tepat satu status. Part yang bergantung pada part sebelumnya
-  (`pull_subject_apk` part ≥ 2) tanpa prasyarat `acquired` → `failed`, alasan `prasyarat part <n> tidak diperoleh`,
-  perintahnya tidak dijalankan. Operasi selesai saat `part == parts_total`; `failed` bila ada part bukan `acquired`.
+  (`pull_subject_apk`: part APK butuh part 1; part bundel butuh **semua** part APK) tanpa prasyarat `acquired` → `failed`,
+  alasan `prasyarat part <n> tidak diperoleh`, perintahnya tidak dijalankan. Operasi selesai saat `part == parts_total`;
+  `failed` bila ada part bukan `acquired`. `parts_total` boleh berbeda per sesi (`pull_subject_apk`: jumlah split).
 Bita bukti **selalu** lewat `POST /api/evidence/upload`, tidak pernah WebSocket.
 
 ## §SVC — nama layanan (§X)
@@ -266,6 +267,8 @@ Bita bukti **selalu** lewat `POST /api/evidence/upload`, tidak pernah WebSocket.
 
 `backend/var/evidence/` (EVIDENCE_ROOT) · `agent/var/raw/` (bukti mentah sisi agen sebelum unggah).
 Nama berkas bukti disusun server/agen dari `<session_id>/<sequence>-<operation_id>-<part>.bin`, ⛔ bukan dari input.
+Unggah: batas per berkas `MAX_UPLOAD_BYTES` = 8 GiB (`backend/app/core/constants.py`); streaming ke karantina
+`EVIDENCE_ROOT/.incoming/` → banding hash → pindah tanpa menimpa (v0.30.5 revisi).
 
 ## §FIX — fixture sintetis (dipakai test; aman di-commit)
 
@@ -311,8 +314,8 @@ Satu operasi boleh menjalankan beberapa perintah berurutan → satu berkas bukti
 | | 2 | `shell dumpsys activity activities` | `dumpsys activity` | |
 | | 3 | `shell ps -A -o PID,UID,USER,NAME` | `ps` | |
 | `pull_subject_apk` | 1 | `shell pm path <pkg>` | `pm path` | v0.45 |
-| | 2 | `pull <path> <berkas lokal agen>` — `<path>` dari keluaran part 1 milik agen sendiri, regex `^/(data/app\|system\|product\|system_ext)/[^\s]+\.apk$`; ⛔ path dari backend | `apk file` | |
-| | 3..n | ekstraktor §STATIC atas APK hasil part 2 (dijalankan agen) | `static:<nama berkas>` | |
+| | 2..1+S | `pull <path> <berkas lokal agen>`, satu part per baris `pm path` (S = jumlah berkas APK; `base.apk` dulu, lalu split urut nama) — `<path>` dari keluaran part 1 milik agen sendiri, regex `^/(data/app\|system\|product\|system_ext)/[^\s]+\.apk$`, ⛔ segmen `..`; ⛔ path dari backend | `apk file:<nama berkas>` | |
+| | 2+S.. | 9 berkas ekstraktor §STATIC atas set APK part 2..1+S (dijalankan agen) | `static:<nama berkas>` | |
 | `collect_sensitive_provider_data` | 1 | `shell content query --uri content://sms` | `content sms` | v0.70 |
 | | 2 | `shell content query --uri content://contacts/phones` | `content contacts` | |
 | | 3 | `shell content query --uri content://call_log/calls` | `content call_log` | |
@@ -323,24 +326,28 @@ Satu operasi boleh menjalankan beberapa perintah berurutan → satu berkas bukti
 
 ## §STATIC — ekstraktor APK statis `[plan]` (K2 di MAP)
 
-Logika: `agent/src/static_analysis/extractor.py` `extract(apk, out_dir) -> list[Path]` (urutan tabel di bawah);
-CLI pembungkus untuk VM S-C: `scripts/static/extract_apk.py <apk> <folder_keluar>`. Python stdlib + alat SDK
-(list argumen, ⛔ shell), ⛔ memasang/menjalankan APK.
+Logika: `agent/src/static_analysis/extractor.py` `extract(apks, out_dir) -> list[Path]` (`apks` = `base.apk` dulu lalu split;
+urutan tabel di bawah); CLI pembungkus untuk VM S-C: `scripts/static/extract_apk.py <apk…> <folder_keluar>`. Python stdlib +
+alat SDK (list argumen, ⛔ shell), ⛔ memasang/menjalankan APK. Berkas dibaca bertahap (⛔ seluruh entri ke memori).
 Build-tools dicari dari `ANDROID_SDK_ROOT` → `ANDROID_HOME` → `%LOCALAPPDATA%/Android/Sdk`, versi 36.x.
-Di `pull_subject_apk`, 7 berkas ini = part 3..9 (`raw_source` `static:<nama>`), `parts_total = 9`.
+Di `pull_subject_apk`, 9 berkas ini = part `2+S..`, `raw_source` `static:<nama>`. Timeout per part: `adb pull` dan alat SDK
+1800 s, perintah lain 60 s (`agent/src/device/adb_commands.py`).
 
 | Berkas bundel | Isi |
 |---|---|
-| `apk.sha256` | SHA-256 APK (hex) |
-| `badging.txt` | `aapt2 dump badging <apk>` |
-| `permissions.txt` | `aapt2 dump permissions <apk>` |
-| `manifest.txt` | `aapt2 dump xmltree --file AndroidManifest.xml <apk>` |
-| `certs.txt` | `apksigner verify --print-certs <apk>` (gagal verifikasi tetap dicatat) |
-| `strings_urls.txt` | URL/domain/IP dari `classes*.dex` + `res/`, regex, urut unik, maks 5000 baris |
-| `bundle.json` | `{apk_sha256, extractor_version, tool_versions, created_at, files:{nama: sha256}}` |
+| `apk.sha256` | baris `<sha256>  <nama berkas>` per APK, `base.apk` dulu; identitas = `base.apk` |
+| `badging.txt` | `aapt2 dump badging <base.apk>` |
+| `permissions.txt` | `aapt2 dump permissions <base.apk>` |
+| `manifest.txt` | `aapt2 dump xmltree --file AndroidManifest.xml <base.apk>` |
+| `certs.txt` | `apksigner verify --print-certs <base.apk>` (gagal verifikasi tetap dicatat) |
+| `strings_urls.txt` | URL/IP dari **semua entri** semua APK (dex, `lib/*.so`, `assets/`, `res/`, …), regex, urut unik, maks 5000 baris; tiap entri dipindai maks 256 MiB pertama |
+| `native_libs.txt` | baris `<apk>\t<entri lib/<abi>/*.so>\t<ukuran>\t<sha256>` — artefak konteks, tanpa fakta |
+| `api_refs.txt` | baris `<apk>\t<entri dex>\t<descriptor>` untuk descriptor tertutup: `Ldalvik/system/DexClassLoader;`, `Ldalvik/system/InMemoryDexClassLoader;`, `Ldalvik/system/PathClassLoader;`, `Ldalvik/system/DelegateLastClassLoader;` — artefak konteks, tanpa fakta |
+| `bundle.json` | `{apk_sha256 (base), apks:{nama: sha256}, extractor_version, tool_versions, created_at, files:{nama: sha256}, scan:{entri_terpotong:[…]}}` |
 
-- S-A/S-B: dijalankan agen setelah `pull_subject_apk` (keluaran jadi bukti part 3..9). APK > 50 MiB → unggah part 2
-  ditolak (413) → `failed`, dicatat apa adanya.
+- Artefak `native_libs`/`api_refs` = "APK memuat/mereferensikan …" (konteks untuk pemeriksa). ⛔ Fakta, ⛔ dipakai mesin aturan,
+  ⛔ dibaca sebagai "kode diunduh/dijalankan". Menjadikannya fakta = kandidat amandemen (`docs/core_deviations.md`).
+- S-A/S-B: dijalankan agen setelah `pull_subject_apk`. Berkas APK > `MAX_UPLOAD_BYTES` → unggah ditolak (413) → `failed`, apa adanya.
 - S-C: dijalankan **di VM terisolasi** oleh user; hanya folder bundel (tanpa APK) yang diimpor lewat
   `POST /api/static-bundles` (v0.90). Keluaran `evidence_mode = apk_static`.
 
@@ -363,6 +370,7 @@ di sesi itu; **subjek** = hanya `parameters.package_name` sesi itu. Sumber = ses
 | `activity_observed_resumed` | `collect_usage_state` · `dumpsys activity` | perangkat | — |
 | `process_observed_running` | `collect_usage_state` · `ps` | perangkat | — |
 | fakta dari bundel statis | `pull_subject_apk` · `static:<nama>` | subjek | action vocab tidak dideklarasikan |
+| — (artefak konteks saja) | `pull_subject_apk` · `static:native_libs.txt`, `static:api_refs.txt` | subjek | — |
 
 - Tanpa baris `evidence` untuk part itu → `not_acquired`; status bukan `acquired` → `availability_<status>`;
   ada artefak `failed` → `parse_incomplete`. FALSE hanya bila `acquired` + semua artefak `parsed`/`empty`.
@@ -388,7 +396,7 @@ di sesi itu; **subjek** = hanya `parameters.package_name` sesi itu. Sumber = ses
 - Status per artefak per lingkungan (per subjek): hitung ulangan `observed` → 3/3 = konsisten · 1–2/3 = `CONDITIONAL` ·
   0/3 = dipilah §11.1 `unavailable`/`denied`/`unsupported`/`failed` + alasan (⛔ tidak diciutkan, ⛔ label lain):
   `not_observed` → `unavailable` (sumber terakses, datum tidak muncul); `parse_incomplete` → `failed`.
-  Batas platform (mis. unggah > 50 MiB, HTTP 413) → `failed` + alasan "batas platform", bukan sifat perangkat; artefak dinilai
+  Batas platform (mis. unggah > `MAX_UPLOAD_BYTES`, HTTP 413) → `failed` + alasan "batas platform", bukan sifat perangkat; artefak dinilai
   dari subjek lain bila ada. Ringkasan di `docs/tier2_<profile>.md`.
 - `not_evaluated` tidak masuk hitungan 3/3–0/3; dilaporkan terpisah dengan alasan dan kartu yang menilainya.
   G1-B8 = `not_evaluated` sampai atribusi boot/package-event divalidasi (v0.80, simulator); ketersediaan sumbernya = G1-A10.
