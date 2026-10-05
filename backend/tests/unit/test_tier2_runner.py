@@ -386,3 +386,27 @@ def test_the_generic_apk_file_part_of_a_failed_path_query_counts_for_g1_a3(
     assert runner_labels == ["apk file"]
     assert runner.expand_source([], "apk file:*") == ["apk file"]
     assert runner.expand_source([{"raw_source": "apk file:b.apk"}], "pm path") == ["pm path"]
+
+
+def test_g1_b8_is_never_judged_even_when_usage_events_are_present(tmp_path: Path) -> None:
+    api = FakeApi()
+    code, output = _run(tmp_path, api, Recorder(), "--reps", "1", "--subject", "com.android.stk")
+    assert code == 0
+    by_id = {r["artifact_id"]: r for r in _rows(output)}
+    assert by_id["G1-A10"]["actual_result"] == "observed"  # the same source, availability only
+    assert by_id["G1-B8"]["actual_result"] == "not_evaluated"
+    assert by_id["G1-B8"]["availability_status"] == "acquired"
+    assert "not evaluated" in by_id["G1-B8"]["test_action"]
+
+
+def test_g1_b8_stays_not_evaluated_when_its_source_is_not_acquired(tmp_path: Path) -> None:
+    api = FakeApi()
+    api.status_overrides = {"dumpsys usagestats": "denied"}
+    code, output = _run(tmp_path, api, Recorder(), "--reps", "1", "--subject", "com.android.stk")
+    assert code == 0
+    by_id = {r["artifact_id"]: r for r in _rows(output)}
+    assert by_id["G1-A10"]["actual_result"] == "denied"
+    assert (by_id["G1-B8"]["actual_result"], by_id["G1-B8"]["availability_status"]) == (
+        "not_evaluated",
+        "denied",
+    )

@@ -70,6 +70,8 @@ DEFAULT_SUBJECTS = ("com.android.settings", "com.android.stk")
 SUPPORTED_PROFILES = ("tier2_g1",)
 KNOWN_PROFILES = ("tier2_g1", "tier2_g2g3", "tier2_confirm")
 NOT_ACQUIRED = "not_acquired"
+# Tier-2 cannot judge this artifact yet (REF §TIER2): reported apart, never counted in 3/3-0/3.
+NOT_EVALUATED = "not_evaluated"
 SDK_PROPERTY = "ro.build.version.sdk"
 DEFAULT_SESSION_TIMEOUT = 900
 SETTLE_SECONDS = 5
@@ -131,8 +133,8 @@ TIER1: tuple[Tier1, ...] = (
           (_PKG,), "current", "read the subject's package record", "receivers"),
     Tier1("G1-B8", "observed boot / package-event execution", "collect_usage_state", (_USAGE,),
           "historical limited",
-          "read usage events (source availability only; boot or package-event attribution "
-          "is not evaluated)", "usage_events"),
+          "read usage events (source availability is G1-A10; boot or package-event attribution "
+          "is not evaluated until v0.80)", NOT_EVALUATED),
 )
 
 
@@ -395,7 +397,10 @@ def artifact_row(
             actual = "parse_incomplete"
         else:
             merged = [a for p in parts for a in p.artifacts]
-            actual = "observed" if CHECKS[tier1.check](merged) else "not_observed"
+            judged = tier1.check != NOT_EVALUATED and CHECKS[tier1.check](merged)
+            actual = "observed" if judged else "not_observed"
+    if tier1.check == NOT_EVALUATED:
+        actual = NOT_EVALUATED  # whatever the source returned, there is nothing to judge it by
     times = [p.acquired_at for p in parts if p.acquired_at]
     return {
         "availability_status": status,
