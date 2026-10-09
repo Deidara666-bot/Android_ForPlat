@@ -3,7 +3,7 @@
 > Papan status hidup. **Satu-satunya file kendali yang diperbarui tiap sesi** (lewat `/card` dan `/wrap-up`).
 > Aturan tetap di `CLAUDE.md` dan `.claude/`; rencana di `docs/dev/`. Tanggal format `YYYY-MM-DD`.
 
-**Terakhir diperbarui:** 2026-10-04
+**Terakhir diperbarui:** 2026-10-09
 
 ## Posisi saat ini
 
@@ -13,7 +13,7 @@
 | *Increment* aktif | **1 selesai** (irisan tegak minimum, tag `v0.40`). Berikutnya **2** |
 | Milestone aktif | **`v0.45`** berjalan (`feature/v0.45`; `docs/dev/v0.45.md` masih draf, belum `/plan-milestone`). `v0.40` tercapai (tag `v0.40`) |
 | Kartu terakhir | **`v0.45.9`** (2026-10-05) — kartu terakhir milestone `v0.45` |
-| Kartu berikutnya | Persetujuan user untuk `/milestone v0.45` (tag belum dibuat); lalu `v0.50` lewat `/plan-milestone` bila drafnya perlu disegarkan |
+| Kartu berikutnya | Sebelum tag: housekeeping CSV `adb_version` + revisi `v0.45.1` → `.2` → `.7` (lingkup pengguna 0, branch `fix/*`); lalu persetujuan user `/milestone v0.45`; `v0.50` lewat `/plan-milestone` bila drafnya perlu disegarkan |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30`, `v0.40` (2026-10-02)
@@ -154,6 +154,11 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
   pindai string semua entri, artefak konteks `native_libs`/`api_refs` tanpa fakta (revisi `v0.45.5`). Baris 50 MiB `v0.80.9` dicabut;
   laporan `v1.00.1` memuat artefak konteks terpisah. Fakta dari indikator statis (AMD-01) dan obfuskasi/string terenkripsi (AMD-02) =
   kandidat amandemen di `docs/core_deviations.md`. RE & analisis dinamis berinstrumen tidak ditambahkan (S-C statis saja, tanpa akar).
+- 2026-10-09 — Lingkup pengguna Android 0 (temuan review `v0.45` butir 9, opsi 2): subjek = paket di pengguna 0 (REF §COV);
+  `installed` pengguna 0 ≠ `true` → tanpa fakta identitas & negatif dari dump; pengguna lain hanya konteks `other_users_installed`.
+  Revisi `v0.45.1`/`.2`/`.7` sebelum tag `v0.45`; teks `v0.60.2` (`coverage_incomplete`), `v0.90.7`/`.8` (`pm list users`), `v1.00.1`.
+  Penilaian per pengguna tidak dibangun (butuh amandemen `subject_binding`). CSV G1: runner simpan baris pertama `adb version`,
+  kolom `adb_version` CSV lama disanitasi (housekeeping, repo privat).
 
 ## Keputusan / aksi user yang tertunda
 
@@ -184,6 +189,7 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 ## Data OPEN (jangan ditebak — isi hanya dari hasil nyata)
 
 - [ ] Versi Android/API aktual Samsung Galaxy A10 → API AVD kedua (kartu v0.90.7, dipindah dari v0.05.5)
+- [ ] Daftar pengguna Android di Galaxy A10 (`pm list users`, v0.90.7)
 - [x] Perangkat lunak virtualisasi desktop yang dipakai → **WHPX** (Windows 11 Home, tanpa Hyper-V), diverifikasi
       `emulator -accel-check` 2026-09-30.
 - [x] Perintah ADB final G1 untuk API 36 → `docs/tier2_g1.md` (2026-10-05). Versi Android lain: belum (v0.90.8)
@@ -226,3 +232,5 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - BAB III (batasan): analisis statis tidak membaca isi kode native, string terenkripsi, kode yang diunduh saat berjalan, dan konten
   unduhan game di luar APK → `UNKNOWN`, tidak pernah `FALSE`; keberadaan library native & API pemuat kode hanya artefak konteks.
 - BAB V (saran): reverse engineering mendalam dan analisis dinamis berinstrumen (di luar batas tanpa akar & S-C statis saja).
+- BAB III (batasan): penilaian subjek untuk pengguna Android 0; subjek di pengguna lain (Dual Messenger, Secure Folder, profil kerja)
+  hanya dideteksi, tidak dinilai. BAB V (saran): penilaian per pengguna.

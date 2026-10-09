@@ -375,6 +375,13 @@ di sesi itu; **subjek** = hanya `parameters.package_name` sesi itu. Sumber = ses
 - Tanpa baris `evidence` untuk part itu → `not_acquired`; status bukan `acquired` → `availability_<status>`;
   ada artefak `failed` → `parse_incomplete`. FALSE hanya bila `acquired` + semua artefak `parsed`/`empty`.
 - Fakta negatif hanya untuk subjek sesi, ⛔ untuk paket inventaris lain.
+- Lingkup pengguna `[plan]` (2026-10-09): subjek = paket di **pengguna Android 0**; TRUE/FALSE berlaku untuk pengguna 0.
+  Dump paket: izin runtime & `installed` dari blok `User 0:`; `settings secure`/`appops` = pengguna aktif (0 di lingkungan uji).
+  `installed` pengguna 0 ≠ `true` (`false`/tak terbaca) → tanpa `package_observed_installed`/`uid_observed` dan tanpa negatif dari
+  dump; fakta deklaratif APK tetap. Pengguna lain (`User N:` `installed=true`, N≠0) hanya konteks `other_users_installed`:
+  ⛔ dinilai, ⛔ `failed` bila bentuknya tak dikenal.
+- Cakupan lengkap tetapi tanpa fakta negatif untuk nilai sasaran (overlay `default`, `installed` ≠ `true`) → UNKNOWN
+  `coverage_incomplete` (v0.60.2), ⛔ FALSE.
 
 ## §TIER2 — protokol Tier-2 lewat agen (§11.1) `[plan]`
 
