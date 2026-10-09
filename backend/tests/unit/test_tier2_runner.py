@@ -410,3 +410,21 @@ def test_g1_b8_stays_not_evaluated_when_its_source_is_not_acquired(tmp_path: Pat
         "not_evaluated",
         "denied",
     )
+
+
+def test_only_the_first_line_of_adb_version_is_kept() -> None:
+    raw = (
+        "Android Debug Bridge version 1.0.41\n"
+        "Version 37.0.1-15733141\n"
+        "Installed as C:\\Users\\someone\\Sdk\\platform-tools\\adb.exe\n"
+        "Running on Windows 10.0.26200 (x86_64)\n"
+    )
+    assert runner.first_line(raw) == "Android Debug Bridge version 1.0.41"
+    assert runner.first_line("") == "unknown"
+
+
+def test_the_committed_result_files_carry_no_local_path() -> None:
+    results = _ROOT / "experiments" / "feasibility_tier2" / "results"
+    for path in results.glob("*.csv"):
+        text = path.read_text(encoding="utf-8")
+        assert "Installed as" not in text and "\\Users\\" not in text, path.name
