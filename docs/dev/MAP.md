@@ -71,7 +71,7 @@ fakta negatif eksplisit; status Tier-2 G1 formatif di AVD #1 (K6).
 1. `KB_Source` + `knowledge_base/data/sources.yaml` (11 entri §12.1) + loader/validator.
 2. Lima `family.yaml` **disalin apa adanya** dari `01_BREAKDOWN` §14.2 + model `RuleMetadata`, `RuleReference`, `RuleElementReference`.
 3. **Kontrak §Z.0/§Y.3.3/§Y.3.3a** — validasi saat muat: field wajib, `profile_id` unik, `fact` ∈ katalog & kelas =
-   `expects_epistemic_class`, `reference_ids` resolve, `any_of` setara, larangan override, `validation_only`.
+   `expects_epistemic_class`, `reference_ids` resolve, `any_of`/override ditolak skema (baseline), `validation_only`.
 4. Siklus status + `content_hash` (dev: `design_baseline`/`authoring_candidate`; holdout: hanya `frozen_for_holdout` + manifest).
 5. Test "YAML rusak → gagal dimuat" untuk tiap aturan + rute baca aturan/KB → tag.
 
