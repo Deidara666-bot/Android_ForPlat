@@ -11,9 +11,9 @@
 |---|---|
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **1 selesai** (irisan tegak minimum, tag `v0.40`). Berikutnya **2** |
-| Milestone aktif | **`v0.45`** berjalan (`feature/v0.45`; `docs/dev/v0.45.md` masih draf, belum `/plan-milestone`). `v0.40` tercapai (tag `v0.40`) |
+| Milestone aktif | **`v0.45`** selesai dikerjakan di `main` (revisi lingkup pengguna 0 sudah masuk), **tag `v0.45` menunggu persetujuan user**. `v0.40` tercapai (tag `v0.40`) |
 | Kartu terakhir | **`v0.45.9`** (2026-10-05) — kartu terakhir milestone `v0.45` |
-| Kartu berikutnya | Sebelum tag: housekeeping CSV `adb_version` + revisi `v0.45.1` → `.2` → `.7` (lingkup pengguna 0, branch `fix/*`); lalu persetujuan user `/milestone v0.45`; `v0.50` lewat `/plan-milestone` bila drafnya perlu disegarkan |
+| Kartu berikutnya | Persetujuan user untuk `/milestone v0.45` (tag belum dibuat); lalu `v0.50` lewat `/plan-milestone` bila drafnya perlu disegarkan |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30`, `v0.40` (2026-10-02)
@@ -207,6 +207,9 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - [ ] Bentuk deployment final (VPS) dan distribusi agen
 
 ## Sinkronisasi remote
+
+- 2026-10-09 — `/finish-branch fix/user0-scope`: digabung `--no-ff` ke `main`, `check.sh all` OK di `main`, push GitHub. `claim-auditor`: 0 blocking (`forensic-integrity-reviewer` tidak dijalankan: diff tak menyentuh `agent/`, API, penyimpanan bukti, `.env`). Branch `fix/user0-scope` dan `feature/v0.05`–`v0.45`, `fix/*` lain belum dihapus (menunggu persetujuan user). Tag `v0.45` belum terbit.
+  Catatan non-blocking review `fix/user0-scope`, TIDAK dikerjakan: (1) fakta `sensitive_communication_capability_observed_granted` dari dump tidak dijaga `installed_user0` (paket ber-shared-UID yang `installed=false` untuk pengguna 0 masih bisa menghasilkannya dari blok `Shared users:` → `User 0:`, berlabel `android_user: 0`); REF §COV hanya menyebut identitas dan negatif — perlu keputusan Planning (jaga juga cabang granted, atau catat sengaja) · (2) `subject_uid` fakta deklaratif tetap terisi saat `installed_user0` bukan `true` (pengikatan subjek `v0.60` jangan membacanya sebagai bukti keberadaan di pengguna 0) · (3) `CoverageService.can_be_false` tak tahu `installed_user0` (ditangani `v0.60.2` `coverage_incomplete`; pastikan ada test di sana) · (4) pesan `parse_note` "blok 'User 0:' tidak ada" menimpa catatan lain.
 
 - 2026-10-05 — `/finish-branch v0.45`: `feature/v0.45` digabung `--no-ff` ke `main` (`b9c1a12`), `check.sh all` OK di `main`, push GitHub sukses. Reviewer `claim-auditor` + `forensic-integrity-reviewer`: 0 blocking. Branch `feature/v0.05`–`v0.45` dan `fix/*` belum dihapus (menunggu persetujuan user). Tag `v0.45` belum terbit.
   Catatan non-blocking review `v0.45`, TIDAK dikerjakan: (1) sisa `.incoming/` bila proses mati + berkas final tanpa baris `evidence` bila commit gagal (tanpa pembersih/rekonsiliasi) · (2) `Content-Length` hanya melindungi klien jujur; `Transfer-Encoding: chunked` tetap di-spool Starlette ke disk dulu · (3) jendela izin sebelum `chmod 0o444` (karantina dibuat dengan izin bawaan) · (4) `write_csv` `os.replace` bisa menimpa hasil dari run paralel · (5) CSV `tier2_g1_avd1-api36.csv` memuat path lokal Windows di kolom `adb_version` (baris "Installed as …") · (6) regex path APK `[^\s]+` longgar (aman karena list argumen) · (7) pull: `exists()` lalu tulis (TOCTOU kecil), berkas agen tak `chmod` read-only · (8) berkas bundel dibaca penuh (kecil) · (9) negatif izin hanya dari blok `User 0:` tanpa mencatat user · (10) paket vs shared-user `granted` bisa bertentangan → negatif keliru mungkin · (11) `native_libs`/`api_refs` di `PARTS` melapor `can_be_false=true` (tak ada fakta yang memakainya; usul bendera context-only) · (12) subjek proses dari bentuk nama (pengikatan v0.60 lewat inventaris) · (13) `EvidenceMode`/`UnknownReason` perlu dipastikan disetujui REF §ENUM2 · (14) `event_time` usage memakai satu zona sesi untuk 24 jam.
