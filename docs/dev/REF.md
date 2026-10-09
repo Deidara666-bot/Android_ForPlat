@@ -449,10 +449,10 @@ dan hanya bila sumbernya `acquired` + terurai penuh untuk subjek itu (v0.45.6).
 
 | Tabel | Kolom | Lahir |
 |---|---|---|
-| `kb_sources` | id (teks `KB-…`), title, publisher, url, accessed_at, extracted_claim, version_scope, reference_role, quality_note, verification_status, active | v0.50 |
+| `kb_sources` | id (teks `KB-…`), title, publisher, url, accessed_at, extracted_claim, version_scope NULL, reference_role, quality_note NULL, verification_status, active | v0.50 |
 | `rule_metadata` | id, family_id, profile_id NULL (baris keluarga), version, status, applicability JSONB, claim_level NULL, incident_scope, content_hash, source_path*, loaded_at* | v0.50 |
 | `rule_references` | rule_metadata_id, source_id (PK gabungan) | v0.50 |
-| `rule_element_references` | id, rule_metadata_id, rule_element_key, source_id, reference_role, extracted_claim, version_scope, verification_status | v0.50 |
+| `rule_element_references` | id, rule_metadata_id, rule_element_key, source_id, reference_role, extracted_claim, version_scope NULL, verification_status | v0.50 |
 | `correlation_runs`* | id, case_id, evidence_mode, run_purpose, window_start NULL, window_end NULL, subjects JSONB, rule_set_hash, kb_hash, code_commit, created_at | v0.60 |
 | `rule_family_evaluations` | id, correlation_run_id, family_id, rule_metadata_id*, subject_package*, subject_uid*, evidence_mode, run_purpose, outcome, matched_profile_ids JSONB, interpretation_status, reason NULL | v0.60 |
 | `rule_profile_evaluations` | id, correlation_run_id, family_evaluation_id*, rule_id (→ rule_metadata), profile_id, subject_package*, subject_uid*, evidence_mode, run_purpose, evaluation_status, outcome NULL, interpretation_status, reason NULL, evaluated_at | v0.60 |
@@ -473,6 +473,27 @@ dan hanya bila sumbernya `acquired` + terurai penuh untuk subjek itu (v0.45.6).
 - `backend/app/research/rules/data/apk_fraud/APKF-K0N/family.yaml` — **salin apa adanya** blok YAML
   `01_BREAKDOWN` §14.2.N (buka hanya seksi itu: `grep -n "^### 14.2" context/01_BREAKDOWN_*.md`).
 - Batas perubahan & commit: `.claude/rules/rules-kb-yaml.md` + skill `/rule-change`.
+- `sources.yaml` `[plan]` (2026-10-09): `title`/`publisher` dari kolom "Sumber primer" §12.1 (`Android Developers` · `MITRE ATT&CK`);
+  `extracted_claim` = kolom "Peran/label baku"; `version_scope`, `quality_note` = `null` + `# TODO(open-data)` (kunci tetap ada),
+  diisi USER di `v0.90.2`; loader `holdout` menolak NULL (`kb_incomplete`).
+- Sintaks baseline = kunci yang dipakai §14.2, ⛔ lainnya (skema `extra="forbid"`):
+  - `reference_ids` keluarga wajib, tidak kosong; kondisi **opsional** (9 dari 55 kondisi §14.2 tanpa), bila ada: tidak kosong,
+    tanpa duplikat, resolve ke `kb_sources.active`. Rujukan tingkat profil/`limitations` tidak ada.
+  - `any_of` dan override `reference_role` per elemen: **tidak didukung** (core tidak mendefinisikan bentuknya, §14.2 tidak
+    memakai) → `schema_invalid`. Dibutuhkan saat authoring → keputusan planning (bentuk + semantik v0.60) sebelum freeze.
+  - Parameter operator: `exists`, `overlaps_window` → tanpa parameter; `equals`, `greater_than`, `delta_greater_than` → `field` + `value`;
+    `in` → `field` + `values` (tidak kosong).
+- `RuleLoadError(code, path)` — kode tertutup; `ValidationError` skema dibungkus jadi `schema_invalid`:
+
+| Pelanggaran | `code` |
+|---|---|
+| struktur, field wajib hilang, field asing (termasuk `any_of`, override role, `unknown_handling`/`conflict_handling` di profil), tipe/enum salah | `schema_invalid` |
+| `profile_id` duplikat global · tidak berawalan `family_id` | `duplicate_profile_id` · `profile_id_prefix` |
+| `fact` ∉ katalog · kelas katalog ≠ `expects_epistemic_class` | `unknown_fact` · `epistemic_class_mismatch` |
+| parameter operator kurang/berlebih/kosong | `operator_parameters` |
+| `reference_ids` keluarga kosong atau kondisi `[]` · ID duplikat · ID tak resolve ke KB aktif | `reference_ids_empty` · `reference_ids_duplicate` · `reference_unresolved` |
+| `validation_only: true` dengan `production` atau `apk_static` | `validation_only_scope` |
+| status tak diizinkan `run_purpose` (v0.50.4) · KB ber-NULL saat `holdout` · hash ≠ manifest (v0.90.2) | `status_not_allowed` · `kb_incomplete` · `manifest_mismatch` |
 
 ## §API2 — rute v0.45+
 

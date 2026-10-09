@@ -11,9 +11,9 @@
 |---|---|
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **2 selesai** (kelengkapan kelompok G1, tag `v0.45`). Berikutnya **3** (penalaran: `v0.50`–`v0.60`) |
-| Milestone aktif | `v0.45` tercapai (tag `v0.45`, 2026-10-09). Berikutnya **`v0.50`** (draf; disegarkan lewat `/plan-milestone`) |
+| Milestone aktif | `v0.45` tercapai (tag `v0.45`, 2026-10-09). Berikutnya **`v0.50`** (disegarkan 2026-10-09) |
 | Kartu terakhir | **`v0.45.9`** (2026-10-05) — kartu terakhir milestone `v0.45` |
-| Kartu berikutnya | `/plan-milestone v0.50` (mode *refresh*) di sesi Planning, lalu kartu pertama `v0.50`. Keputusan user tertunda: hapus branch lama; catatan non-blocking review `v0.45` + `fix/user0-scope` untuk Planning |
+| Kartu berikutnya | `/card v0.50.1`. Keputusan user tertunda: hapus branch lama; catatan non-blocking review `v0.45` + `fix/user0-scope` untuk Planning |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30`, `v0.40` (2026-10-02), `v0.45` (2026-10-09)
@@ -163,6 +163,10 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
   Revisi `v0.45.1`/`.2`/`.7` sebelum tag `v0.45`; teks `v0.60.2` (`coverage_incomplete`), `v0.90.7`/`.8` (`pm list users`), `v1.00.1`.
   Penilaian per pengguna tidak dibangun (butuh amandemen `subject_binding`). CSV G1: runner simpan baris pertama `adb version`,
   kolom `adb_version` CSV lama disanitasi (housekeeping, repo privat).
+- 2026-10-09 — Refresh `v0.50` (temuan dev sesi 8): `kb_sources.version_scope`/`quality_note` NULL + `TODO(open-data)`, diisi
+  `v0.90.2`, `holdout` menolak NULL (`kb_incomplete`); `reference_ids` wajib di keluarga, opsional di kondisi; `any_of` & override
+  `reference_role` tidak didukung baseline (ditolak skema); kode `RuleLoadError` tertutup di REF §YAML (`ValidationError` →
+  `schema_invalid`). Tanpa amandemen core.
 
 ## Keputusan / aksi user yang tertunda
 
@@ -194,6 +198,7 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 
 - [ ] Versi Android/API aktual Samsung Galaxy A10 → API AVD kedua (kartu v0.90.7, dipindah dari v0.05.5)
 - [ ] Daftar pengguna Android di Galaxy A10 (`pm list users`, v0.90.7)
+- [ ] `version_scope` + `quality_note` 11 `KB_Source` (`sources.yaml` `null` sejak v0.50.1; USER memeriksa sumber, v0.90.2)
 - [x] Perangkat lunak virtualisasi desktop yang dipakai → **WHPX** (Windows 11 Home, tanpa Hyper-V), diverifikasi
       `emulator -accel-check` 2026-09-30.
 - [x] Perintah ADB final G1 untuk API 36 → `docs/tier2_g1.md` (2026-10-05). Versi Android lain: belum (v0.90.8)
