@@ -377,8 +377,9 @@ di sesi itu; **subjek** = hanya `parameters.package_name` sesi itu. Sumber = ses
 - Fakta negatif hanya untuk subjek sesi, ⛔ untuk paket inventaris lain.
 - Lingkup pengguna `[plan]` (2026-10-09): subjek = paket di **pengguna Android 0**; TRUE/FALSE berlaku untuk pengguna 0.
   Dump paket: izin runtime & `installed` dari blok `User 0:`; `settings secure`/`appops` = pengguna aktif (0 di lingkungan uji).
-  `installed` pengguna 0 ≠ `true` (`false`/tak terbaca) → tanpa `package_observed_installed`/`uid_observed` dan tanpa negatif dari
-  dump; fakta deklaratif APK tetap. Pengguna lain (`User N:` `installed=true`, N≠0) hanya konteks `other_users_installed`:
+  `installed` pengguna 0 ≠ `true` (`false`/tak terbaca) → tanpa `package_observed_installed`/`uid_observed`, tanpa
+  `sensitive_communication_capability_observed_granted` (blok paket maupun shared user), dan tanpa negatif dari dump; fakta
+  deklaratif APK tetap. `subject_uid` fakta deklaratif ≠ bukti keberadaan di pengguna 0 (keberadaan hanya `package_observed_installed`). Pengguna lain (`User N:` `installed=true`, N≠0) hanya konteks `other_users_installed`:
   ⛔ dinilai, ⛔ `failed` bila bentuknya tak dikenal.
 - Cakupan lengkap tetapi tanpa fakta negatif untuk nilai sasaran (overlay `default`, `installed` ≠ `true`) → UNKNOWN
   `coverage_incomplete` (v0.60.2), ⛔ FALSE.
