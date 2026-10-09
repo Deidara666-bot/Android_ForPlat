@@ -63,6 +63,8 @@ _TABLES = {
     "Provider Resolver Table:": "provider",
 }
 _IDENTITY_TYPE = "package_identity"
+_USER_BLOCK = re.compile(r"    User (?P<user>\d+):.*")
+_INSTALLED = re.compile(r"(?<![A-Za-z])installed=(?P<value>true|false)(?![A-Za-z])")
 _REQUIRED_KEYS = ("versionCode", "versionName")
 
 
@@ -129,7 +131,7 @@ def _blocks(
 class PackageDetailParser:
     operation_id = "collect_package_detail"
     parser_name = "package_state.detail"
-    parser_version = "1"
+    parser_version = "2"
 
     def parse(self, raw: bytes) -> list[ParsedArtifact]:
         try:
@@ -243,6 +245,9 @@ class PackageDetailParser:
             raw_lines.append(keys["installerPackageName"][1])
         if first_install is not None:
             raw_lines.append(first_install)
+        installed_user0, other_users, user0_line, installed_note = self._install_state(body)
+        if user0_line is not None:
+            raw_lines.append(user0_line)
 
         signatures: list[str] = []
         if "signatures" in keys:
@@ -269,8 +274,42 @@ class PackageDetailParser:
                 "last_update_time": text_or_none("lastUpdateTime"),
                 "installer_package_name": text_or_none("installerPackageName"),
                 "signatures": signatures,
+                # Android user 0 is the examined user (REF §COV); null = not readable.
+                "installed_user0": installed_user0,
+                "other_users_installed": other_users,
             },
+            note=installed_note,
         )
+
+    @staticmethod
+    def _install_state(
+        body: list[tuple[int, str]],
+    ) -> tuple[bool | None, list[int], str | None, str]:
+        """(installed for user 0, other users with the package installed, the `User 0:` line,
+        note). Only the header line of a `User N:` block is read here, and for N != 0 only its
+        `installed=`: any other shape in those blocks is ignored, never an error."""
+        installed_user0: bool | None = None
+        user0_line: str | None = None
+        note = ""
+        others: set[int] = set()
+        for _, line in body:
+            block = _USER_BLOCK.fullmatch(line)
+            if block is None:
+                continue
+            user = int(block["user"])
+            flag = _INSTALLED.search(line)
+            if user == 0:
+                if user0_line is None:
+                    user0_line = line
+                    if flag is not None:
+                        installed_user0 = flag["value"] == "true"
+                    else:
+                        note = "baris 'User 0:' tidak memuat installed="
+            elif flag is not None and flag["value"] == "true":
+                others.add(user)
+        if user0_line is None:
+            note = "blok 'User 0:' tidak ada pada dump paket"
+        return installed_user0, sorted(others), user0_line, note
 
     @staticmethod
     def _user0(body: list[tuple[int, str]]) -> list[tuple[int, str]]:

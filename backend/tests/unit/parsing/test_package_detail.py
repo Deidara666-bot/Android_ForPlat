@@ -34,7 +34,7 @@ def test_parser_identity() -> None:
     assert (parser.operation_id, parser.parser_name, parser.parser_version) == (
         "collect_package_detail",
         "package_state.detail",
-        "1",
+        "2",
     )
 
 
@@ -62,6 +62,8 @@ def test_real_settings_identity_values() -> None:
         "last_update_time": "2026-09-30 22:53:13",
         "installer_package_name": None,  # printed as `null`, not the text "null"
         "signatures": ["b2d95fc0"],
+        "installed_user0": True,
+        "other_users_installed": [],
     }
 
 
@@ -268,3 +270,69 @@ def test_crlf_output_gives_the_same_artifacts_as_lf() -> None:
 def test_package_name_in_the_output_is_the_subject_not_a_parameter() -> None:
     rows = PackageDetailParser().parse(_SYNTHETIC_TEXT.encode("utf-8"))
     assert {r.subject_key for r in rows} == {"com.synthetic.alpha"}
+
+
+# --- per-user install state (REF §COV, Android user 0) -------------------------------------
+
+_NOT_INSTALLED = "package_detail_user0_not_installed_synthetic.txt"
+_UNREADABLE = "package_detail_user0_unreadable_synthetic.txt"
+_OTHER_USER = "package_detail_other_user_synthetic.txt"
+
+
+def _identity(name: str):  # noqa: ANN202
+    (identity,) = _of(_parse(name), "package_identity")
+    return identity
+
+
+def test_real_settings_is_installed_for_user_0_and_for_nobody_else() -> None:
+    identity = _identity(_SETTINGS)
+    assert identity.parsed_value_json["installed_user0"] is True
+    assert identity.parsed_value_json["other_users_installed"] == []
+    assert identity.parse_note == ""
+    assert "    User 0: ceDataInode=557114" in identity.raw_value  # the line is kept as evidence
+
+
+def test_installed_false_for_user_0_is_recorded_and_the_artifact_stays_parsed() -> None:
+    identity = _identity(_NOT_INSTALLED)
+    assert identity.parse_status == ParseStatus.parsed
+    assert identity.parsed_value_json["installed_user0"] is False
+    assert "installed=false" in identity.raw_value
+
+
+def test_a_user_0_line_without_installed_is_null_with_a_note_and_still_parsed() -> None:
+    identity = _identity(_UNREADABLE)
+    assert identity.parse_status == ParseStatus.parsed
+    assert identity.parsed_value_json["installed_user0"] is None
+    assert "installed=" in identity.parse_note
+    assert not [r for r in _parse(_UNREADABLE) if r.parse_status == ParseStatus.failed]
+
+
+def test_another_users_block_is_context_only_and_never_a_source_of_permissions() -> None:
+    rows = _parse(_OTHER_USER)
+    identity = _of(rows, "package_identity")[0]
+    # user 95 has the package installed; 96 does not; 97 has a shape that is not understood
+    assert identity.parsed_value_json["other_users_installed"] == [95]
+    assert identity.parsed_value_json["installed_user0"] is True
+    assert not [r for r in rows if r.parse_status == ParseStatus.failed]  # 97 is no error
+    # permissions come from user 0 only: SEND_SMS / READ_CALL_LOG appear in blocks 95 / 96
+    names = {r.parsed_value_json["name"] for r in _of(rows, "granted_permission")}
+    assert "android.permission.SEND_SMS" not in names
+    assert "android.permission.READ_CALL_LOG" not in names
+    baseline = _parse("package_detail_synthetic.txt")
+    assert Counter(r.artifact_type for r in rows) == Counter(r.artifact_type for r in baseline)
+    assert len(_of(rows, "granted_permission")) == len(_of(baseline, "granted_permission"))
+
+
+def test_other_users_are_listed_in_ascending_order() -> None:
+    text = (_FIXTURES / _OTHER_USER).read_text(encoding="utf-8")
+    text += "    User 12: ceDataInode=1 installed=true hidden=false\n"
+    identity = _of(PackageDetailParser().parse(text.encode()), "package_identity")[0]
+    assert identity.parsed_value_json["other_users_installed"] == [12, 95]
+
+
+def test_a_dump_without_any_user_block_has_a_null_install_state_and_a_note() -> None:
+    text = (_FIXTURES / "package_detail_synthetic.txt").read_text(encoding="utf-8")
+    text = "\n".join(line for line in text.splitlines() if not line.startswith("    User 0:"))
+    identity = _of(PackageDetailParser().parse(text.encode()), "package_identity")[0]
+    assert identity.parsed_value_json["installed_user0"] is None
+    assert identity.parse_note
