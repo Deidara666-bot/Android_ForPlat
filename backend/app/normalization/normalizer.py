@@ -228,6 +228,11 @@ def _normalize_detail(
 
     `firstInstallTime` / `lastUpdateTime` stay in `context_json`; they are device-local wall-clock
     text and never become `event_time`. Nothing here is a negative fact (that is v0.45.7).
+
+    The examined user is Android user 0 (REF §COV): "installed" and the UID are facts only when
+    the dump says `installed=true` for that user. Declarations (permissions asked for, components,
+    actions) describe the APK and stay either way. Identity and granted facts carry
+    `android_user: 0`; identity also lists the other users that have the package.
     """
     package = artifact.subject_key
     if not isinstance(package, str) or not package:
@@ -252,15 +257,24 @@ def _normalize_detail(
             "signatures",
         )
         extras = {key: value.get(key) for key in keys}
-        claims = [
-            ("package_observed_installed", "package_name", package),
-            ("uid_observed", "uid", str(user_id)),
-        ]
+        extras["android_user"] = 0
+        others = value.get("other_users_installed")
+        if isinstance(others, list) and others:
+            extras["other_users_installed"] = others
+        if value.get("installed_user0") is True:  # false / null / absent: not installed for user 0
+            claims = [
+                ("package_observed_installed", "package_name", package),
+                ("uid_observed", "uid", str(user_id)),
+            ]
     elif kind == _REQUESTED:
         claims = _requested_claims(_text(value, "name"))
     elif kind == _GRANTED:
         name = _text(value, "name")
-        extras = {"permission_kind": value.get("kind"), "scope": value.get("scope")}
+        extras = {
+            "permission_kind": value.get("kind"),
+            "scope": value.get("scope"),
+            "android_user": 0,
+        }
         # Only an explicit `granted: true` counts; `false` yields no fact here.
         if value.get("granted") is True and name in SENSITIVE_COMMUNICATION_PERMISSIONS:
             claims = [("sensitive_communication_capability_observed_granted", "permission", name)]
