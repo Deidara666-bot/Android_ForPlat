@@ -10,13 +10,13 @@
 | | |
 |---|---|
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
-| *Increment* aktif | **1 selesai** (irisan tegak minimum, tag `v0.40`). Berikutnya **2** |
-| Milestone aktif | **`v0.45`** selesai dikerjakan di `main` (revisi lingkup pengguna 0 sudah masuk), **tag `v0.45` menunggu persetujuan user**. `v0.40` tercapai (tag `v0.40`) |
+| *Increment* aktif | **2 selesai** (kelengkapan kelompok G1, tag `v0.45`). Berikutnya **3** (penalaran: `v0.50`–`v0.60`) |
+| Milestone aktif | `v0.45` tercapai (tag `v0.45`, 2026-10-09). Berikutnya **`v0.50`** (draf; disegarkan lewat `/plan-milestone`) |
 | Kartu terakhir | **`v0.45.9`** (2026-10-05) — kartu terakhir milestone `v0.45` |
-| Kartu berikutnya | Persetujuan user untuk `/milestone v0.45` (tag belum dibuat); lalu `v0.50` lewat `/plan-milestone` bila drafnya perlu disegarkan |
+| Kartu berikutnya | `/plan-milestone v0.50` (mode *refresh*) di sesi Planning, lalu kartu pertama `v0.50`. Keputusan user tertunda: hapus branch lama; catatan non-blocking review `v0.45` + `fix/user0-scope` untuk Planning |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
-Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30`, `v0.40` (2026-10-02)
+Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30`, `v0.40` (2026-10-02), `v0.45` (2026-10-09)
 
 ## Selesai
 

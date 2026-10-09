@@ -2,6 +2,20 @@
 
 Satu entri per tag milestone. Rincian kartu: `docs/progress.md`; bukti: `docs/smoke/`.
 
+## v0.45 — 2026-10-09
+
+Kelengkapan kelompok sumber G1 + Tier-2 formatif (AVD #1). Akhir Increment 2.
+
+- Empat operasi G1 terpetakan dan terurai: `collect_package_detail`, `collect_accessibility_state`, `collect_usage_state`, `pull_subject_apk` (satu part per berkas APK, bundel statis 9 berkas). Parser ketat: struktur tak dikenali → artefak `failed` dengan catatan, tidak diurai sebagian.
+- Fakta ternormalisasi G1 berlabel epistemik (identitas, deklarasi, kapabilitas aktif, penggunaan), semuanya `current_state` kecuali penggunaan aplikasi yang memakai zona waktu sesi; tidak ada `execution_observed` dari analisis statis.
+- Cakupan sumber per bagian (`CoverageService`, `GET /api/cases/{id}/coverage`) dan fakta negatif eksplisit: hanya untuk subjek sesi, hanya bila sumber `acquired` dan terurai penuh; selain itu UNKNOWN beserta alasan.
+- Lingkup pengguna Android 0: identitas dan negatif dari dump paket hanya bila terpasang untuk pengguna 0; pengguna lain hanya konteks (`other_users_installed`). Format blok pengguna lain diamati live di AVD #1 (fixture nyata).
+- Unggah bukti streaming lewat karantina (batas 8 GiB per berkas, hash dihitung sambil menulis, pindah tanpa menimpa); split APK dan artefak konteks `native_libs` / `api_refs` tanpa fakta.
+- Tier-2 G1 formatif, AVD #1 (API 36, 2 paket sistem, 3 ulangan dari snapshot `clean`): 15 artefak dinilai, 14 konsisten 3/3, `G1-A5` (installer) `unavailable` (sifat subjek); `G1-B8` `not_evaluated` dilaporkan terpisah. `denied` / `unsupported` tidak teramati. Ringkasan: `docs/tier2_g1.md`; data: `experiments/feasibility_tier2/results/tier2_g1_avd1-api36.csv`.
+- 680 test backend + 214 test agen; `check.sh all` OK. Review `claim-auditor` + `forensic-integrity-reviewer`: 0 blocking; catatan non-blocking di `docs/progress.md`.
+- Tidak digeneralisasi: hasil Tier-2 hanya AVD #1; lintas lingkungan di Tier-2 konfirmatif (`v0.90.8`).
+- Tag ditempatkan di `main` setelah revisi lingkup pengguna 0 digabung; AVD #1 dipakai pada verifikasi akhir.
+
 ## v0.40 — 2026-10-02
 
 Parser → Artifact → NormalizedEvent → UI. Akhir Increment 1 (irisan tegak minimum).
