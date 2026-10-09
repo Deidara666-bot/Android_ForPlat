@@ -336,3 +336,23 @@ def test_a_dump_without_any_user_block_has_a_null_install_state_and_a_note() -> 
     identity = _of(PackageDetailParser().parse(text.encode()), "package_identity")[0]
     assert identity.parsed_value_json["installed_user0"] is None
     assert identity.parse_note
+
+
+_MULTIUSER = "package_detail_settings_multiuser_api36.txt"
+
+
+def test_real_multi_user_dump_lists_the_second_user_without_reading_its_block() -> None:
+    """Real `dumpsys package com.android.settings` of AVD #1 (API 36) after `pm create-user`
+    (user 10), from the `Packages:` section to the end; no line edited."""
+    rows = _parse(_MULTIUSER)
+    assert not [r for r in rows if r.parse_status == ParseStatus.failed]
+    identity = _of(rows, "package_identity")[0]
+    assert identity.parsed_value_json["installed_user0"] is True
+    assert identity.parsed_value_json["other_users_installed"] == [10]
+    granted = _of(rows, "granted_permission")
+    assert {r.parsed_value_json["scope"] for r in granted} == {"package", "shared_user"}
+    # user 10 prints no runtime permission list, so every runtime grant belongs to user 0
+    assert all(
+        r.parsed_value_json["kind"] == "install" or r.parsed_value_json["scope"] == "shared_user"
+        for r in granted
+    )
