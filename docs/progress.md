@@ -13,7 +13,7 @@
 | *Increment* aktif | **2 selesai** (kelengkapan kelompok G1, tag `v0.45`). Berikutnya **3** (penalaran: `v0.50`–`v0.60`) |
 | Milestone aktif | `v0.45` tercapai (tag `v0.45`, 2026-10-09). Berikutnya **`v0.50`** (disegarkan 2026-10-09) |
 | Kartu terakhir | **`v0.45.9`** (2026-10-05) — kartu terakhir milestone `v0.45` |
-| Kartu berikutnya | `/card v0.50.1`. Keputusan user tertunda: hapus branch lama; catatan non-blocking review `v0.45` + `fix/user0-scope` untuk Planning |
+| Kartu berikutnya | `/card v0.45.2` (hanya R4, di `feature/v0.50`), lalu `/card v0.50.1`. Keputusan user tertunda: hapus branch lama; catatan non-blocking review `v0.45` untuk Planning |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30`, `v0.40` (2026-10-02), `v0.45` (2026-10-09)
@@ -167,6 +167,9 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
   `v0.90.2`, `holdout` menolak NULL (`kb_incomplete`); `reference_ids` wajib di keluarga, opsional di kondisi; `any_of` & override
   `reference_role` tidak didukung baseline (ditolak skema); kode `RuleLoadError` tertutup di REF §YAML (`ValidationError` →
   `schema_invalid`). Tanpa amandemen core.
+- 2026-10-09 — Review `fix/user0-scope` butir 1–3 diputuskan: `_granted` dari dump juga dijaga `installed_user0` (REF §COV, `v0.45.2`
+  R4 di `feature/v0.50` sebelum `v0.50.1`); `subject_uid` deklaratif ≠ bukti terpasang dan test `installed_user0=false` →
+  `coverage_incomplete` masuk teks `v0.60.2`. Butir 4 (`parse_note` saling menimpa) dilewati.
 
 ## Keputusan / aksi user yang tertunda
 
@@ -214,7 +217,7 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 ## Sinkronisasi remote
 
 - 2026-10-09 — `/finish-branch fix/user0-scope`: digabung `--no-ff` ke `main`, `check.sh all` OK di `main`, push GitHub. `claim-auditor`: 0 blocking (`forensic-integrity-reviewer` tidak dijalankan: diff tak menyentuh `agent/`, API, penyimpanan bukti, `.env`). Branch `fix/user0-scope` dan `feature/v0.05`–`v0.45`, `fix/*` lain belum dihapus (menunggu persetujuan user). Tag `v0.45` belum terbit.
-  Catatan non-blocking review `fix/user0-scope`, TIDAK dikerjakan: (1) fakta `sensitive_communication_capability_observed_granted` dari dump tidak dijaga `installed_user0` (paket ber-shared-UID yang `installed=false` untuk pengguna 0 masih bisa menghasilkannya dari blok `Shared users:` → `User 0:`, berlabel `android_user: 0`); REF §COV hanya menyebut identitas dan negatif — perlu keputusan Planning (jaga juga cabang granted, atau catat sengaja) · (2) `subject_uid` fakta deklaratif tetap terisi saat `installed_user0` bukan `true` (pengikatan subjek `v0.60` jangan membacanya sebagai bukti keberadaan di pengguna 0) · (3) `CoverageService.can_be_false` tak tahu `installed_user0` (ditangani `v0.60.2` `coverage_incomplete`; pastikan ada test di sana) · (4) pesan `parse_note` "blok 'User 0:' tidak ada" menimpa catatan lain.
+  Catatan non-blocking review `fix/user0-scope` (butir 1–3 diputuskan Planning 2026-10-09, butir 4 dilewati): (1) fakta `sensitive_communication_capability_observed_granted` dari dump tidak dijaga `installed_user0` (paket ber-shared-UID yang `installed=false` untuk pengguna 0 masih bisa menghasilkannya dari blok `Shared users:` → `User 0:`, berlabel `android_user: 0`); REF §COV hanya menyebut identitas dan negatif — perlu keputusan Planning (jaga juga cabang granted, atau catat sengaja) · (2) `subject_uid` fakta deklaratif tetap terisi saat `installed_user0` bukan `true` (pengikatan subjek `v0.60` jangan membacanya sebagai bukti keberadaan di pengguna 0) · (3) `CoverageService.can_be_false` tak tahu `installed_user0` (ditangani `v0.60.2` `coverage_incomplete`; pastikan ada test di sana) · (4) pesan `parse_note` "blok 'User 0:' tidak ada" menimpa catatan lain.
 
 - 2026-10-05 — `/finish-branch v0.45`: `feature/v0.45` digabung `--no-ff` ke `main` (`b9c1a12`), `check.sh all` OK di `main`, push GitHub sukses. Reviewer `claim-auditor` + `forensic-integrity-reviewer`: 0 blocking. Branch `feature/v0.05`–`v0.45` dan `fix/*` belum dihapus (menunggu persetujuan user). Tag `v0.45` belum terbit.
   Catatan non-blocking review `v0.45`, TIDAK dikerjakan: (1) sisa `.incoming/` bila proses mati + berkas final tanpa baris `evidence` bila commit gagal (tanpa pembersih/rekonsiliasi) · (2) `Content-Length` hanya melindungi klien jujur; `Transfer-Encoding: chunked` tetap di-spool Starlette ke disk dulu · (3) jendela izin sebelum `chmod 0o444` (karantina dibuat dengan izin bawaan) · (4) `write_csv` `os.replace` bisa menimpa hasil dari run paralel · (5) CSV `tier2_g1_avd1-api36.csv` memuat path lokal Windows di kolom `adb_version` (baris "Installed as …") · (6) regex path APK `[^\s]+` longgar (aman karena list argumen) · (7) pull: `exists()` lalu tulis (TOCTOU kecil), berkas agen tak `chmod` read-only · (8) berkas bundel dibaca penuh (kecil) · (9) negatif izin hanya dari blok `User 0:` tanpa mencatat user · (10) paket vs shared-user `granted` bisa bertentangan → negatif keliru mungkin · (11) `native_libs`/`api_refs` di `PARTS` melapor `can_be_false=true` (tak ada fakta yang memakainya; usul bendera context-only) · (12) subjek proses dari bentuk nama (pengikatan v0.60 lewat inventaris) · (13) `EvidenceMode`/`UnknownReason` perlu dipastikan disetujui REF §ENUM2 · (14) `event_time` usage memakai satu zona sesi untuk 24 jam.
