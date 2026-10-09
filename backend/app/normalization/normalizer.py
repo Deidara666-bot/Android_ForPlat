@@ -630,6 +630,14 @@ def _detail_negatives[A: ArtifactLike](
     )
     if anchor is None:
         return []
+    if anchor.parsed_value_json.get("installed_user0") is not True:
+        # Not installed for Android user 0 (or unreadable): the dump says nothing about what
+        # user 0 holds, so no negative is made from it (REF §COV, user 0 scope).
+        return []
+    scope: dict[str, object] = {"android_user": 0}
+    others = anchor.parsed_value_json.get("other_users_installed")
+    if isinstance(others, list) and others:
+        scope["other_users_installed"] = others
     granted: dict[str, bool] = {}
     for row in rows:
         if row.artifact_type != _GRANTED or not _parsed(row) or row.subject_key != subject:
@@ -643,11 +651,13 @@ def _detail_negatives[A: ArtifactLike](
         if granted.get(name):
             continue
         basis = "granted_false_in_dump" if name in granted else "not_listed_in_dump"
-        base = _negative_base(anchor, subject, context.subject_uid, observed_at, basis=basis)
+        base = _negative_base(
+            anchor, subject, context.subject_uid, observed_at, basis=basis, **scope
+        )
         claim = ("sensitive_communication_capability_observed_granted", "permission", name)
         facts += _pairs(split_claims(base, [claim]), anchor)
     facts += _trigger_negatives(
-        anchor, rows, subject, context.subject_uid, observed_at, context, static=False
+        anchor, rows, subject, context.subject_uid, observed_at, context, static=False, scope=scope
     )
     return facts
 
@@ -680,6 +690,7 @@ def _trigger_negatives[A: ArtifactLike](
     context: NormalizationContext,
     *,
     static: bool,
+    scope: dict[str, object] | None = None,
 ) -> list[tuple[NormalizedFact, A]]:
     """Vocabulary actions that no receiver of the subject declares.
 
@@ -706,7 +717,7 @@ def _trigger_negatives[A: ArtifactLike](
             ambiguous.add(action)
         elif "receiver" in kinds:
             declared.add(action)
-    extras: dict[str, object] = {"basis": "action_not_declared_by_a_receiver"}
+    extras: dict[str, object] = {"basis": "action_not_declared_by_a_receiver", **(scope or {})}
     if static:
         extras["source"] = "apk_static"
     base = _negative_base(anchor, subject, uid, observed_at, **extras)

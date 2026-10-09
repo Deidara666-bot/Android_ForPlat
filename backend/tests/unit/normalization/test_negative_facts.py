@@ -31,7 +31,7 @@ def _row(
 
 
 def _identity() -> ParsedArtifact:
-    return _row("package_identity", {"user_id": 10101})
+    return _row("package_identity", {"user_id": 10101, "installed_user0": True})
 
 
 def _triggers(rows: list[ParsedArtifact]) -> set[str]:
@@ -99,3 +99,34 @@ def test_a_source_without_a_negative_rule_gives_nothing() -> None:
             )
             == []
         )
+
+
+def _all(rows: list[ParsedArtifact]) -> list:  # noqa: ANN401
+    return negative_facts(
+        *_DETAIL, rows, subject=_PKG, observed_at=_NOW, context=build_context(rows)
+    )
+
+
+def test_installed_for_user_0_negatives_carry_android_user_0() -> None:
+    facts = _all([_identity()])
+    assert facts and all(f.context_json["android_user"] == 0 for f, _ in facts)
+    assert all("other_users_installed" not in f.context_json for f, _ in facts)
+
+
+def test_other_installed_users_are_context_on_every_dump_negative() -> None:
+    identity = _row(
+        "package_identity",
+        {"user_id": 10101, "installed_user0": True, "other_users_installed": [95]},
+    )
+    facts = _all([identity])
+    assert facts
+    assert all(f.context_json["other_users_installed"] == [95] for f, _ in facts)
+    assert all(f.context_json["android_user"] == 0 for f, _ in facts)
+
+
+def test_not_installed_or_unreadable_for_user_0_gives_no_negative_from_the_dump() -> None:
+    for installed in (False, None):
+        identity = _row("package_identity", {"user_id": 10101, "installed_user0": installed})
+        assert _all([identity]) == []
+    # artifacts of version 1 have no such key at all
+    assert _all([_row("package_identity", {"user_id": 10101})]) == []

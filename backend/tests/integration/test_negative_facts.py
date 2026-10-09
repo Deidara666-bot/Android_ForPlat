@@ -410,3 +410,70 @@ def test_negative_facts_are_only_of_vocabulary_event_types(
         process_evidence(session, evidence.id, storage)
     types = {f.event_type for f in _facts(session, False)}
     assert types and types <= _NEGATIVE_EVENT_TYPES
+
+
+# --- Android user 0 scope (REF §COV) -------------------------------------------------
+
+_SYNTH = "com.synthetic.alpha"
+_GRANTED = "sensitive_communication_capability_observed_granted"
+_NLS = "settings secure nls"
+
+
+def _dump(
+    session: Session, storage: EvidenceStorageService, acquisition: AcquisitionSession, name: str
+) -> Evidence:
+    return _acquire(
+        session,
+        storage,
+        acquisition,
+        "collect_package_detail",
+        "dumpsys package",
+        (_FIXTURES / name).read_bytes(),
+        {"package_name": _SYNTH},
+        sequence=1,
+    )
+
+
+def test_installed_false_for_user_0_gives_no_negative_from_the_dump_but_other_sources_keep_theirs(
+    session: Session, storage: EvidenceStorageService, acquisition: AcquisitionSession
+) -> None:
+    dump = _dump(session, storage, acquisition, "package_detail_user0_not_installed_synthetic.txt")
+    process_evidence(session, dump.id, storage)
+    assert _facts(session, False) == []
+    # the same session also read the accessibility list in full: its negative is untouched
+    listing = _acquire(
+        session,
+        storage,
+        acquisition,
+        _A11Y,
+        "settings secure a11y",
+        b"null\n",
+        {"package_name": _SYNTH},
+        sequence=2,
+    )
+    process_evidence(session, listing.id, storage)
+    negatives = _facts(session, False)
+    assert [(f.event_type, f.object_value) for f in negatives] == [
+        ("special_access_capability_observed_enabled", "accessibility_service")
+    ]
+    assert negatives[0].context_json["basis"] == "not_in_enabled_list"
+    assert "android_user" not in negatives[0].context_json  # not a dump negative
+
+
+def test_a_permission_granted_only_for_another_user_is_still_negated_for_user_0(
+    session: Session, storage: EvidenceStorageService, acquisition: AcquisitionSession
+) -> None:
+    dump = _dump(session, storage, acquisition, "package_detail_other_user_synthetic.txt")
+    process_evidence(session, dump.id, storage)
+    negatives = _facts(session, False)
+    send_sms = [f for f in negatives if f.object_value == "android.permission.SEND_SMS"]
+    assert len(send_sms) == 1 and send_sms[0].event_type == _GRANTED
+    assert send_sms[0].context_json["android_user"] == 0
+    assert send_sms[0].context_json["other_users_installed"] == [95]
+    assert send_sms[0].context_json["basis"] == "not_listed_in_dump"
+    assert not [
+        f
+        for f in _facts(session, True)
+        if f.object_value == "android.permission.SEND_SMS" and f.event_type == _GRANTED
+    ]
+    assert all(f.context_json["android_user"] == 0 for f in negatives)
