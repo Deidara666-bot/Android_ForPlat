@@ -574,12 +574,23 @@ def write_csv(path: Path, rows: Sequence[dict[str, Any]]) -> None:
     os.replace(temporary, path)
 
 
-def _capture(command: list[str]) -> str:
+def first_line(text: str) -> str:
+    """Only the first line: `adb version` also prints where the tool is installed, which is
+    local information that must not end up in a result file."""
+    lines = text.strip().splitlines()
+    return lines[0].strip() if lines else "unknown"
+
+
+def _capture(command: list[str], *, only_first_line: bool = False) -> str:
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=False, cwd=ROOT)
     except OSError:
         return "unknown"
-    return result.stdout.strip().replace("\n", " ") if result.returncode == 0 else "unknown"
+    if result.returncode != 0:
+        return "unknown"
+    if only_first_line:
+        return first_line(result.stdout)
+    return result.stdout.strip().replace("\n", " ")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -616,7 +627,7 @@ def main(
         active = hooks or Hooks(
             reset=run_reset,
             git_commit=_capture(["git", "rev-parse", "HEAD"]),
-            adb_version=_capture(["adb", "version"]),
+            adb_version=_capture(["adb", "version"], only_first_line=True),
         )
         rows = run_tier2(args, client, active)
         write_csv(output, rows)

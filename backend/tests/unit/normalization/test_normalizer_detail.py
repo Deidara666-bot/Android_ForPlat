@@ -307,3 +307,66 @@ def test_build_context_ignores_failed_rows_and_collects_kinds() -> None:
     assert context.subject_uid == 1000
     assert context.component_kinds == {"p/.A": frozenset({"receiver", "service"})}
     assert build_context([]) == NormalizationContext()
+
+
+# --- Android user 0 scope (REF §COV) ---------------------------------------------------
+
+_IDENTITY_EVENTS = {"package_observed_installed", "uid_observed"}
+_NOT_INSTALLED = "package_detail_user0_not_installed_synthetic.txt"
+_UNREADABLE = "package_detail_user0_unreadable_synthetic.txt"
+_OTHER_USER = "package_detail_other_user_synthetic.txt"
+_MULTIUSER = "package_detail_settings_multiuser_api36.txt"
+
+
+def _without_identity(facts: list[NormalizedFact]) -> list[NormalizedFact]:
+    return [f for f in facts if f.event_type not in _IDENTITY_EVENTS]
+
+
+def test_installed_true_for_user_0_gives_the_identity_facts_with_android_user_0() -> None:
+    facts = _facts(_artifacts())
+    identity = [f for f in facts if f.event_type in _IDENTITY_EVENTS]
+    assert [f.event_type for f in identity] == ["package_observed_installed", "uid_observed"]
+    assert all(f.context_json["android_user"] == 0 for f in identity)
+    assert all("other_users_installed" not in f.context_json for f in identity)
+
+
+@pytest.mark.parametrize("name", [_NOT_INSTALLED, _UNREADABLE])
+def test_not_installed_or_unreadable_for_user_0_gives_no_identity_fact(name: str) -> None:
+    facts = _facts(_artifacts(name))
+    assert not [f for f in facts if f.event_type in _IDENTITY_EVENTS]
+    # the declarations describe the APK: identical to the installed=true fixture
+    assert _summary(facts) == _summary(_without_identity(_facts(_artifacts())))
+
+
+def test_declarations_keep_their_uid_from_the_identity_artifact_when_not_installed() -> None:
+    declared = [f for f in _facts(_artifacts(_NOT_INSTALLED)) if f.event_type.endswith("declared")]
+    assert declared and {f.subject_uid for f in declared} == {10101}
+
+
+def test_another_users_install_is_context_on_the_identity_facts_only() -> None:
+    facts = _facts(_artifacts(_OTHER_USER))
+    identity = [f for f in facts if f.event_type in _IDENTITY_EVENTS]
+    assert len(identity) == 2
+    assert all(f.context_json["other_users_installed"] == [95] for f in identity)
+    base = _facts(_artifacts())
+    # SEND_SMS granted=true exists only in user 95's block: no `_granted` fact comes from it
+    assert _summary(facts) == _summary(base)
+    others = [f for f in facts if f.event_type not in _IDENTITY_EVENTS]
+    assert all("other_users_installed" not in f.context_json for f in others)
+
+
+def test_granted_facts_carry_android_user_0() -> None:
+    granted = [
+        f
+        for f in _facts(_artifacts())
+        if f.event_type == "sensitive_communication_capability_observed_granted"
+    ]
+    assert granted and all(f.context_json["android_user"] == 0 for f in granted)
+
+
+def test_real_multi_user_dump_gives_user_0_identity_with_user_10_as_context() -> None:
+    facts = _facts(_artifacts(_MULTIUSER))
+    identity = [f for f in facts if f.event_type in _IDENTITY_EVENTS]
+    assert [f.event_type for f in identity] == ["package_observed_installed", "uid_observed"]
+    assert all(f.context_json["other_users_installed"] == [10] for f in identity)
+    assert all(f.subject_package == "com.android.settings" for f in identity)

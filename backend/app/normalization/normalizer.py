@@ -228,6 +228,11 @@ def _normalize_detail(
 
     `firstInstallTime` / `lastUpdateTime` stay in `context_json`; they are device-local wall-clock
     text and never become `event_time`. Nothing here is a negative fact (that is v0.45.7).
+
+    The examined user is Android user 0 (REF §COV): "installed" and the UID are facts only when
+    the dump says `installed=true` for that user. Declarations (permissions asked for, components,
+    actions) describe the APK and stay either way. Identity and granted facts carry
+    `android_user: 0`; identity also lists the other users that have the package.
     """
     package = artifact.subject_key
     if not isinstance(package, str) or not package:
@@ -252,15 +257,24 @@ def _normalize_detail(
             "signatures",
         )
         extras = {key: value.get(key) for key in keys}
-        claims = [
-            ("package_observed_installed", "package_name", package),
-            ("uid_observed", "uid", str(user_id)),
-        ]
+        extras["android_user"] = 0
+        others = value.get("other_users_installed")
+        if isinstance(others, list) and others:
+            extras["other_users_installed"] = others
+        if value.get("installed_user0") is True:  # false / null / absent: not installed for user 0
+            claims = [
+                ("package_observed_installed", "package_name", package),
+                ("uid_observed", "uid", str(user_id)),
+            ]
     elif kind == _REQUESTED:
         claims = _requested_claims(_text(value, "name"))
     elif kind == _GRANTED:
         name = _text(value, "name")
-        extras = {"permission_kind": value.get("kind"), "scope": value.get("scope")}
+        extras = {
+            "permission_kind": value.get("kind"),
+            "scope": value.get("scope"),
+            "android_user": 0,
+        }
         # Only an explicit `granted: true` counts; `false` yields no fact here.
         if value.get("granted") is True and name in SENSITIVE_COMMUNICATION_PERMISSIONS:
             claims = [("sensitive_communication_capability_observed_granted", "permission", name)]
@@ -616,6 +630,14 @@ def _detail_negatives[A: ArtifactLike](
     )
     if anchor is None:
         return []
+    if anchor.parsed_value_json.get("installed_user0") is not True:
+        # Not installed for Android user 0 (or unreadable): the dump says nothing about what
+        # user 0 holds, so no negative is made from it (REF §COV, user 0 scope).
+        return []
+    scope: dict[str, object] = {"android_user": 0}
+    others = anchor.parsed_value_json.get("other_users_installed")
+    if isinstance(others, list) and others:
+        scope["other_users_installed"] = others
     granted: dict[str, bool] = {}
     for row in rows:
         if row.artifact_type != _GRANTED or not _parsed(row) or row.subject_key != subject:
@@ -629,11 +651,13 @@ def _detail_negatives[A: ArtifactLike](
         if granted.get(name):
             continue
         basis = "granted_false_in_dump" if name in granted else "not_listed_in_dump"
-        base = _negative_base(anchor, subject, context.subject_uid, observed_at, basis=basis)
+        base = _negative_base(
+            anchor, subject, context.subject_uid, observed_at, basis=basis, **scope
+        )
         claim = ("sensitive_communication_capability_observed_granted", "permission", name)
         facts += _pairs(split_claims(base, [claim]), anchor)
     facts += _trigger_negatives(
-        anchor, rows, subject, context.subject_uid, observed_at, context, static=False
+        anchor, rows, subject, context.subject_uid, observed_at, context, static=False, scope=scope
     )
     return facts
 
@@ -666,6 +690,7 @@ def _trigger_negatives[A: ArtifactLike](
     context: NormalizationContext,
     *,
     static: bool,
+    scope: dict[str, object] | None = None,
 ) -> list[tuple[NormalizedFact, A]]:
     """Vocabulary actions that no receiver of the subject declares.
 
@@ -692,7 +717,7 @@ def _trigger_negatives[A: ArtifactLike](
             ambiguous.add(action)
         elif "receiver" in kinds:
             declared.add(action)
-    extras: dict[str, object] = {"basis": "action_not_declared_by_a_receiver"}
+    extras: dict[str, object] = {"basis": "action_not_declared_by_a_receiver", **(scope or {})}
     if static:
         extras["source"] = "apk_static"
     base = _negative_base(anchor, subject, uid, observed_at, **extras)
