@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -333,12 +334,125 @@ def test_an_unknown_run_purpose_is_refused(session: Session) -> None:
         RuleLoader(session).load_all("demo")
 
 
-def test_an_empty_rules_folder_is_an_error(session: Session, tmp_path: Path) -> None:
-    (tmp_path / "apk_fraud").mkdir()
-    with pytest.raises(FileNotFoundError):
-        RuleLoader(session, rules_dir=tmp_path / "apk_fraud").load_all("authoring")
-
-
 def test_rules_without_a_loaded_knowledge_base_do_not_resolve(session: Session) -> None:
     assert _error(session, "authoring").code == "reference_unresolved"
     assert _count(session, RuleMetadata) == 0
+
+
+# --- the closed family set (R1) ---------------------------------------------------------
+
+
+@pytest.mark.usefixtures("kb")
+@pytest.mark.parametrize("purpose", ["authoring", "benign_control", "holdout", "production"])
+def test_an_empty_rules_folder_is_schema_invalid_for_every_purpose(
+    session: Session, tmp_path: Path, purpose: str
+) -> None:
+    empty = tmp_path / "apk_fraud"
+    empty.mkdir()
+    error = _error(session, purpose, rules_dir=empty)
+    assert (error.code, error.path) == ("schema_invalid", "APKF-K01")
+    assert _count(session, RuleMetadata) == 0
+
+
+@pytest.mark.usefixtures("kb")
+def test_a_missing_rules_folder_is_schema_invalid(session: Session, tmp_path: Path) -> None:
+    assert _error(session, "authoring", rules_dir=tmp_path / "absent").code == "schema_invalid"
+
+
+@pytest.mark.usefixtures("kb")
+@pytest.mark.parametrize("purpose", ["authoring", "production", "holdout"])
+def test_a_missing_family_directory_is_schema_invalid(
+    session: Session, tmp_path: Path, purpose: str
+) -> None:
+    rules = _rules_copy(tmp_path, "frozen_for_holdout")
+    shutil.rmtree(rules / "APKF-K05")
+    error = _error(session, purpose, rules_dir=rules)
+    assert (error.code, error.path) == ("schema_invalid", "APKF-K05")
+    assert _count(session, RuleMetadata) == 0
+
+
+@pytest.mark.usefixtures("kb")
+def test_a_sixth_directory_is_schema_invalid(session: Session, tmp_path: Path) -> None:
+    rules = _rules_copy(tmp_path)
+    shutil.copytree(rules / "APKF-K01", rules / "APKF-K06")
+    error = _error(session, "authoring", rules_dir=rules)
+    assert (error.code, error.path) == ("schema_invalid", "APKF-K06")
+
+
+@pytest.mark.usefixtures("kb")
+def test_a_directory_holding_another_family_is_schema_invalid(
+    session: Session, tmp_path: Path
+) -> None:
+    rules = _rules_copy(tmp_path)
+    k01 = rules / "APKF-K01" / "family.yaml"
+    text = k01.read_text(encoding="utf-8")
+    marker = "  family_id: APKF-K01" + chr(10)
+    assert text.count(marker) == 1
+    k01.write_text(text.replace(marker, "  family_id: APKF-K02" + chr(10)))
+    error = _error(session, "authoring", rules_dir=rules)
+    assert (error.code, error.path) == ("schema_invalid", "APKF-K01/family.yaml")
+    assert "APKF-K02" in error.detail
+    assert _count(session, RuleMetadata) == 0
+
+
+@pytest.mark.usefixtures("kb")
+def test_a_family_directory_without_its_file_is_schema_invalid(
+    session: Session, tmp_path: Path
+) -> None:
+    rules = _rules_copy(tmp_path)
+    (rules / "APKF-K03" / "family.yaml").unlink()
+    error = _error(session, "authoring", rules_dir=rules)
+    assert (error.code, error.path) == ("schema_invalid", "APKF-K03/family.yaml")
+
+
+# --- two ways to load (R2) --------------------------------------------------------------
+
+
+def test_load_all_needs_a_run_purpose(session: Session) -> None:
+    with pytest.raises(ValueError, match="run_purpose is required"):
+        RuleLoader(session).load_all(None)  # type: ignore[arg-type]
+    assert _count(session, RuleMetadata) == 0
+
+
+@pytest.mark.usefixtures("kb")
+def test_load_validated_skips_the_gate_for_frozen_rules_and_an_unchecked_kb(
+    session: Session, tmp_path: Path
+) -> None:
+    frozen = _rules_copy(tmp_path, "frozen_for_holdout")
+    # load_all("holdout") on the same input is refused (unchecked KB, no manifest) ...
+    assert _error(session, "holdout", rules_dir=frozen).code == "kb_incomplete"
+    # ... load_validated has no run purpose, so no gate
+    rule_set = RuleLoader(session, rules_dir=frozen).load_validated()
+    assert rule_set.run_purpose is None
+    assert {f.status for f in rule_set.families} == {"frozen_for_holdout"}
+    assert _count(session, RuleMetadata) == 21
+
+
+@pytest.mark.usefixtures("kb")
+def test_load_validated_and_load_all_share_rows_and_hashes(session: Session) -> None:
+    loader = RuleLoader(session)
+    validated = loader.load_validated()
+    counts = _count(session, RuleMetadata), _count(session, RuleElementReference)
+    gated = loader.load_all("authoring")
+    assert (_count(session, RuleMetadata), _count(session, RuleElementReference)) == counts
+    assert (gated.hash, gated.kb_hash) == (validated.hash, validated.kb_hash)
+    assert gated.run_purpose == "authoring" and validated.run_purpose is None
+
+
+@pytest.mark.usefixtures("kb")
+def test_load_validated_still_validates(session: Session, tmp_path: Path) -> None:
+    rules = _rules_copy(tmp_path)
+    k02 = rules / "APKF-K02" / "family.yaml"
+    k02.write_text(
+        k02.read_text(encoding="utf-8").replace("fact: package_observed_installed", "fact: nope", 1)
+    )
+    with pytest.raises(RuleLoadError) as caught:
+        RuleLoader(session, rules_dir=rules).load_validated()
+    assert caught.value.code == RuleLoadErrorCode.unknown_fact
+    assert _count(session, RuleMetadata) == 0
+
+
+def test_load_validated_without_a_knowledge_base_does_not_resolve(session: Session) -> None:
+    with pytest.raises(RuleLoadError) as caught:
+        RuleLoader(session).load_validated()
+    assert caught.value.code == "reference_unresolved"

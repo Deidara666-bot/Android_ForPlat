@@ -30,6 +30,9 @@ from app.research.rules.schema import RuleFamilyFile
 from app.research.rules.validator import RuleValidator, parse_family_text
 
 RULES_DIR = Path(__file__).parent / "data" / "apk_fraud"
+FAMILY_IDS = tuple(
+    f"APKF-K0{number}" for number in range(1, 6)
+)  # the closed set (REF section YAML)
 MANIFEST_PATH = Path(__file__).resolve().parents[4] / "experiments" / "freeze_manifest.json"
 
 _ALLOWED_STATUS: dict[RunPurpose, frozenset[RuleStatus]] = {
@@ -57,7 +60,7 @@ class LoadedFamily:
 
 @dataclass(frozen=True)
 class RuleSet:
-    run_purpose: RunPurpose
+    run_purpose: RunPurpose | None  # None: loaded by `load_validated`, never usable for an analysis
     hash: str  # combined hash of the family files, see `combine_hashes`
     kb_hash: str  # `KnowledgeBase.hash`
     families: tuple[LoadedFamily, ...]
@@ -97,36 +100,71 @@ class RuleLoader:
         self.manifest_path = manifest_path
 
     def load_all(self, run_purpose: RunPurpose | str) -> RuleSet:
-        """Validate and store every family for `run_purpose`; flushes, never commits."""
-        purpose = RunPurpose(run_purpose)
+        """Validate, gate and store every family for `run_purpose`; flushes, never commits.
+
+        Used once per analysis. `run_purpose` is required: the gate cannot be skipped by passing
+        nothing (use `load_validated` for the startup load, which has no run).
+        """
+        if run_purpose is None:
+            raise ValueError(
+                "run_purpose is required; load_validated() is the ungated startup load"
+            )
+        return self._load(RunPurpose(run_purpose))
+
+    def load_validated(self) -> RuleSet:
+        """Validate and store every family without the run-purpose gate (startup, display only).
+
+        The `RuleSet` has `run_purpose=None`; an analysis must not use it.
+        """
+        return self._load(None)
+
+    def _load(self, purpose: RunPurpose | None) -> RuleSet:
         active_sources = list(self.db.scalars(select(KbSource).where(KbSource.active.is_(True))))
         validator = RuleValidator({source.id: source for source in active_sources})
         sources = self._read_sources()
         validator.validate_all([source.family_file for source in sources])
 
-        self._check_status(purpose, sources)
         kb_hash = self.knowledge_base.content_hash()
-        if purpose == RunPurpose.holdout:
-            self._check_knowledge_base_complete(active_sources)
-            self._check_manifest(sources, kb_hash)
+        if purpose is not None:
+            self._check_status(purpose, sources)
+            if purpose == RunPurpose.holdout:
+                self._check_knowledge_base_complete(active_sources)
+                self._check_manifest(sources, kb_hash)
 
         loaded = tuple(self._store(source, validator) for source in sources)
         hashes = {family.family_id: family.content_hash for family in loaded}
         return RuleSet(purpose, combine_hashes(hashes), kb_hash, loaded)
 
     def _read_sources(self) -> list[_Source]:
-        paths = sorted(self.rules_dir.glob("*/family.yaml"))
-        if not paths:
-            raise FileNotFoundError(f"no family.yaml under {self.rules_dir}")
+        """The closed family set: exactly `APKF-K01`..`K05`, each folder named like its family."""
+        schema_invalid = RuleLoadErrorCode.schema_invalid
+        present = (
+            {entry.name for entry in self.rules_dir.iterdir() if entry.is_dir()}
+            if self.rules_dir.is_dir()
+            else set()
+        )
+        for name in FAMILY_IDS:
+            if name not in present:
+                raise RuleLoadError(schema_invalid, name, "family directory is missing")
+        for name in sorted(present - set(FAMILY_IDS)):
+            raise RuleLoadError(schema_invalid, name, "not one of the five family directories")
         sources = []
-        for path in paths:
+        for name in FAMILY_IDS:
+            path = self.rules_dir / name / "family.yaml"
+            where = f"{name}/family.yaml"
+            if not path.is_file():
+                raise RuleLoadError(schema_invalid, where, "family.yaml is missing")
             raw = path.read_bytes()
             try:
                 family_file = parse_family_text(raw.decode("utf-8"))
             except UnicodeDecodeError as error:
+                raise RuleLoadError(schema_invalid, where, "file is not UTF-8") from error
+            if family_file.rule_family.family_id != name:
                 raise RuleLoadError(
-                    RuleLoadErrorCode.schema_invalid, "", f"{path.name} is not UTF-8"
-                ) from error
+                    schema_invalid,
+                    where,
+                    f"directory {name} holds family {family_file.rule_family.family_id!r}",
+                )
             sources.append(_Source(path, raw, family_file))
         return sources
 
