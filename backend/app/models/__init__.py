@@ -7,6 +7,7 @@ from app.models.case import Case
 from app.models.case_device import CaseDevice
 from app.models.device import Device
 from app.models.evidence import Evidence
+from app.models.kb_source import KbSource
 from app.models.normalized_event import NormalizedEvent
 from app.models.user import User
 
@@ -20,6 +21,7 @@ __all__ = [
     "CaseDevice",
     "Device",
     "Evidence",
+    "KbSource",
     "NormalizedEvent",
     "User",
 ]

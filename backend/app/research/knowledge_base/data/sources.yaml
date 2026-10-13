@@ -1,0 +1,115 @@
+# Knowledge-base sources: the 11 entries of 01_BREAKDOWN section 12.1 (REF section YAML).
+# title/publisher come from the "Sumber primer" column; extracted_claim is the "Peran/label baku" column.
+# version_scope and quality_note are open data: the examiner fills them in v0.90.2 (keys stay, value null).
+schema_version: "3.3"
+sources:
+  - id: KB-AND-PACKAGE
+    title: "Android Developers — PackageManager"
+    publisher: "Android Developers"
+    url: "https://developer.android.com/reference/android/content/pm/PackageManager"
+    accessed_at: 2026-09-05
+    extracted_claim: "artifact_semantics — identitas package terpasang"
+    reference_role: artifact_semantics
+    verification_status: verified_design
+    version_scope: null  # TODO(open-data)
+    quality_note: null  # TODO(open-data)
+  - id: KB-AND-PERMISSION
+    title: "Android Developers — Permissions on Android"
+    publisher: "Android Developers"
+    url: "https://developer.android.com/guide/topics/permissions/overview"
+    accessed_at: 2026-09-05
+    extracted_claim: "artifact_semantics — permission dan akses khusus"
+    reference_role: artifact_semantics
+    verification_status: verified_design
+    version_scope: null  # TODO(open-data)
+    quality_note: null  # TODO(open-data)
+  - id: KB-AND-ACCESSIBILITY
+    title: "Android Developers — AccessibilityService"
+    publisher: "Android Developers"
+    url: "https://developer.android.com/reference/android/accessibilityservice/AccessibilityService"
+    accessed_at: 2026-09-05
+    extracted_claim: "artifact_semantics — deklarasi/pengaktifan layanan aksesibilitas"
+    reference_role: artifact_semantics
+    verification_status: verified_design
+    version_scope: null  # TODO(open-data)
+    quality_note: null  # TODO(open-data)
+  - id: KB-AND-OVERLAY
+    title: "Android Developers — Settings.canDrawOverlays"
+    publisher: "Android Developers"
+    url: "https://developer.android.com/reference/android/provider/Settings#canDrawOverlays(android.content.Context)"
+    accessed_at: 2026-09-05
+    extracted_claim: "artifact_semantics — kemampuan menggambar di atas aplikasi lain"
+    reference_role: artifact_semantics
+    verification_status: verified_design
+    version_scope: null  # TODO(open-data)
+    quality_note: null  # TODO(open-data)
+  - id: KB-AND-NOTIFICATION
+    title: "Android Developers — NotificationListenerService"
+    publisher: "Android Developers"
+    url: "https://developer.android.com/reference/android/service/notification/NotificationListenerService"
+    accessed_at: 2026-09-05
+    extracted_claim: "artifact_semantics — deklarasi/akses listener notifikasi"
+    reference_role: artifact_semantics
+    verification_status: verified_design
+    version_scope: null  # TODO(open-data)
+    quality_note: null  # TODO(open-data)
+  - id: KB-AND-BROADCAST
+    title: "Android Developers — Broadcasts overview"
+    publisher: "Android Developers"
+    url: "https://developer.android.com/develop/background-work/background-tasks/broadcasts"
+    accessed_at: 2026-09-05
+    extracted_claim: "artifact_semantics — receiver dan pemicu peristiwa sistem"
+    reference_role: artifact_semantics
+    verification_status: verified_design
+    version_scope: null  # TODO(open-data)
+    quality_note: null  # TODO(open-data)
+  - id: KB-AND-USAGE
+    title: "Android Developers — UsageStatsManager"
+    publisher: "Android Developers"
+    url: "https://developer.android.com/reference/android/app/usage/UsageStatsManager"
+    accessed_at: 2026-09-05
+    extracted_claim: "artifact_semantics — riwayat/statistik penggunaan aplikasi"
+    reference_role: artifact_semantics
+    verification_status: verified_design
+    version_scope: null  # TODO(open-data)
+    quality_note: null  # TODO(open-data)
+  - id: KB-AND-NETWORK
+    title: "Android Developers — NetworkStatsManager"
+    publisher: "Android Developers"
+    url: "https://developer.android.com/reference/android/app/usage/NetworkStatsManager"
+    accessed_at: 2026-09-05
+    extracted_claim: "artifact_semantics — statistik jaringan berbasis bucket"
+    reference_role: artifact_semantics
+    verification_status: verified_design
+    version_scope: null  # TODO(open-data)
+    quality_note: null  # TODO(open-data)
+  - id: KB-MITRE-T1624
+    title: "MITRE ATT&CK Mobile — Event Triggered Execution"
+    publisher: "MITRE ATT&CK"
+    url: "https://attack.mitre.org/techniques/T1624/"
+    accessed_at: 2026-09-05
+    extracted_claim: "technique_mapping — pemicu terhadap eksekusi/persistensi"
+    reference_role: technique_mapping
+    verification_status: verified_design
+    version_scope: null  # TODO(open-data)
+    quality_note: null  # TODO(open-data)
+  - id: KB-MITRE-T1417-002
+    title: "MITRE ATT&CK Mobile — GUI Input Capture"
+    publisher: "MITRE ATT&CK"
+    url: "https://attack.mitre.org/techniques/T1417/002/"
+    accessed_at: 2026-09-05
+    extracted_claim: "technique_mapping — aksesibilitas/overlay sebagai kapabilitas relevan"
+    reference_role: technique_mapping
+    verification_status: verified_design
+    version_scope: null  # TODO(open-data)
+    quality_note: null  # TODO(open-data)
+  - id: KB-MITRE-T1644
+    title: "MITRE ATT&CK Mobile — Out of Band Data"
+    publisher: "MITRE ATT&CK"
+    url: "https://attack.mitre.org/techniques/T1644/"
+    accessed_at: 2026-09-05
+    extracted_claim: "technique_mapping — notifikasi/SMS sebagai kanal sensitif"
+    reference_role: technique_mapping
+    verification_status: verified_design
+    version_scope: null  # TODO(open-data)
+    quality_note: null  # TODO(open-data)

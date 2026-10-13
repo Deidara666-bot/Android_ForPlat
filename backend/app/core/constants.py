@@ -202,3 +202,17 @@ class UnknownReason(StrEnum):
     coverage_incomplete = "coverage_incomplete"
     conflicting_evidence = "conflicting_evidence"
     no_applicable_profile = "no_applicable_profile"
+
+
+class ReferenceRole(StrEnum):
+    """What a knowledge-base source is cited for (REF §ENUM2)."""
+
+    artifact_semantics = "artifact_semantics"
+    behavior_relevance = "behavior_relevance"
+    interpretation_limit = "interpretation_limit"
+    technique_mapping = "technique_mapping"
+
+
+class VerificationStatus(StrEnum):
+    verified_design = "verified_design"
+    verified = "verified"

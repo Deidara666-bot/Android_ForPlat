@@ -13,6 +13,7 @@ _TABLES = {
     "cases",
     "devices",
     "evidence",
+    "kb_sources",
     "normalized_events",
     "users",
 }
