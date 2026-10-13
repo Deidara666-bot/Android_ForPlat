@@ -6,7 +6,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.api.deps import get_db
 from app.core.constants import APP_VERSION
-from app.main import app
+from app.main import RulesStartupConfig, app
 
 
 class _BrokenSession:
@@ -18,9 +18,12 @@ class _BrokenSession:
 
 @pytest.fixture
 def client() -> Iterator[TestClient]:
+    app.state.rules_startup = RulesStartupConfig(enabled=False)  # never write to the dev database
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+    app.state.rules_startup = None
+    app.state.rules_status = None
 
 
 def test_health_ok_when_database_is_up(client: TestClient) -> None:

@@ -61,12 +61,17 @@ def session(migrated_db: str) -> Iterator[Session]:
 def client(session: Session) -> Iterator[TestClient]:
     """App client whose DB dependency is the rolled-back test session."""
     from app.api.deps import get_db
-    from app.main import app
+    from app.main import RulesStartupConfig, app
 
     app.dependency_overrides[get_db] = lambda: session
+    # the startup rule load writes to a database: no test client may do that to the dev database
+    app.state.rules_startup = RulesStartupConfig(enabled=False)
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+    app.state.rules_startup = None
+    app.state.rule_set = None
+    app.state.rules_status = None
 
 
 @pytest.fixture

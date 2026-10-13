@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.core.config import get_settings
 from app.core.constants import APP_VERSION
+from app.schemas.rules import RulesHealth
 
 router = APIRouter(tags=["health"])
 
@@ -20,6 +21,7 @@ class HealthOut(BaseModel):
     database: str
     alembic_revision: str | None
     app_version: str
+    rules: RulesHealth | None  # None: the startup load was not attempted (tests only)
 
 
 class HealthUnavailableOut(BaseModel):
@@ -33,7 +35,7 @@ class HealthUnavailableOut(BaseModel):
     responses={503: {"model": HealthUnavailableOut, "description": "Database unreachable"}},
     summary="Service health, including a real database round-trip",
 )
-def health(db: Annotated[Session, Depends(get_db)]) -> HealthOut | JSONResponse:
+def health(request: Request, db: Annotated[Session, Depends(get_db)]) -> HealthOut | JSONResponse:
     try:
         db.execute(text("SELECT 1"))
     except SQLAlchemyError:
@@ -51,4 +53,5 @@ def health(db: Annotated[Session, Depends(get_db)]) -> HealthOut | JSONResponse:
         database="reachable",
         alembic_revision=revision,
         app_version=APP_VERSION,
+        rules=getattr(request.app.state, "rules_status", None),
     )

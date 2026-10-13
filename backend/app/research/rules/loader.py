@@ -56,6 +56,7 @@ class LoadedFamily:
     status: str
     content_hash: str
     row_ids: Mapping[str | None, uuid.UUID]
+    family_file: RuleFamilyFile  # the parsed YAML: conditions are not stored in the database
 
 
 @dataclass(frozen=True)
@@ -230,7 +231,12 @@ class RuleLoader:
         if existing:  # same bytes already stored: nothing is written
             row_ids = {row.profile_id: row.id for row in existing}
             return LoadedFamily(
-                family.family_id, family.version, family.status.value, content_hash, row_ids
+                family.family_id,
+                family.version,
+                family.status.value,
+                content_hash,
+                row_ids,
+                source.family_file,
             )
 
         relative = source.path.relative_to(self.rules_dir.parent).as_posix()
@@ -291,6 +297,7 @@ class RuleLoader:
             family.status.value,
             content_hash,
             {profile_id: stored.id for profile_id, stored in rows.items()},
+            source.family_file,
         )
 
 
