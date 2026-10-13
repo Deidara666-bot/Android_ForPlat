@@ -484,6 +484,12 @@ dan hanya bila sumbernya `acquired` + terurai penuh untuk subjek itu (v0.45.6).
     memakai) → `schema_invalid`. Dibutuhkan saat authoring → keputusan planning (bentuk + semantik v0.60) sebelum freeze.
   - Parameter operator: `exists`, `overlaps_window` → tanpa parameter; `equals`, `greater_than`, `delta_greater_than` → `field` + `value`;
     `in` → `field` + `values` (tidak kosong).
+- `rule_metadata` insert-only per `content_hash` (hash sama → tidak menulis; versi lama tetap). Baris aktif = baris ber-`content_hash`
+  milik `RuleSet` yang termuat; rute v0.50.5 dan v0.60 hanya membaca baris aktif. `KnowledgeBase.hash` = SHA-256 byte `sources.yaml`.
+- `experiments/freeze_manifest.json` (dibuat v0.90.2, isi lengkap core §AG.11). Bagian yang dibaca loader `holdout` (kunci lain
+  tidak dibaca): `{"rule_files": {"APKF-K01": "<sha256>", …tepat 5 family_id}, "kb_sources": "<sha256>"}`; hash = SHA-256 byte
+  berkas (= `content_hash` / `KnowledgeBase.hash`). Berkas tak ada, JSON rusak, kunci kurang, keluarga kurang/lebih, atau hash
+  beda → `manifest_mismatch`.
 - `RuleLoadError(code, path)` — kode tertutup; `ValidationError` skema dibungkus jadi `schema_invalid`:
 
 | Pelanggaran | `code` |

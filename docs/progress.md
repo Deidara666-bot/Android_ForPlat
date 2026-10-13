@@ -174,6 +174,9 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - 2026-10-09 — Review `fix/user0-scope` butir 1–3 diputuskan: `_granted` dari dump juga dijaga `installed_user0` (REF §COV, `v0.45.2`
   R4 di `feature/v0.50` sebelum `v0.50.1`); `subject_uid` deklaratif ≠ bukti terpasang dan test `installed_user0=false` →
   `coverage_incomplete` masuk teks `v0.60.2`. Butir 4 (`parse_note` saling menimpa) dilewati.
+- 2026-10-13 — Temuan `v0.50.4`: bagian `freeze_manifest.json` yang dibaca loader dikunci di REF §YAML (`rule_files` 5 hash +
+  `kb_sources` hash, `manifest_mismatch`; KB ikut dicek sesuai core §AG.11 "registri KB"); `rule_metadata` insert-only per
+  `content_hash`, rute/v0.60 hanya baris aktif; `KnowledgeBase.hash` = SHA-256 `sources.yaml`. Teks `v0.50.4`/`.5`, `v0.90.2`.
 
 ## Keputusan / aksi user yang tertunda
 
