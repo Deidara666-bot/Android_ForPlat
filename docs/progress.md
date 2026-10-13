@@ -179,6 +179,11 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - 2026-10-13 — Temuan `v0.50.4`: bagian `freeze_manifest.json` yang dibaca loader dikunci di REF §YAML (`rule_files` 5 hash +
   `kb_sources` hash, `manifest_mismatch`; KB ikut dicek sesuai core §AG.11 "registri KB"); `rule_metadata` insert-only per
   `content_hash`, rute/v0.60 hanya baris aktif; `KnowledgeBase.hash` = SHA-256 `sources.yaml`. Teks `v0.50.4`/`.5`, `v0.90.2`.
+  (Revisi ini di-commit Planning sebelum ACC user; user menyetujuinya belakangan, 2026-10-13.)
+- 2026-10-13 — Temuan `v0.50.5` + sapuan antarmuka `v0.50`→`v0.60`/`v0.90` (ACC user): set keluarga tertutup 5 `APKF-K0N`
+  (nama direktori = `family_id`, `schema_invalid`); dua cara muat — `load_all(run_purpose)` wajib purpose, per analisis, bergerbang;
+  `load_validated()` tanpa gerbang hanya untuk startup; startup = KB → aturan satu transaksi, health `rules` `{status, code|null,
+  hash}`, rute 503. Revisi `v0.50.4` (R1–R3, dikerjakan ulang); teks `v0.50.5`, `v0.60.6`. Tanpa amandemen core.
 
 ## Keputusan / aksi user yang tertunda
 

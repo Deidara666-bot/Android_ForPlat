@@ -486,6 +486,16 @@ dan hanya bila sumbernya `acquired` + terurai penuh untuk subjek itu (v0.45.6).
     `in` → `field` + `values` (tidak kosong).
 - `rule_metadata` insert-only per `content_hash` (hash sama → tidak menulis; versi lama tetap). Baris aktif = baris ber-`content_hash`
   milik `RuleSet` yang termuat; rute v0.50.5 dan v0.60 hanya membaca baris aktif. `KnowledgeBase.hash` = SHA-256 byte `sources.yaml`.
+- Set keluarga tertutup: tepat 5 direktori `APKF-K01`…`APKF-K05`, nama direktori = `family_id` di berkas. Kurang, lebih, beda
+  nama, atau tanpa berkas → `schema_invalid` (path = direktori/berkas). Berlaku semua `run_purpose` dan pemuatan startup.
+- Dua cara muat (2026-10-13): `RuleLoader.load_all(run_purpose)` — `run_purpose` wajib (⛔ `None`), dengan gerbang status/KB/manifest;
+  dipanggil **per analisis** (v0.60). `RuleLoader.load_validated()` — validasi + simpan, **tanpa** gerbang, `RuleSet.run_purpose=None`;
+  hanya untuk startup (tampilan & kesehatan). ⛔ `RuleSet` startup dipakai analisis; `RuleEngine.run` menolak `RuleSet` yang
+  `run_purpose`-nya ≠ run.
+- Startup backend: satu transaksi `KnowledgeBaseLoader.load_to_db()` → `load_validated()` → commit; hasil di `app.state.rule_set`.
+  Gagal → rollback, backend tetap hidup, tanpa coba ulang sampai restart. `/api/health` +`rules`:
+  `{"status": "ok"|"load_failed", "code": <kode tabel di bawah> | null, "rule_set_hash", "kb_hash"}` (hash `null` bila gagal;
+  `code: null` = galat bukan aturan, mis. DB/IO, detail hanya di log). Rute `rules`/`kb` saat gagal → 503 `{code}`.
 - `experiments/freeze_manifest.json` (dibuat v0.90.2, isi lengkap core §AG.11). Bagian yang dibaca loader `holdout` (kunci lain
   tidak dibaca): `{"rule_files": {"APKF-K01": "<sha256>", …tepat 5 family_id}, "kb_sources": "<sha256>"}`; hash = SHA-256 byte
   berkas (= `content_hash` / `KnowledgeBase.hash`). Berkas tak ada, JSON rusak, kunci kurang, keluarga kurang/lebih, atau hash
