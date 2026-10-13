@@ -14,6 +14,10 @@ class RuleLoadErrorCode(StrEnum):
     reference_ids_duplicate = "reference_ids_duplicate"
     reference_unresolved = "reference_unresolved"
     validation_only_scope = "validation_only_scope"
+    # raised by the loader's gate, not by the validator
+    status_not_allowed = "status_not_allowed"
+    kb_incomplete = "kb_incomplete"
+    manifest_mismatch = "manifest_mismatch"
 
 
 class RuleLoadError(ValueError):

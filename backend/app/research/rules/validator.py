@@ -54,8 +54,12 @@ class ElementReference:
 
 def load_family_file(path: Path) -> RuleFamilyFile:
     """Read one `family.yaml`; a structure the schema refuses becomes `schema_invalid`."""
+    return parse_family_text(path.read_text(encoding="utf-8"))
+
+
+def parse_family_text(text: str) -> RuleFamilyFile:
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        data = yaml.safe_load(text)
     except yaml.YAMLError as error:
         raise RuleLoadError(
             RuleLoadErrorCode.schema_invalid, "", f"not valid YAML: {error}"

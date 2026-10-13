@@ -89,7 +89,9 @@ def test_the_minimal_fixture_is_clean(validator: RuleValidator) -> None:
 def test_the_fixture_table_covers_every_file_and_every_validator_code() -> None:
     on_disk = {path.stem for path in (_FIXTURES / "broken").glob("*.yaml")}
     assert on_disk == set(_EXPECTED)
-    assert {code for code, _ in _EXPECTED.values()} == set(RuleLoadErrorCode)
+    # the three codes the loader's gate raises (status, KB, manifest) are tested with the loader
+    gate = {_C.status_not_allowed, _C.kb_incomplete, _C.manifest_mismatch}
+    assert {code for code, _ in _EXPECTED.values()} == set(RuleLoadErrorCode) - gate
 
 
 @pytest.mark.parametrize("name", sorted(_EXPECTED))

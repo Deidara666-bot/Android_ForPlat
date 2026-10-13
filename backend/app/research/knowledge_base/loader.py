@@ -1,6 +1,7 @@
 """Load the knowledge-base sources into `kb_sources` (idempotent upsert by id)."""
 
 import argparse
+import hashlib
 import sys
 from pathlib import Path
 
@@ -28,6 +29,10 @@ class KnowledgeBaseLoader:
         except yaml.YAMLError as error:
             raise KnowledgeBaseError(f"{self.path.name}: not valid YAML: {error}") from error
         return validate_sources(data)
+
+    def content_hash(self) -> str:
+        """`KnowledgeBase.hash`: SHA-256 of the bytes of `sources.yaml`."""
+        return hashlib.sha256(self.path.read_bytes()).hexdigest()
 
     def load_to_db(self, db: Session) -> int:
         """Insert missing sources and update changed ones; flushes, never commits."""
