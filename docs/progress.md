@@ -11,9 +11,9 @@
 |---|---|
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
 | *Increment* aktif | **3 berjalan** (penalaran): `v0.50` tercapai. Berikutnya **`v0.60`** (mesin aturan 3-keadaan) |
-| Milestone aktif | `v0.50` tercapai (tag `v0.50`, 2026-10-13). Berikutnya **`v0.60`** (draf; disegarkan lewat `/plan-milestone v0.60`) |
+| Milestone aktif | `v0.50` tercapai (tag `v0.50`, 2026-10-13). Berikutnya **`v0.60`** (disegarkan 2026-10-13, Planning 4) |
 | Kartu terakhir | **`v0.50.5`** (2026-10-13) — kartu terakhir milestone `v0.50` |
-| Kartu berikutnya | `/plan-milestone v0.60` (mode *refresh*) di sesi Planning, lalu `/card v0.60.1`. Keputusan user tertunda: hapus branch lama; catatan non-blocking review `v0.45` dan `v0.50` untuk Planning |
+| Kartu berikutnya | `/card v0.60.1`. Keputusan user tertunda: hapus branch lama; near-miss K04/K05 (refresh `v0.70`/`v0.80`) |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30`, `v0.40` (2026-10-02), `v0.45` (2026-10-09), `v0.50` (2026-10-13)
@@ -186,10 +186,18 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
   (nama direktori = `family_id`, `schema_invalid`); dua cara muat — `load_all(run_purpose)` wajib purpose, per analisis, bergerbang;
   `load_validated()` tanpa gerbang hanya untuk startup; startup = KB → aturan satu transaksi, health `rules` `{status, code|null,
   hash}`, rute 503. Revisi `v0.50.4` (R1–R3, dikerjakan ulang); teks `v0.50.5`, `v0.60.6`. Tanpa amandemen core.
+- 2026-10-13 — Refresh `v0.60` (audit dev sesi 9 + Planning 4, ACC user): REF §ENGINE baru (subjek per mode, pemilihan fakta, ikatan
+  pengguna 0/UID unik, `time_binding`, operator, konflik lewat `conflict_reason`, temuan, `code_commit`, label kerja); §COV: sesi sumber
+  per subjek (sesi subjek dulu), part statis lengkap, dua sumber identitas/UID, tanpa produsen, versi pengurai terbaru, `time_range`;
+  §ENT2: NULL/CHECK, `subject_apk_sha256` + subjek statis paket+hash, `limitations`. Near-miss K04/K05 → refresh `v0.70`/`v0.80`. Kartu selesai
+  tidak dikerjakan ulang; `coverage.py` (v0.45.6) diubah di `v0.60.2`. Catatan `[v0.60]` di `v0.70.1/.2/.4/.6`, `v0.80.5/.7/.8`, `v0.90.6`.
+  Tanpa amandemen core.
 
 ## Keputusan / aksi user yang tertunda
 
 - Putuskan hapus branch `feature/v0.05` dan `feature/v0.10` (lokal + GitHub). Tag `v0.05`, `v0.10` sudah terbit.
+- Near-miss per keluarga (core §15.2) tak terjangkau di data nyata untuk K04 (dan K05 tanpa nilai 0 netstats): putuskan di refresh
+  `v0.70` (`.2` nilai 0) dan `v0.80` (negatif activity/proses) sebelum `v0.80.8`, atau deviasi core.
 - Galaxy A10 harus tersedia paling lambat `v0.90.7`, dan versinya dibutuhkan sebelum BAB III 3.3 final. Bila tidak ada
   → keputusan amandemen `G-05` (ganti perangkat / lepas AVD #2 dari A10 / emulator saja dengan batasan dinyatakan).
 
@@ -268,3 +276,5 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 - BAB V (saran): reverse engineering mendalam dan analisis dinamis berinstrumen (di luar batas tanpa akar & S-C statis saja).
 - BAB III (batasan): penilaian subjek untuk pengguna Android 0; subjek di pengguna lain (Dual Messenger, Secure Folder, profil kerja)
   hanya dideteksi, tidak dinilai. BAB V (saran): penilaian per pengguna.
+- BAB III (batasan): `notification_context_observed` (K02-P03 C03) dan `lab_network_flow_observed` (K05-P03 C03) tanpa produsen → selalu UNKNOWN.
+- Diagram (DGM-07 ERD): tabel evaluasi/temuan `v0.60` membawa `subject_apk_sha256`, `conflict_reason`, `limitations` — sesuaikan saat Generate 2.

@@ -133,6 +133,8 @@ fakta negatif eksplisit; status Tier-2 G1 formatif di AVD #1 (K6).
 3. Paket PyInstaller → pindah ke jalur VPS setelah v1.00 (agen tetap jalan sebagai `python -m`).
 4. `K05-P03` (flow lab): bila capture lab tidak tersedia, profil tetap dievaluasi dan dilaporkan
    `insufficient_evidence` apa adanya — bukan dihapus.
+5. `notification_context_observed` (K02-P03 C03, kontekstual): tanpa produsen terjadwal → kondisi UNKNOWN `not_acquired`;
+   keluaran profil tidak terpengaruh.
 
 ⛔ **Tidak boleh dipangkas:** 5 keluarga/16 profil, kelas skenario A–F, 20 authoring + 8 holdout, freeze sebelum
 holdout, baseline manual tersegel, uji konsistensi, keterlacakan dua arah, 3 kategori sampel.

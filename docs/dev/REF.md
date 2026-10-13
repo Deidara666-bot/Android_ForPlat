@@ -351,29 +351,41 @@ Di `pull_subject_apk`, 9 berkas ini = part `2+S..`, `raw_source` `static:<nama>`
 - S-C: dijalankan **di VM terisolasi** oleh user; hanya folder bundel (tanpa APK) yang diimpor lewat
   `POST /api/static-bundles` (v0.90). Keluaran `evidence_mode = apk_static`.
 
-## §COV — cakupan fakta → sumber (v0.45.6–.7) `[plan]`
+## §COV — cakupan fakta → sumber (v0.45.6–.7, v0.60.2) `[plan]`
 
 Cakupan dinilai per part `(operation_id, raw_source)`, bukan per operasi. Lingkup **perangkat** = berlaku untuk tiap subjek
-di sesi itu; **subjek** = hanya `parameters.package_name` sesi itu. Sumber = sesi terbaru di kasus yang memuat part itu
-(lingkup subjek: sesi dengan subjek itu).
+di sesi itu; **subjek** = hanya `parameters.package_name` sesi itu. Subjek sesi = `parameters.package_name` operasi mana pun di sesi (§OPS: ≤1).
+Sesi sumber untuk subjek X (v0.60.2): sesi terbaru kasus yang subjeknya X dan memuat part itu; tidak ada → part lingkup perangkat: sesi terbaru
+kasus yang memuat part itu, part lingkup subjek: `not_acquired`. Tanpa subjek (matriks `/coverage` tanpa `?subject=`) → sesi terbaru yang
+memuat part. Mode `apk_static`: sesi bundel subjek (§ENGINE).
 
 | event_type (object_value) | Operasi · `raw_source` | Lingkup | Negatif (v0.45.7) |
 |---|---|---|---|
-| `package_observed_installed`, `uid_observed` | `collect_package_inventory` · `pm list packages -U` | perangkat | — |
+| `package_observed_installed`, `uid_observed` (dua sumber) | `collect_package_inventory` · `pm list packages -U` **dan** `collect_package_detail` · `dumpsys package` | perangkat · subjek | — |
 | `sensitive_communication_capability_observed_granted` | `collect_package_detail` · `dumpsys package` | subjek | izin vocab tidak granted |
 | `event_trigger_capability_observed_declared` | `collect_package_detail` · `dumpsys package` | subjek | action vocab tidak dideklarasikan |
-| fakta deklaratif lain `collect_package_detail` | `collect_package_detail` · `dumpsys package` | subjek | — |
+| fakta deklaratif lain (`installed_runtime`) | `collect_package_detail` · `dumpsys package` | subjek | — |
 | `special_access_capability_observed_enabled` (`accessibility_service`) | `collect_accessibility_state` · `settings secure a11y` | perangkat | subjek tak ada di daftar |
 | … (`notification_listener`) | `collect_accessibility_state` · `settings secure nls` | perangkat | subjek tak ada di daftar |
 | … (`draw_over_other_apps`) | `collect_accessibility_state` · `appops overlay` | subjek | mode `ignore`/`deny` saja (`default` → tanpa fakta) |
 | `app_usage_observed` | `collect_usage_state` · `dumpsys usagestats` | perangkat | — |
 | `activity_observed_resumed` | `collect_usage_state` · `dumpsys activity` | perangkat | — |
 | `process_observed_running` | `collect_usage_state` · `ps` | perangkat | — |
-| fakta dari bundel statis | `pull_subject_apk` · `static:<nama>` | subjek | action vocab tidak dideklarasikan |
+| `apk_identity_observed` (semua mode) | `pull_subject_apk` · `static:apk.sha256` | subjek | — |
+| `apk_endpoint_reference_observed` (semua mode) | `pull_subject_apk` · `static:strings_urls.txt` | subjek | — |
+| `apk_static`: `permission_observed_requested`, `sensitive_communication_capability_observed_declared`, `special_access_capability_observed_declared` (`draw_over_other_apps`) | `pull_subject_apk` · `static:permissions.txt` | subjek | — |
+| `apk_static`: `service_observed_declared`, `accessibility_service_observed_declared`, `special_access_capability_observed_declared` (`accessibility_service`, `notification_listener`), `event_trigger_capability_observed_declared` | `pull_subject_apk` · `static:manifest.txt` | subjek | action vocab tidak dideklarasikan |
 | — (artefak konteks saja) | `pull_subject_apk` · `static:native_libs.txt`, `static:api_refs.txt` | subjek | — |
+| **tanpa produsen**: `scenario_subject_binding_observed`, `synthetic_exclusion_marker_observed`, `event_trigger_execution_observed` (v0.80.5), `uid_network_activity_observed` (v0.70.2), `local_endpoint_request_observed` (v0.80.4), `sms_record_observed`, `contact_record_observed`, `call_log_record_observed` (v0.70.1), `notification_context_observed`, `lab_network_flow_observed` (tak terjadwal) | — | — | — |
 
 - Tanpa baris `evidence` untuk part itu → `not_acquired`; status bukan `acquired` → `availability_<status>`;
   ada artefak `failed` → `parse_incomplete`. FALSE hanya bila `acquired` + semua artefak `parsed`/`empty`.
+- Hanya artefak **versi pengurai terbaru** per bukti yang dinilai (cakupan dan pemilihan fakta).
+- `part_for`: tanpa produsen → penanda "tanpa produsen" (bukan galat; §ENGINE); `UnknownCoverageSourceError` hanya untuk event di luar katalog
+  atau `object_value` tak dikenal. Produsen baru → baris tabel ini dipindah di kartu yang membuatnya.
+- Dua sumber: TRUE bila salah satu memuat positif; tidak → UNKNOWN, reason: ada sumber lengkap → `coverage_incomplete`, tidak → reason inventaris.
+- `Coverage.time_range` (`(start, end)` | `None`): rentang waktu yang dicakup sumber riwayat/agregat; `None` sampai produsennya (netstats v0.70.2); usage `None`.
+- Asumsi belum diverifikasi: `pm list packages -U` = pengguna 0 (cek saat ada pengguna kedua, v0.90.7).
 - Fakta negatif hanya untuk subjek sesi, ⛔ untuk paket inventaris lain.
 - Lingkup pengguna `[plan]` (2026-10-09): subjek = paket di **pengguna Android 0**; TRUE/FALSE berlaku untuk pengguna 0.
   Dump paket: izin runtime & `installed` dari blok `User 0:`; `settings secure`/`appops` = pengguna aktif (0 di lingkungan uji).
@@ -455,18 +467,19 @@ dan hanya bila sumbernya `acquired` + terurai penuh untuk subjek itu (v0.45.6).
 | `rule_references` | rule_metadata_id, source_id (PK gabungan) | v0.50 |
 | `rule_element_references` | id, rule_metadata_id, rule_element_key, source_id, reference_role, extracted_claim, version_scope NULL, verification_status | v0.50 |
 | `correlation_runs`* | id, case_id, evidence_mode, run_purpose, window_start NULL, window_end NULL, subjects JSONB, rule_set_hash, kb_hash, code_commit, created_at | v0.60 |
-| `rule_family_evaluations` | id, correlation_run_id, family_id, rule_metadata_id*, subject_package*, subject_uid*, evidence_mode, run_purpose, outcome, matched_profile_ids JSONB, interpretation_status, reason NULL | v0.60 |
-| `rule_profile_evaluations` | id, correlation_run_id, family_evaluation_id*, rule_id (→ rule_metadata), profile_id, subject_package*, subject_uid*, evidence_mode, run_purpose, evaluation_status, outcome NULL, interpretation_status, reason NULL, evaluated_at | v0.60 |
-| `rule_condition_results` | id, profile_evaluation_id, condition_key (`profile_id.condition_id`), role, operator, selector_json, state, reason NULL, conflict_reason NULL | v0.60 |
+| `rule_family_evaluations` | id, correlation_run_id, family_id, rule_metadata_id*, subject_package*, subject_uid* NULL, subject_apk_sha256* NULL, evidence_mode, run_purpose, outcome, matched_profile_ids JSONB, interpretation_status, reason NULL | v0.60 |
+| `rule_profile_evaluations` | id, correlation_run_id, family_evaluation_id*, rule_id (→ rule_metadata), profile_id, subject_package*, subject_uid* NULL, subject_apk_sha256* NULL, evidence_mode, run_purpose, evaluation_status, outcome NULL, interpretation_status, reason NULL, evaluated_at | v0.60 |
+| `rule_condition_results` | id, profile_evaluation_id, condition_key (`profile_id.condition_id`), role, operator, selector_json JSONB, state, reason NULL, conflict_reason JSONB NULL | v0.60 |
 | `rule_condition_facts` | condition_result_id, normalized_event_id (PK gabungan) | v0.60 |
-| `correlation_findings` | id, family_evaluation_id, profile_evaluation_id UNIQUE, claim_level, interpretation_status, blocked_from_reconstruction, subject_package, subject_uid, window_start, window_end, summary | v0.60 |
+| `correlation_findings` | id, family_evaluation_id, profile_evaluation_id UNIQUE, claim_level, interpretation_status, blocked_from_reconstruction, subject_package, subject_uid NULL, subject_apk_sha256* NULL, window_start NULL, window_end NULL, summary, limitations* JSONB | v0.60 |
 | `reconstruction_runs` | id, correlation_run_id, subject_package, subject_uid, window_start, window_end, status | v0.70 |
 | `reconstruction_findings` | reconstruction_run_id, finding_id, sequence_order, relation_type | v0.70 |
 | `investigation_hypotheses` | id, reconstruction_run_id UNIQUE, statement, support_scope, missing_evidence JSONB, created_at — ⛔ tanpa UPDATE | v0.70 |
 | `reports` | id, case_id, correlation_run_id, generated_at, content_hash, format | v1.00 |
 
-`correlation_runs.subjects` = daftar package yang dievaluasi; default = package yang punya bukti
-`collect_package_detail` (runtime) atau bundel statis (apk_static) di kasus itu.
+`correlation_runs.subjects` = subjek yang dievaluasi (§ENGINE): runtime = nama paket, `apk_static` = `{package, apk_sha256}`.
+v0.60: kolom tanpa tanda NULL = NOT NULL. CHECK: enum §ENUM2 (`reason` ∈ `UnknownReason`), `skipped_not_applicable` ⇔ `outcome` NULL,
+`state='UNKNOWN'` ⇔ `reason` NOT NULL. UNIQUE `rule_condition_results(profile_evaluation_id, condition_key)`.
 
 ## §YAML — lokasi & salinan aturan
 
@@ -478,7 +491,7 @@ dan hanya bila sumbernya `acquired` + terurai penuh untuk subjek itu (v0.45.6).
   `extracted_claim` = kolom "Peran/label baku"; `version_scope`, `quality_note` = `null` + `# TODO(open-data)` (kunci tetap ada),
   diisi USER di `v0.90.2`; loader `holdout` menolak NULL (`kb_incomplete`).
 - Sintaks baseline = kunci yang dipakai §14.2, ⛔ lainnya (skema `extra="forbid"`):
-  - `reference_ids` keluarga wajib, tidak kosong; kondisi **opsional** (9 dari 55 kondisi §14.2 tanpa), bila ada: tidak kosong,
+  - `reference_ids` keluarga wajib, tidak kosong; kondisi **opsional** (14 dari 55 kondisi §14.2 tanpa), bila ada: tidak kosong,
     tanpa duplikat, resolve ke `kb_sources.active`. Rujukan tingkat profil/`limitations` tidak ada.
   - `any_of` dan override `reference_role` per elemen: **tidak didukung** (core tidak mendefinisikan bentuknya, §14.2 tidak
     memakai) → `schema_invalid`. Dibutuhkan saat authoring → keputusan planning (bentuk + semantik v0.60) sebelum freeze.
@@ -523,6 +536,92 @@ dan hanya bila sumbernya `acquired` + terurai penuh untuk subjek itu (v0.45.6).
 | `GET /api/cases/{case_id}/reconstructions?run=` · `GET /api/trace/profile-evaluations/{id}` · `GET /api/trace/findings/{id}` | JWT | v0.70 |
 | `POST /api/static-bundles` (multipart: `bundle.zip` + `case_id`) | JWT | v0.90 |
 | `GET /api/cases/{case_id}/report?run=` (HTML) | JWT | v1.00 |
+
+- `/analyze`: 422 `invalid_window` · `no_subjects` · subjek di luar `PACKAGE_NAME_PATTERN`; 409 `{code, path}` dari `RuleLoadError`; 409 `code_commit_unverified` (§ENGINE).
+
+## §ENGINE — mesin aturan v0.60 `[plan]` (2026-10-13)
+
+Lapisan: selector (DB: subjek, fakta, `Coverage`) → operator (fungsi murni: fakta + `Coverage` + jendela → `ConditionOutcome`) → profil →
+keluarga → pencatatan.
+
+**Subjek per mode**
+
+| Mode | Subjek | Default `subjects` | Sesi sumber |
+|---|---|---|---|
+| `installed_runtime` | `subject_package` (pengguna 0); `subject_uid` = `uid_observed` subjek di sesi sumber identitas (tak ada / >1 nilai → NULL) | paket ber-`collect_package_detail` di kasus | §COV |
+| `apk_static` | `(subject_package, subject_apk_sha256)` per sesi bundel; hash = `object_value` `apk_identity_observed` sesi itu (tak ada → NULL) | tiap pasangan dari sesi `pull_subject_apk` kasus; pasangan sama → sesi terbaru | sesi bundel itu |
+
+`subjects` eksplisit = nama paket; `apk_static` mengembangkannya ke pasangan. Subjek tanpa bukti tetap dievaluasi (UNKNOWN). Kosong → 422 `no_subjects`.
+
+**Pemilihan fakta** (urut)
+1. `event_type` = `fact` kondisi; part dari §COV per (event_type, nilai sasaran, mode).
+2. Hanya fakta dari artefak versi pengurai terbaru bukti itu.
+3. `current_state`: hanya bukti `Coverage.evidence_ids` part sumber (dua sumber → gabungan). `historical_event`, `aggregated_window`: semua sesi kasus.
+4. Tanpa produsen (§COV): semua bukti kasus untuk subjek; positif → TRUE; selain itu UNKNOWN `not_acquired`, `sources=null`; ⛔ FALSE.
+5. Pengikatan subjek:
+
+| Fakta | Diikat lewat |
+|---|---|
+| `activity_observed_resumed` | `subject_package` (paket komponen) + `context_json.user == 0` |
+| `app_usage_observed` | `subject_package` + `context_json.user == 0` |
+| `process_observed_running`, `uid_network_activity_observed` | `subject_uid` = UID subjek < 100000, unik di inventaris sesi sumber; UID dipakai >1 paket / inventaris tak lengkap / UID subjek NULL → UNKNOWN `coverage_incomplete`; ⛔ nama proses |
+| fakta statis (`apk_static`) | bukti sesi bundel subjek |
+| `scenario_id` (K05-P02/P03) | definisi v0.80; v0.60 hanya lewat kondisi C01 |
+| lainnya | `subject_package` |
+
+**`time_binding`** · jendela run: `window_start` + `window_end` keduanya atau tidak sama sekali, `start < end` (else 422 `invalid_window`); ⛔ jendela bawaan.
+
+| Nilai | Profil | Penyaring fakta | Jendela run | Jendela temuan |
+|---|---|---|---|---|
+| `current` | K01-P01/P02, K02-P01..P03, K03-P01 | `current_state` sesi sumber | hanya kondisi `overlaps_window` | [min, max] `observed_at` fakta penopang kondisi wajib |
+| `observation_time` | K04-P02/P03 | `current_state` sesi sumber; tanpa jendela | tidak dipakai | idem |
+| `case_window` | K03-P03, K04-P01, K05-P02/P03 | fakta riwayat/agregat wajib beririsan; identitas tak disaring | wajib; kosong → kondisi berjendela UNKNOWN `coverage_incomplete` | [min, max] waktu fakta eksekusi penopang |
+| `bucket_overlap` | K05-P01 | bucket beririsan jendela run | wajib (idem) | [min `window_start`, max `window_end`] bucket penopang |
+| `not_applicable` | statis | — | tidak dipakai | NULL |
+
+Irisan: titik `t` → `start ≤ t ≤ end`; interval `[a, b)` → `a < end` ∧ `b > start`. `event_time` NULL → tak beririsan.
+
+**Operator** (`field` = `object_value` | `context_json.<kunci>`)
+
+| Operator | Keadaan |
+|---|---|
+| `exists` · `equals` · `in` | TRUE: positif cocok untuk nilai tak berkonflik. FALSE: tiap nilai sasaran punya negatif + cakupan part nilai itu lengkap. Cakupan lengkap tanpa negatif → UNKNOWN `coverage_incomplete`; selain itu reason cakupan. `exists` tanpa nilai: FALSE = ada negatif, tanpa positif, cakupan lengkap |
+| `greater_than` | TRUE: ada nilai sah > batas. FALSE: ≥1 nilai sah, semua ≤ batas, cakupan lengkap, dan (`bucket_overlap`) `time_range ⊇` jendela. Tanpa nilai → UNKNOWN |
+| `delta_greater_than` | observasi = sesi; nilai sesi = jumlah `field` fakta subjek yang beririsan jendela; dua sesi terbaru bercakupan lengkap; selisih baru − lama > batas → TRUE, ≤ → FALSE; <2 → UNKNOWN `coverage_incomplete` |
+| `overlaps_window` | TRUE: positif beririsan jendela run. FALSE: cakupan lengkap + `time_range ⊇` jendela + tanpa irisan. Jendela kosong → UNKNOWN `coverage_incomplete`. ⛔ fakta di luar jendela sebagai bukti ketiadaan |
+
+v0.60: `time_range` di data nyata selalu `None` → FALSE operator numerik/jendela hanya teruji sintetis.
+
+**Konflik, eksklusioner, pencatatan**
+- Konflik: nilai sasaran dengan positif + negatif sah (subjek, jendela sama) → tanpa positif tak berkonflik: UNKNOWN `conflicting_evidence`,
+  `conflict_reason = {"fact_ids": [...]}` terurut; ⛔ `RuleConditionFact` (UNKNOWN = 0 fakta). Beda antarsesi = perubahan keadaan, bukan konflik.
+- Eksklusioner TRUE → profil `constrained` (apa pun outcome); UNKNOWN → dicatat. Keluarga `constrained` hanya bila semua profil matched `constrained`.
+- `reason`: `UnknownReason` atau NULL. Kondisi UNKNOWN wajib; profil NULL; keluarga `no_applicable_profile` atau NULL.
+- `RuleConditionFact`: TRUE → semua positif cocok; FALSE → semua negatif nilai sasaran.
+- `selector_json`: `{fact, operator, field, value|values, subject:{package, uid, apk_sha256}, time_binding, window, sources:[{operation_id, raw_source, session_id, evidence_ids, availability_status, reason}] | null}`.
+- Profil `validation_only` di `production`/`apk_static` → `skipped_not_applicable` walau applicability memuatnya.
+
+**Temuan**: `summary` = `summary_template` dengan `{matched_values}` / `{object_value}` = `object_value` unik terurut (", ") fakta penopang
+kondisi wajib non-`identity_attribute`; placeholder lain ⛔. `limitations` = daftar YAML profil. Jendela: tabel `time_binding`.
+`blocked_from_reconstruction` = `constrained`.
+
+**Run**
+- Aturan `RuleLoader.load_all(run_purpose)` per run (§YAML "Dua cara muat"); semua rekaman satu transaksi; urutan stabil (sort kunci/id).
+- YAML `design_baseline` (sampai v0.80.10): `authoring`, `benign_control` jalan; `production`, `holdout` → 409 `status_not_allowed`.
+- `code_commit` dibaca sekali saat startup: `git rev-parse HEAD`; `git status --porcelain --untracked-files=no` tidak kosong → `<sha>-dirty`;
+  gagal → `unknown`. Run `holdout` dengan `-dirty`/`unknown` → 409 `code_commit_unverified`. Restart backend setelah commit sebelum holdout.
+- Fixture adapter v0.60: hanya test, evaluasi di memori, klon ⛔ ke DB. Fakta fixture run sungguhan → refresh v0.80 (rantai artefak → bukti → sesi
+  + lolos pemilihan fakta di atas).
+
+**Label kerja UI** (belum terkunci §4.7; nilai mentah selalu tampil): `ConditionRole` wajib · opsional · kontekstual · eksklusioner ·
+`EvaluationStatus` dievaluasi · tidak berlaku · `InterpretationStatus` normal · tertahan · `UnknownReason` `availability_<s>` sumber + padanan §ENUM ·
+`not_acquired` sumber belum diakuisisi (`sources=null`: sumber belum tersedia di platform) · `parse_incomplete` penguraian tidak lengkap ·
+`coverage_incomplete` cakupan tidak lengkap · `conflicting_evidence` bukti bertentangan · `no_applicable_profile` tidak ada profil yang berlaku ·
+`EvidenceMode` runtime terpasang · APK statis · `RunPurpose` authoring · holdout · kontrol benign · produksi.
+
+**Keterjangkauan `not_matched` di data nyata** (keputusan 2026-10-13: diputuskan di refresh v0.70/v0.80): K01, K02, K03 bisa ·
+K04 tidak (tanpa negatif activity/proses; usage `time_range=None`) · K05 kemungkinan tidak (netstats tanpa UID bernilai 0) ·
+statis K01-P03, K02-P04 tidak (tanpa negatif deklarasi).
 
 ## §SIM — simulator & skenario `[plan]` (nilai final = data OPEN, diisi v0.80)
 
