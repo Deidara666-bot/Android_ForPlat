@@ -2,6 +2,20 @@
 
 Satu entri per tag milestone. Rincian kartu: `docs/progress.md`; bukti: `docs/smoke/`.
 
+## v0.50 — 2026-10-13
+
+Basis pengetahuan + pemuat YAML APKF. Awal Increment 3 (penalaran): aturan dimuat, divalidasi, dan dapat dibaca; belum dievaluasi.
+
+- `kb_sources` (migrasi `98b9516689ef`) + `sources.yaml` berisi 11 entri `01_BREAKDOWN` §12.1. `version_scope` dan `quality_note` sengaja `null` (`TODO(open-data)`, diisi pemeriksa di `v0.90.2`); validator dan pemuat idempoten menolak id tak berawalan `KB-`, URL non-`https`, enum di luar himpunan, id ganda.
+- `rule_metadata`, `rule_references`, `rule_element_references` (migrasi `08afd29d88ec`) dan lima `APKF-K01`…`K05/family.yaml` yang **byte-identik** dengan blok §14.2 (16 profil: 3/4/3/3/3, 55 kondisi), dijaga test yang membaca `context/`. Skema `extra="forbid"` membaca persis kunci §14.2; `any_of` dan override `reference_role` tidak didukung (ditolak `schema_invalid`).
+- Validasi saat muat (§Z.0, §Y.3.3, §Y.3.3a): `RuleLoadError(code, path)` dengan kode tertutup. Aturan yang menyatakan kapabilitas sebagai eksekusi, fakta di luar katalog, parameter operator salah, rujukan kosong/ganda/tak resolve, `profile_id` ganda/tak berawalan keluarga, atau profil `validation_only` untuk produksi/`apk_static` **gagal dimuat**. 20 berkas rusak, masing-masing melanggar tepat satu hal (dibuktikan test).
+- `RuleLoader`: set keluarga tertutup (tepat 5 direktori); `load_all(run_purpose)` dengan gerbang status → kelengkapan KB → `freeze_manifest.json` (`rule_files` + `kb_sources`); `load_validated()` tanpa gerbang untuk startup. Baris `rule_metadata` insert-only per `content_hash`; `RuleSet.hash` dan `KnowledgeBase.hash` tercatat untuk `correlation_runs`.
+- `GET /api/rules`, `/api/rules/{family_id}`, `/api/kb/sources` (JWT, read-only, baris aktif). Startup memuat KB + aturan dalam satu transaksi; gagal → backend tetap hidup, rute 503 `{code}`, `/api/health` melapor `rules`.
+- Revisi dari review `fix/user0-scope`: fakta `sensitive_communication_capability_observed_granted` dari dump hanya bila terpasang untuk pengguna 0 (blok paket dan blok shared user).
+- 866 test backend + 214 test agen; `check.sh all` OK. Review `claim-auditor` + `forensic-integrity-reviewer`: 0 blocking; catatan non-blocking di `docs/progress.md`.
+- Tidak ada skor, bobot, ambang, atau peringkat; belum ada evaluasi aturan (itu `v0.60`). Aturan berstatus `design_baseline` dan belum dibekukan.
+- Tag ditempatkan di `main` (`f4baf8a`); tanpa AVD (milestone hanya membutuhkan PostgreSQL).
+
 ## v0.45 — 2026-10-09
 
 Kelengkapan kelompok sumber G1 + Tier-2 formatif (AVD #1). Akhir Increment 2.
