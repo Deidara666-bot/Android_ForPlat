@@ -9,6 +9,7 @@ from app.models.device import Device
 from app.models.evidence import Evidence
 from app.models.kb_source import KbSource
 from app.models.normalized_event import NormalizedEvent
+from app.models.rule_metadata import RuleElementReference, RuleMetadata, RuleReference
 from app.models.user import User
 
 __all__ = [
@@ -23,5 +24,8 @@ __all__ = [
     "Evidence",
     "KbSource",
     "NormalizedEvent",
+    "RuleElementReference",
+    "RuleMetadata",
+    "RuleReference",
     "User",
 ]

@@ -1,0 +1,74 @@
+schema_version: "3.3"
+rule_family:
+  family_id: APKF-K04
+  version: 1
+  status: design_baseline
+  name: package_execution_observed
+  incident_scope: apk_fraud_investigation
+  reference_ids: [KB-AND-PACKAGE, KB-AND-USAGE]
+  aggregation: {any_matched: matched, all_not_matched: not_matched, otherwise: insufficient_evidence}
+  unknown_handling: {required_unknown: insufficient_evidence, optional_unknown: annotate, contextual_unknown: annotate, exclusionary_unknown: do_not_exclude}
+  conflict_handling: {condition_conflict: insufficient_evidence, reason: conflicting_evidence}
+  profiles:
+    - profile_id: APKF-K04-P01
+      name: usage_history_execution
+      applicability:
+        evidence_modes: [installed_runtime]
+        run_purposes: [authoring, holdout, benign_control, production]
+      claim_level: observed_activity
+      subject_binding: [subject_package]
+      time_binding: case_window
+      conditions:
+        required:
+          - {condition_id: C01, fact: package_observed_installed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists, reference_ids: [KB-AND-PACKAGE]}
+          - {condition_id: C02, fact: app_usage_observed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: execution_observed, operator: overlaps_window, reference_ids: [KB-AND-USAGE]}
+        optional:
+          - {condition_id: C03, fact: uid_observed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists, reference_ids: [KB-AND-PACKAGE]}
+        contextual: []
+        exclusionary: []
+      output:
+        behavior_id: BHV-PACKAGE-USAGE-OBSERVED
+        summary_template: "Penggunaan package teramati dalam jendela analisis."
+        limitations: ["Ketepatan waktu dibatasi retensi dan granularitas sumber UsageStats/UsageEvents."]
+
+    - profile_id: APKF-K04-P02
+      name: resumed_activity_snapshot
+      applicability:
+        evidence_modes: [installed_runtime]
+        run_purposes: [authoring, holdout, benign_control, production]
+      claim_level: observed_activity
+      subject_binding: [subject_package]
+      time_binding: observation_time
+      conditions:
+        required:
+          - {condition_id: C01, fact: package_observed_installed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists, reference_ids: [KB-AND-PACKAGE]}
+          - {condition_id: C02, fact: activity_observed_resumed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: execution_observed, operator: exists}
+        optional:
+          - {condition_id: C03, fact: uid_observed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists}
+        contextual: []
+        exclusionary: []
+      output:
+        behavior_id: BHV-ACTIVITY-RESUMED-OBSERVED
+        summary_template: "Activity package teramati aktif saat observasi."
+        limitations: ["Snapshot tidak membuktikan riwayat eksekusi sebelum waktu observasi."]
+
+    - profile_id: APKF-K04-P03
+      name: running_process_snapshot
+      applicability:
+        evidence_modes: [installed_runtime]
+        run_purposes: [authoring, holdout, benign_control, production]
+      claim_level: observed_activity
+      subject_binding: [subject_package, subject_uid]
+      time_binding: observation_time
+      conditions:
+        required:
+          - {condition_id: C01, fact: package_observed_installed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists, reference_ids: [KB-AND-PACKAGE]}
+          - {condition_id: C02, fact: process_observed_running, source_group: APP_SYSTEM_STATE, expects_epistemic_class: execution_observed, operator: exists}
+        optional:
+          - {condition_id: C03, fact: activity_observed_resumed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: execution_observed, operator: exists}
+        contextual: []
+        exclusionary: []
+      output:
+        behavior_id: BHV-PROCESS-RUNNING-OBSERVED
+        summary_template: "Proses package/UID teramati berjalan saat observasi."
+        limitations: ["Snapshot tidak menjelaskan pemicu, durasi, atau tindakan yang dilakukan proses."]

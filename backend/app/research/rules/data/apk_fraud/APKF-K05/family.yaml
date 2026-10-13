@@ -1,0 +1,79 @@
+schema_version: "3.3"
+rule_family:
+  family_id: APKF-K05
+  version: 1
+  status: design_baseline
+  name: uid_package_network_activity
+  incident_scope: apk_fraud_investigation
+  reference_ids: [KB-AND-PACKAGE, KB-AND-NETWORK]
+  aggregation: {any_matched: matched, all_not_matched: not_matched, otherwise: insufficient_evidence}
+  unknown_handling: {required_unknown: insufficient_evidence, optional_unknown: annotate, contextual_unknown: annotate, exclusionary_unknown: do_not_exclude}
+  conflict_handling: {condition_conflict: insufficient_evidence, reason: conflicting_evidence}
+  profiles:
+    - profile_id: APKF-K05-P01
+      name: uid_network_statistics
+      applicability:
+        evidence_modes: [installed_runtime]
+        run_purposes: [authoring, holdout, benign_control, production]
+      claim_level: observed_activity
+      subject_binding: [subject_package, subject_uid]
+      time_binding: bucket_overlap
+      conditions:
+        required:
+          - {condition_id: C01, fact: package_observed_installed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists, reference_ids: [KB-AND-PACKAGE]}
+          - {condition_id: C02, fact: uid_observed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists, reference_ids: [KB-AND-PACKAGE]}
+          - {condition_id: C03, fact: uid_network_activity_observed, source_group: NETWORK_ACTIVITY, expects_epistemic_class: execution_observed, operator: greater_than, field: context_json.total_bytes, value: 0, reference_ids: [KB-AND-NETWORK]}
+        optional:
+          - {condition_id: C04, fact: uid_network_activity_observed, source_group: NETWORK_ACTIVITY, expects_epistemic_class: execution_observed, operator: delta_greater_than, field: context_json.total_bytes, value: 0, reference_ids: [KB-AND-NETWORK]}
+        contextual:
+          - {condition_id: C05, fact: apk_endpoint_reference_observed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists}
+        exclusionary: []
+      output:
+        behavior_id: BHV-UID-NETWORK-ACTIVITY-OBSERVED
+        summary_template: "Aktivitas jaringan teramati pada UID yang dipetakan ke package."
+        limitations: ["Tidak membuktikan endpoint, payload, tujuan komunikasi, atau eksfiltrasi."]
+
+    - profile_id: APKF-K05-P02
+      name: controlled_local_endpoint_request
+      applicability:
+        evidence_modes: [installed_runtime]
+        run_purposes: [authoring, holdout]
+      validation_only: true
+      claim_level: observed_activity
+      subject_binding: [scenario_id, subject_package, subject_uid]
+      time_binding: case_window
+      conditions:
+        required:
+          - {condition_id: C01, fact: scenario_subject_binding_observed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists}
+          - {condition_id: C02, fact: local_endpoint_request_observed, source_group: NETWORK_ACTIVITY, expects_epistemic_class: execution_observed, operator: overlaps_window}
+        optional:
+          - {condition_id: C03, fact: uid_network_activity_observed, source_group: NETWORK_ACTIVITY, expects_epistemic_class: execution_observed, operator: overlaps_window, reference_ids: [KB-AND-NETWORK]}
+        contextual: []
+        exclusionary: []
+      output:
+        behavior_id: BHV-CONTROLLED-LOCAL-COMMUNICATION-OBSERVED
+        summary_template: "Simulator melakukan komunikasi terkendali ke endpoint lokal."
+        limitations: ["Keluaran hanya oracle validasi dan tidak digeneralisasi ke APK malware nyata."]
+
+    - profile_id: APKF-K05-P03
+      name: attributed_lab_flow_cooccurrence
+      applicability:
+        evidence_modes: [installed_runtime]
+        run_purposes: [authoring, holdout, benign_control]
+      validation_only: true
+      claim_level: contextual_cooccurrence
+      subject_binding: [scenario_id, subject_package, subject_uid]
+      time_binding: case_window
+      conditions:
+        required:
+          - {condition_id: C01, fact: scenario_subject_binding_observed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists}
+          - {condition_id: C02, fact: uid_network_activity_observed, source_group: NETWORK_ACTIVITY, expects_epistemic_class: execution_observed, operator: overlaps_window, reference_ids: [KB-AND-NETWORK]}
+          - {condition_id: C03, fact: lab_network_flow_observed, source_group: NETWORK_ACTIVITY, expects_epistemic_class: execution_observed, operator: overlaps_window}
+        optional: []
+        contextual:
+          - {condition_id: C04, fact: apk_endpoint_reference_observed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists}
+        exclusionary: []
+      output:
+        behavior_id: BHV-LAB-NETWORK-COOCCURRENCE
+        summary_template: "Aktivitas UID dan flow lab berkoeksistensi pada skenario/jendela yang sama."
+        limitations: ["Koeksistensi tidak membuktikan payload, niat, atau eksfiltrasi; atribusi dibatasi pada skenario terkontrol."]

@@ -216,3 +216,44 @@ class ReferenceRole(StrEnum):
 class VerificationStatus(StrEnum):
     verified_design = "verified_design"
     verified = "verified"
+
+
+class RuleStatus(StrEnum):
+    """Lifecycle of a rule YAML (REF §ENUM2): never goes backwards for the same test round."""
+
+    design_baseline = "design_baseline"
+    authoring_candidate = "authoring_candidate"
+    frozen_for_holdout = "frozen_for_holdout"
+
+
+class RunPurpose(StrEnum):
+    authoring = "authoring"
+    holdout = "holdout"
+    benign_control = "benign_control"
+    production = "production"
+
+
+class ClaimLevel(StrEnum):
+    identity = "identity"
+    capability = "capability"
+    observed_activity = "observed_activity"
+    contextual_cooccurrence = "contextual_cooccurrence"
+
+
+class TimeBinding(StrEnum):
+    current = "current"
+    not_applicable = "not_applicable"
+    case_window = "case_window"
+    observation_time = "observation_time"
+    bucket_overlap = "bucket_overlap"
+
+
+class Operator(StrEnum):
+    """The only operators a rule condition may use (02_ARSITEKTUR §Z.0.1)."""
+
+    exists = "exists"
+    equals = "equals"
+    in_ = "in"
+    greater_than = "greater_than"
+    delta_greater_than = "delta_greater_than"
+    overlaps_window = "overlaps_window"
