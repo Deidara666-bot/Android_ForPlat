@@ -13,7 +13,7 @@
 | *Increment* aktif | **2 selesai** (kelengkapan kelompok G1, tag `v0.45`). Berikutnya **3** (penalaran: `v0.50`–`v0.60`) |
 | Milestone aktif | `v0.45` tercapai (tag `v0.45`, 2026-10-09). Berikutnya **`v0.50`** (disegarkan 2026-10-09) |
 | Kartu terakhir | **`v0.50.4`** (2026-10-13, di `feature/v0.50`) |
-| Kartu berikutnya | `/card v0.50.5` (kartu terakhir `v0.50`: lalu `/finish-branch`). Keputusan user tertunda: hapus branch lama; catatan non-blocking review `v0.45` untuk Planning |
+| Kartu berikutnya | Revisi `v0.50.4` (R1–R3), lalu `/card v0.50.5` (kartu terakhir `v0.50`: lalu `/finish-branch`). Keputusan user tertunda: hapus branch lama; catatan non-blocking review `v0.45` untuk Planning |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30`, `v0.40` (2026-10-02), `v0.45` (2026-10-09)
