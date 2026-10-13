@@ -318,8 +318,15 @@ _OTHER_USER = "package_detail_other_user_synthetic.txt"
 _MULTIUSER = "package_detail_settings_multiuser_api36.txt"
 
 
+_GRANTED_EVENT = "sensitive_communication_capability_observed_granted"
+
+
 def _without_identity(facts: list[NormalizedFact]) -> list[NormalizedFact]:
     return [f for f in facts if f.event_type not in _IDENTITY_EVENTS]
+
+
+def _without_identity_and_granted(facts: list[NormalizedFact]) -> list[NormalizedFact]:
+    return [f for f in _without_identity(facts) if f.event_type != _GRANTED_EVENT]
 
 
 def test_installed_true_for_user_0_gives_the_identity_facts_with_android_user_0() -> None:
@@ -334,8 +341,10 @@ def test_installed_true_for_user_0_gives_the_identity_facts_with_android_user_0(
 def test_not_installed_or_unreadable_for_user_0_gives_no_identity_fact(name: str) -> None:
     facts = _facts(_artifacts(name))
     assert not [f for f in facts if f.event_type in _IDENTITY_EVENTS]
-    # the declarations describe the APK: identical to the installed=true fixture
-    assert _summary(facts) == _summary(_without_identity(_facts(_artifacts())))
+    # the declarations describe the APK: identical to the installed=true fixture; granted facts
+    # are about user 0 and go with the identity (R4)
+    assert not [f for f in facts if f.event_type == _GRANTED_EVENT]
+    assert _summary(facts) == _summary(_without_identity_and_granted(_facts(_artifacts())))
 
 
 def test_declarations_keep_their_uid_from_the_identity_artifact_when_not_installed() -> None:
@@ -370,3 +379,66 @@ def test_real_multi_user_dump_gives_user_0_identity_with_user_10_as_context() ->
     assert [f.event_type for f in identity] == ["package_observed_installed", "uid_observed"]
     assert all(f.context_json["other_users_installed"] == [10] for f in identity)
     assert all(f.subject_package == "com.android.settings" for f in identity)
+
+
+# --- granted facts gated on the user 0 install (R4) -------------------------------------
+
+_USER0_LINE = "    User 0: ceDataInode=557114 deDataInode=393276 installed=true"
+_SEND_SMS = "android.permission.SEND_SMS"
+
+
+def _multiuser_text(*, installed: str) -> bytes:
+    """The real multi-user dump with the package's own `User 0:` line rewritten (inline)."""
+    text = (_FIXTURES / _MULTIUSER).read_text(encoding="utf-8")
+    assert text.count(_USER0_LINE) == 1
+    return text.replace(_USER0_LINE, _USER0_LINE.replace("installed=true", installed)).encode()
+
+
+def _granted(facts: list[NormalizedFact]) -> list[NormalizedFact]:
+    return [f for f in facts if f.event_type == _GRANTED_EVENT]
+
+
+def test_shared_user_granted_yields_facts_when_installed_for_user_0() -> None:
+    facts = _facts(PackageDetailParser().parse(_multiuser_text(installed="installed=true")))
+    granted = _granted(facts)
+    assert _SEND_SMS in {f.object_value for f in granted}
+    assert all(f.context_json["android_user"] == 0 for f in granted)
+    assert all(f.context_json["scope"] == "shared_user" for f in granted)
+
+
+@pytest.mark.parametrize("installed", ["installed=false", "hidden=false"])
+def test_shared_user_granted_yields_nothing_when_not_installed_or_unreadable_for_user_0(
+    installed: str,
+) -> None:
+    # `installed=false`, or the `installed=` key removed (-> null): SEND_SMS stays granted=true
+    # in the `Shared users:` block, but that is no evidence about user 0.
+    data = _multiuser_text(installed=installed)
+    artifacts = PackageDetailParser().parse(data)
+    assert any(  # the shared-user grant is still parsed: the gate is the normalizer's
+        a.artifact_type == "granted_permission"
+        and a.parsed_value_json.get("name") == _SEND_SMS
+        and a.parsed_value_json.get("granted") is True
+        for a in artifacts
+    )
+    facts = _facts(artifacts)
+    assert _granted(facts) == []
+    assert not [f for f in facts if f.event_type in _IDENTITY_EVENTS]
+
+
+def test_granted_without_any_identity_artifact_yields_nothing() -> None:
+    artifact = _artifact(
+        "granted_permission", {"name": _SEND_SMS, "granted": True, "scope": "shared_user"}
+    )
+    assert _granted(_facts([artifact])) == []
+
+
+def test_build_context_carries_the_user_0_flag_only_when_it_is_a_boolean() -> None:
+    def ctx(value: object) -> NormalizationContext:
+        return build_context(
+            [_artifact("package_identity", {"user_id": 1000, "installed_user0": value})]
+        )
+
+    assert ctx(True).installed_user0 is True
+    assert ctx(False).installed_user0 is False
+    assert ctx(None).installed_user0 is None
+    assert ctx("true").installed_user0 is None

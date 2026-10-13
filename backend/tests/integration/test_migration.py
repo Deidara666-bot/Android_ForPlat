@@ -13,7 +13,11 @@ _TABLES = {
     "cases",
     "devices",
     "evidence",
+    "kb_sources",
     "normalized_events",
+    "rule_element_references",
+    "rule_metadata",
+    "rule_references",
     "users",
 }
 

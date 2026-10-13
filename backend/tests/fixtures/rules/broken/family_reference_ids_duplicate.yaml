@@ -1,0 +1,50 @@
+schema_version: "3.3"
+rule_family:
+  family_id: APKF-K01
+  version: 1
+  status: design_baseline
+  name: sensitive_communication_capability
+  incident_scope: apk_fraud_investigation
+  reference_ids: [KB-AND-PACKAGE, KB-AND-PERMISSION, KB-AND-PACKAGE]
+  aggregation: {any_matched: matched, all_not_matched: not_matched, otherwise: insufficient_evidence}
+  unknown_handling: {required_unknown: insufficient_evidence, optional_unknown: annotate, contextual_unknown: annotate, exclusionary_unknown: do_not_exclude}
+  conflict_handling: {condition_conflict: insufficient_evidence, reason: conflicting_evidence}
+  profiles:
+    - profile_id: APKF-K01-P01
+      name: runtime_sms_capability
+      applicability:
+        evidence_modes: [installed_runtime]
+        run_purposes: [authoring, production]
+      claim_level: capability
+      subject_binding: [subject_package]
+      time_binding: current
+      conditions:
+        required:
+          - {condition_id: C01, fact: package_observed_installed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists, reference_ids: [KB-AND-PACKAGE]}
+          - {condition_id: C02, fact: sensitive_communication_capability_observed_granted, source_group: APP_SYSTEM_STATE, expects_epistemic_class: capability_state, operator: in, field: object_value, values: [android.permission.READ_SMS], reference_ids: [KB-AND-PERMISSION]}
+        optional:
+          - {condition_id: C03, fact: permission_observed_requested, source_group: APP_SYSTEM_STATE, expects_epistemic_class: capability_state, operator: in, field: object_value, values: [android.permission.READ_SMS]}
+        contextual: []
+        exclusionary: []
+      output:
+        behavior_id: BHV-SENSITIVE-SMS-CAPABILITY
+        summary_template: "Package memiliki kapabilitas SMS aktif: {matched_values}."
+        limitations: ["Tidak membuktikan SMS telah dibaca, diterima, atau dikirim oleh package."]
+    - profile_id: APKF-K01-P02
+      name: static_sensitive_communication_declaration
+      applicability:
+        evidence_modes: [apk_static]
+        run_purposes: [authoring, production]
+      claim_level: capability
+      subject_binding: [subject_package, apk_sha256]
+      time_binding: not_applicable
+      conditions:
+        required:
+          - {condition_id: C01, fact: apk_identity_observed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists}
+        optional: []
+        contextual: []
+        exclusionary: []
+      output:
+        behavior_id: BHV-SENSITIVE-COMMUNICATION-DECLARED
+        summary_template: "APK mendeklarasikan kapabilitas komunikasi sensitif."
+        limitations: ["Tidak membuktikan APK dipasang."]

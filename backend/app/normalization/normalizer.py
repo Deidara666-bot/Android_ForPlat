@@ -75,10 +75,12 @@ class NormalizationContext:
     """What one artifact needs to know about the other artifacts of the same evidence.
 
     `subject_uid` is the uid the package-identity artifact reported; `component_kinds` maps a
-    component name to the kinds (`receiver`, `service`, ...) it was declared under.
+    component name to the kinds (`receiver`, `service`, ...) it was declared under;
+    `installed_user0` is what the identity artifact read for Android user 0 (`None` = not read).
     """
 
     subject_uid: int | None = None
+    installed_user0: bool | None = None
     component_kinds: Mapping[str, frozenset[str]] = field(default_factory=dict)
     session_timezone: str | None = None  # device zone of the session; None/"unknown" = not known
 
@@ -86,6 +88,7 @@ class NormalizationContext:
 def build_context(artifacts: Sequence[ArtifactLike]) -> NormalizationContext:
     """Context from the parsed artifacts of one evidence file; failed rows contribute nothing."""
     uid: int | None = None
+    installed_user0: bool | None = None
     kinds: dict[str, set[str]] = {}
     for artifact in artifacts:
         if ParseStatus(artifact.parse_status) != ParseStatus.parsed:
@@ -95,6 +98,9 @@ def build_context(artifacts: Sequence[ArtifactLike]) -> NormalizationContext:
             candidate = value.get("user_id")
             if isinstance(candidate, int) and not isinstance(candidate, bool):
                 uid = candidate
+            flag = value.get("installed_user0")
+            if isinstance(flag, bool):
+                installed_user0 = flag
         elif artifact.artifact_type == _COMPONENT:
             name, kind = value.get("name"), value.get("kind")
             if isinstance(name, str) and isinstance(kind, str):
@@ -104,7 +110,9 @@ def build_context(artifacts: Sequence[ArtifactLike]) -> NormalizationContext:
             if isinstance(name, str) and isinstance(kind, str) and artifact.subject_key:
                 qualified = qualify_component(artifact.subject_key, name)
                 kinds.setdefault(qualified, set()).add(kind)
-    return NormalizationContext(uid, {name: frozenset(k) for name, k in kinds.items()})
+    return NormalizationContext(
+        uid, installed_user0, {name: frozenset(k) for name, k in kinds.items()}
+    )
 
 
 def split_claims(
@@ -230,8 +238,9 @@ def _normalize_detail(
     text and never become `event_time`. Nothing here is a negative fact (that is v0.45.7).
 
     The examined user is Android user 0 (REF §COV): "installed" and the UID are facts only when
-    the dump says `installed=true` for that user. Declarations (permissions asked for, components,
-    actions) describe the APK and stay either way. Identity and granted facts carry
+    the dump says `installed=true` for that user; the same gate holds for granted facts, whether
+    they come from the package block or the shared-user block. Declarations (permissions asked
+    for, components, actions) describe the APK and stay either way. Identity and granted facts carry
     `android_user: 0`; identity also lists the other users that have the package.
     """
     package = artifact.subject_key
@@ -275,8 +284,13 @@ def _normalize_detail(
             "scope": value.get("scope"),
             "android_user": 0,
         }
-        # Only an explicit `granted: true` counts; `false` yields no fact here.
-        if value.get("granted") is True and name in SENSITIVE_COMMUNICATION_PERMISSIONS:
+        # Only an explicit `granted: true` counts, and only when the package is installed for
+        # user 0: the shared-user block of a package that is not is no evidence about user 0.
+        if (
+            value.get("granted") is True
+            and context.installed_user0 is True
+            and name in SENSITIVE_COMMUNICATION_PERMISSIONS
+        ):
             claims = [("sensitive_communication_capability_observed_granted", "permission", name)]
     elif kind == _COMPONENT:
         name, component_kind = _text(value, "name"), _text(value, "kind")

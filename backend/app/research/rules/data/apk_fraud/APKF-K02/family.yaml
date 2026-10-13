@@ -1,0 +1,96 @@
+schema_version: "3.3"
+rule_family:
+  family_id: APKF-K02
+  version: 1
+  status: design_baseline
+  name: privileged_interface_capability
+  incident_scope: apk_fraud_investigation
+  reference_ids: [KB-AND-PACKAGE, KB-AND-PERMISSION, KB-AND-ACCESSIBILITY, KB-AND-OVERLAY, KB-AND-NOTIFICATION, KB-AND-USAGE, KB-MITRE-T1417-002, KB-MITRE-T1644]
+  aggregation: {any_matched: matched, all_not_matched: not_matched, otherwise: insufficient_evidence}
+  unknown_handling: {required_unknown: insufficient_evidence, optional_unknown: annotate, contextual_unknown: annotate, exclusionary_unknown: do_not_exclude}
+  conflict_handling: {condition_conflict: insufficient_evidence, reason: conflicting_evidence}
+  profiles:
+    - profile_id: APKF-K02-P01
+      name: accessibility_enabled
+      applicability:
+        evidence_modes: [installed_runtime]
+        run_purposes: [authoring, holdout, benign_control, production]
+      claim_level: capability
+      subject_binding: [subject_package]
+      time_binding: current
+      conditions:
+        required:
+          - {condition_id: C01, fact: package_observed_installed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists, reference_ids: [KB-AND-PACKAGE]}
+          - {condition_id: C02, fact: special_access_capability_observed_enabled, source_group: APP_SYSTEM_STATE, expects_epistemic_class: capability_state, operator: equals, field: object_value, value: accessibility_service, reference_ids: [KB-AND-ACCESSIBILITY, KB-MITRE-T1417-002]}
+        optional:
+          - {condition_id: C03, fact: accessibility_service_observed_declared, source_group: APP_SYSTEM_STATE, expects_epistemic_class: capability_state, operator: exists, reference_ids: [KB-AND-ACCESSIBILITY]}
+        contextual:
+          - {condition_id: C04, fact: app_usage_observed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: execution_observed, operator: overlaps_window, reference_ids: [KB-AND-USAGE]}
+        exclusionary: []
+      output:
+        behavior_id: BHV-ACCESSIBILITY-CAPABILITY-ACTIVE
+        summary_template: "Layanan aksesibilitas milik package teramati aktif."
+        limitations: ["Aktif tidak membuktikan penyalahgunaan aksesibilitas."]
+
+    - profile_id: APKF-K02-P02
+      name: overlay_enabled
+      applicability:
+        evidence_modes: [installed_runtime]
+        run_purposes: [authoring, holdout, benign_control, production]
+      claim_level: capability
+      subject_binding: [subject_package]
+      time_binding: current
+      conditions:
+        required:
+          - {condition_id: C01, fact: package_observed_installed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists, reference_ids: [KB-AND-PACKAGE]}
+          - {condition_id: C02, fact: special_access_capability_observed_enabled, source_group: APP_SYSTEM_STATE, expects_epistemic_class: capability_state, operator: equals, field: object_value, value: draw_over_other_apps, reference_ids: [KB-AND-OVERLAY, KB-MITRE-T1417-002]}
+        optional:
+          - {condition_id: C03, fact: permission_observed_requested, source_group: APP_SYSTEM_STATE, expects_epistemic_class: capability_state, operator: equals, field: object_value, value: android.permission.SYSTEM_ALERT_WINDOW, reference_ids: [KB-AND-OVERLAY]}
+        contextual:
+          - {condition_id: C04, fact: app_usage_observed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: execution_observed, operator: overlaps_window, reference_ids: [KB-AND-USAGE]}
+        exclusionary: []
+      output:
+        behavior_id: BHV-OVERLAY-CAPABILITY-ACTIVE
+        summary_template: "Package teramati memiliki kemampuan menggambar di atas aplikasi lain."
+        limitations: ["Tidak membuktikan overlay ditampilkan atau digunakan untuk phishing."]
+
+    - profile_id: APKF-K02-P03
+      name: notification_listener_enabled
+      applicability:
+        evidence_modes: [installed_runtime]
+        run_purposes: [authoring, holdout, benign_control, production]
+      claim_level: capability
+      subject_binding: [subject_package]
+      time_binding: current
+      conditions:
+        required:
+          - {condition_id: C01, fact: package_observed_installed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists, reference_ids: [KB-AND-PACKAGE]}
+          - {condition_id: C02, fact: special_access_capability_observed_enabled, source_group: APP_SYSTEM_STATE, expects_epistemic_class: capability_state, operator: equals, field: object_value, value: notification_listener, reference_ids: [KB-AND-NOTIFICATION, KB-MITRE-T1644]}
+        optional: []
+        contextual:
+          - {condition_id: C03, fact: notification_context_observed, source_group: SENSITIVE_COMMUNICATION, expects_epistemic_class: data_present, operator: exists, reference_ids: [KB-AND-NOTIFICATION, KB-MITRE-T1644]}
+        exclusionary: []
+      output:
+        behavior_id: BHV-NOTIFICATION-LISTENER-CAPABILITY-ACTIVE
+        summary_template: "Listener notifikasi milik package teramati aktif."
+        limitations: ["Tidak membuktikan isi notifikasi dibaca, disimpan, atau disalahgunakan."]
+
+    - profile_id: APKF-K02-P04
+      name: static_privileged_interface_declaration
+      applicability:
+        evidence_modes: [apk_static]
+        run_purposes: [authoring, production]
+      claim_level: capability
+      subject_binding: [subject_package, apk_sha256]
+      time_binding: not_applicable
+      conditions:
+        required:
+          - {condition_id: C01, fact: apk_identity_observed, source_group: APP_SYSTEM_STATE, expects_epistemic_class: identity_attribute, operator: exists, reference_ids: [KB-AND-PACKAGE]}
+          - {condition_id: C02, fact: special_access_capability_observed_declared, source_group: APP_SYSTEM_STATE, expects_epistemic_class: capability_state, operator: in, field: object_value, values: [accessibility_service, draw_over_other_apps, notification_listener], reference_ids: [KB-AND-ACCESSIBILITY, KB-AND-OVERLAY, KB-AND-NOTIFICATION]}
+        optional: []
+        contextual: []
+        exclusionary: []
+      output:
+        behavior_id: BHV-PRIVILEGED-INTERFACE-DECLARED
+        summary_template: "APK mendeklarasikan antarmuka/akses khusus: {matched_values}."
+        limitations: ["Tidak membuktikan APK dipasang, akses diaktifkan, atau antarmuka digunakan."]
