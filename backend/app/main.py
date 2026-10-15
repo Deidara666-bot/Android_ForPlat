@@ -14,6 +14,7 @@ from app.api.audit_handlers import audit_http_exception, audit_validation_error
 from app.api.routes import (
     acquisitions,
     agents,
+    analysis,
     auth,
     cases,
     coverage,
@@ -125,6 +126,7 @@ def create_app() -> FastAPI:
     app.include_router(cases.router, prefix="/api")
     app.include_router(events.router, prefix="/api")
     app.include_router(coverage.router, prefix="/api")
+    app.include_router(analysis.router, prefix="/api")
     app.include_router(agents.router, prefix="/api")
     app.include_router(devices.router, prefix="/api")
     app.include_router(acquisitions.router, prefix="/api")
