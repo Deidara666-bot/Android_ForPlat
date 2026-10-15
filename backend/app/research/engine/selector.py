@@ -67,6 +67,8 @@ def _fact_ref(row: NormalizedEvent, evidence_id: uuid.UUID) -> FactRef:
         event_time=row.event_time,
         subject_uid=row.subject_uid,
         context=row.context_json,
+        window_start=row.window_start,
+        window_end=row.window_end,
     )
 
 
@@ -79,6 +81,7 @@ def _source_ref(coverage: Coverage) -> SourceRef:
         availability_status=coverage.availability_status,
         reason=coverage.reason,
         can_be_false=coverage.can_be_false,
+        time_range=coverage.time_range,
     )
 
 

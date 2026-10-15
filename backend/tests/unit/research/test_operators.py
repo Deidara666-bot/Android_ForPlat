@@ -196,8 +196,3 @@ def test_the_outcome_refuses_an_unknown_without_reason_and_a_reason_without_unkn
         ConditionOutcome(ConditionState.TRUE, (uuid.uuid4(),), UnknownReason.not_acquired, None)
     with pytest.raises(ValueError, match="no supporting fact"):
         ConditionOutcome(ConditionState.UNKNOWN, (uuid.uuid4(),), UnknownReason.not_acquired, None)
-
-
-def test_numeric_and_window_operators_wait_for_their_card() -> None:
-    with pytest.raises(NotImplementedError):
-        evaluate(Operator.greater_than, [_ev((_source(),))])
