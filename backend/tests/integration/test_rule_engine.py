@@ -545,3 +545,29 @@ def test_outcome_and_state_labels_in_the_records_are_the_closed_enums(
     assert {p.interpretation_status for p in session.scalars(select(RuleProfileEvaluation))} <= {
         s.value for s in InterpretationStatus
     }
+
+
+def test_a_declared_boot_action_beside_actions_not_declared_is_no_conflict(
+    session: Session, scene: Scene
+) -> None:
+    """Real data: BOOT_COMPLETED declared and the other three actions explicitly not declared."""
+    _world(scene)
+    detail = scene.acquisition({_DETAIL: {"package_name": "com.a"}})  # newer than the world's
+    dump = scene.part(detail, _DETAIL, src.DUMPSYS_PACKAGE)
+    scene.fact(dump.artifact, _TRIGGER, _ACTIONS[0], "com.a")
+    for action in _ACTIONS[1:]:
+        scene.fact(dump.artifact, _TRIGGER, action, "com.a", positive=False)
+    _engine(session).run(scene.case.id, _RUNTIME, _AUTHORING)
+    optional = session.scalars(
+        select(RuleConditionResult).where(RuleConditionResult.condition_key == "APKF-K03-P03.C03")
+    ).one()
+    assert optional.state == "TRUE" and optional.conflict_reason is None
+    assert _count_links(session, optional.id) == 1  # only the declared BOOT_COMPLETED
+    required = session.scalars(
+        select(RuleProfileEvaluation).where(RuleProfileEvaluation.profile_id == "APKF-K03-P01")
+    ).one()
+    assert required.outcome == "matched"
+    conflicts = session.scalars(
+        select(RuleConditionResult).where(RuleConditionResult.reason == "conflicting_evidence")
+    ).all()
+    assert conflicts == []

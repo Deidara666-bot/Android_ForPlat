@@ -6,7 +6,11 @@ from datetime import UTC, datetime
 import pytest
 
 from app.core.constants import ConditionState, Operator, UnknownReason
-from app.research.engine.conflict import conflict_reason, conflicting_fact_ids
+from app.research.engine.conflict import (
+    conflict_reason,
+    conflicting_fact_ids,
+    conflicting_values,
+)
 from app.research.engine.operators import (
     ConditionOutcome,
     FactRef,
@@ -19,10 +23,10 @@ from app.research.engine.windows import RunWindow
 _T = datetime(2026, 10, 15, 8, 0, tzinfo=UTC)
 
 
-def _fact(positive: bool, at: datetime | None = None) -> FactRef:
+def _fact(positive: bool, at: datetime | None = None, value: str = "v") -> FactRef:
     return FactRef(
         id=uuid.uuid4(),
-        object_value="v",
+        object_value=value,
         predicate_value=positive,
         evidence_id=uuid.uuid4(),
         observed_at=_T,
@@ -114,3 +118,51 @@ def test_the_outcome_refuses_a_conflict_reason_without_facts_and_facts_without_t
         ConditionOutcome(
             ConditionState.UNKNOWN, (), UnknownReason.not_acquired, None, (uuid.uuid4(),)
         )
+
+
+def test_a_positive_and_a_negative_fact_of_different_values_never_conflict() -> None:
+    boot, locked = _fact(True, value="BOOT"), _fact(False, value="LOCKED")
+    assert conflicting_values([boot], [locked]) == frozenset()
+    assert conflicting_fact_ids([boot], [locked]) == ()
+
+
+def test_only_the_facts_of_the_conflicted_value_are_named() -> None:
+    pos, neg = _fact(True, value="A"), _fact(False, value="A")
+    other_pos, other_neg = _fact(True, value="B"), _fact(False, value="C")
+    ids = conflicting_fact_ids([pos, other_pos], [neg, other_neg])
+    assert set(ids) == {pos.id, neg.id}
+
+
+def test_exists_over_any_value_is_true_from_a_value_that_holds_beside_another_that_does_not() -> (
+    None
+):
+    """The real case: BOOT_COMPLETED declared, LOCKED_BOOT_COMPLETED explicitly not declared."""
+    boot, locked = _fact(True, value="BOOT"), _fact(False, value="LOCKED")
+    outcome = evaluate(Operator.exists, [ValueEvidence(None, (_source(),), (boot,), (locked,))])
+    assert outcome.state is ConditionState.TRUE
+    assert outcome.fact_ids == (boot.id,) and outcome.conflict_reason is None
+
+
+def test_a_clear_value_decides_while_another_value_conflicts() -> None:
+    clear = _fact(True, value="A")
+    pos, neg = _fact(True, value="B"), _fact(False, value="B")
+    outcome = evaluate(Operator.exists, [ValueEvidence(None, (_source(),), (clear, pos), (neg,))])
+    assert outcome.state is ConditionState.TRUE and outcome.fact_ids == (clear.id,)
+
+
+def test_when_every_positive_value_conflicts_the_unrelated_negative_is_not_named() -> None:
+    pos, neg = _fact(True, value="B"), _fact(False, value="B")
+    unrelated = _fact(False, value="C")
+    outcome = evaluate(
+        Operator.exists, [ValueEvidence(None, (_source(),), (pos,), (neg, unrelated))]
+    )
+    assert outcome.reason is UnknownReason.conflicting_evidence
+    assert set(outcome.conflict_fact_ids) == {pos.id, neg.id}
+
+
+def test_exists_over_any_value_is_false_when_only_negatives_exist_and_coverage_is_complete() -> (
+    None
+):
+    first, second = _fact(False, value="A"), _fact(False, value="B")
+    outcome = evaluate(Operator.exists, [ValueEvidence(None, (_source(),), (), (first, second))])
+    assert outcome.state is ConditionState.FALSE and set(outcome.fact_ids) == {first.id, second.id}

@@ -14,7 +14,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.core.constants import ConditionState, Operator, TimeBinding, UnknownReason
-from app.research.engine.conflict import conflict_reason, conflicting_fact_ids
+from app.research.engine.conflict import (
+    conflict_reason,
+    conflicting_fact_ids,
+    conflicting_values,
+)
 from app.research.engine.windows import (
     RunWindow,
     binding_uses_window,
@@ -142,13 +146,15 @@ def _value_result(evidence: ValueEvidence) -> _ValueResult:
         if evidence.positives:
             return _ValueResult(ConditionState.TRUE, None, _ids(evidence.positives))
         return _ValueResult(ConditionState.UNKNOWN, UnknownReason.not_acquired, ())
-    conflict = conflicting_fact_ids(evidence.positives, evidence.negatives)
-    if conflict:
+    conflicted = conflicting_values(evidence.positives, evidence.negatives)
+    clear = [fact for fact in evidence.positives if fact.object_value not in conflicted]
+    if clear:  # a value that holds without contradiction decides, whatever else conflicts
+        return _ValueResult(ConditionState.TRUE, None, _ids(clear))
+    if conflicted:
+        conflict = conflicting_fact_ids(evidence.positives, evidence.negatives)
         return _ValueResult(
             ConditionState.UNKNOWN, UnknownReason.conflicting_evidence, (), conflict
         )
-    if evidence.positives:
-        return _ValueResult(ConditionState.TRUE, None, _ids(evidence.positives))
     if evidence.negatives and all(source.can_be_false for source in evidence.sources):
         return _ValueResult(ConditionState.FALSE, None, _ids(evidence.negatives))
     return _ValueResult(ConditionState.UNKNOWN, _unknown_reason(evidence.sources), ())
