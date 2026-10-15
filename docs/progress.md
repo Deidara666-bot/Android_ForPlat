@@ -10,10 +10,10 @@
 | | |
 |---|---|
 | Core kanonik | `context/*_V3_3.md` — `FROZEN` (5 Sep 2026) |
-| *Increment* aktif | **3 berjalan** (penalaran): `v0.50` tercapai. Berikutnya **`v0.60`** (mesin aturan 3-keadaan) |
-| Milestone aktif | `v0.50` tercapai (tag `v0.50`, 2026-10-13). Berikutnya **`v0.60`** (disegarkan 2026-10-13, Planning 4) |
-| Kartu terakhir | **`v0.60.9`** (2026-10-15) — branch `feature/v0.60` |
-| Kartu berikutnya | `/finish-branch` v0.60 lalu ACC user untuk `/milestone v0.60`. Keputusan user tertunda: hapus branch lama; near-miss K04/K05 (refresh `v0.70`/`v0.80`) |
+| *Increment* aktif | **3 berjalan** (penalaran): `v0.60` tergabung ke `main`, menunggu tag. Berikutnya **`v0.70`** (rekonstruksi) |
+| Milestone aktif | `v0.60` tergabung ke `main` (2026-10-15), **tag `v0.60` menunggu ACC user** (`/milestone v0.60`). Sebelum `v0.70`: refresh kartu (Planning) |
+| Kartu terakhir | **`v0.60.9`** (2026-10-15) — digabung ke `main` |
+| Kartu berikutnya | ACC user `/milestone v0.60`; verifikasi visual UI `v0.60.8` oleh user. Keputusan user tertunda: hapus branch lama; near-miss K04/K05 (refresh `v0.70`/`v0.80`) |
 | Jalur naskah paralel | Generate 2 — paket 10 diagram `DGM-01`…`DGM-10` (`docs/diagrams/`), lalu BAB III Draft v3 |
 
 Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `v0.10` (2026-10-01), `v0.20`, `v0.30`, `v0.40` (2026-10-02), `v0.45` (2026-10-09), `v0.50` (2026-10-13)
@@ -249,6 +249,8 @@ Peta milestone lengkap: `docs/dev/ROADMAP.md`. Tag yang sudah dibuat: `v0.05`, `
 
 ## Sinkronisasi remote
 
+- 2026-10-15 — `/finish-branch v0.60`: `feature/v0.60` digabung `--no-ff` ke `main` (`e1e6667`), `check.sh all` OK di `main`, push GitHub. Reviewer `claim-auditor` + `forensic-integrity-reviewer`: 0 blocking. Branch `feature/v0.05`–`v0.60` dan `fix/*` belum dihapus (menunggu persetujuan user). Tag `v0.60` belum terbit (menunggu ACC user).
+  Catatan non-blocking review `v0.60`, TIDAK dikerjakan: (1) `in`/`equals` bernilai banyak: bila satu nilai berkonflik tetapi nilai lain TRUE tanpa kontradiksi, kondisi TRUE dan fakta konflik tidak tercatat di mana pun (benar untuk `exists` tanpa nilai; usul: batas disengaja di REF atau catat id konflik di `selector_json`) · (2) `SourceRef` TS dan `MissingEvidenceBadge`: sumber `not_acquired` mengirim `availability_status`/`session_id` null, tipe TS `string` → UI menampilkan "( )" kosong sebelum alasan (alasan tetap tampil; usul tipe `string | null`) · (3) `analyze`: `SummaryTemplateError`, `RecordingError`, `RuleSetPurposeError`, `ValueError` dari `parse_threshold` lolos jadi HTTP 500 (tanpa data setengah jadi) · (4) `delta_greater_than`: selisih negatif akibat counter reset setelah reboot dinilai FALSE; bahas sebelum produsen netstats `v0.70.2` · (5) `labels.ts` ada artefak format `epistemicClassLabel =(value` · (6) pesan galat `manifest_mismatch` memuat `{error}` mentah (bisa path absolut; belum bocor ke API karena `detail` tak dikirim) · (7) `read_code_commit` memakai `--untracked-files=no`: berkas aturan/kode baru yang belum di-`git add` tak membuat commit `-dirty` (batas untuk run `holdout`) · (8) `analyze` yang ditolak (409/422) tidak diaudit. Satu kalimat laporan `v0.60_unit_matrix.md` (K05 "kondisi wajib selalu tidak diketahui") dipersempit karena terlalu luas; hanya dokumen.
 - 2026-10-13 — `/finish-branch v0.50`: `feature/v0.50` digabung `--no-ff` ke `main` (`cb2ecc6`), `check.sh all` OK di `main`, push GitHub. Reviewer `claim-auditor` + `forensic-integrity-reviewer`: 0 blocking. Branch `feature/v0.05`–`v0.50` dan `fix/*` belum dihapus (menunggu persetujuan user). Tag `v0.50` belum terbit.
   Catatan non-blocking review `v0.50`, TIDAK dikerjakan: (1) cek awalan `profile_id` memakai `startswith(family_id)` (harfiah §Z.0), `APKF-K010-P1` di keluarga `APKF-K01` lolos; tidak berdampak karena set keluarga tertutup, usul `startswith(f"{family_id}-")` · (2) baris `rule_metadata` yang sudah ada (hash YAML sama) tidak menulis ulang `rule_references`/`rule_element_references`; bila `sources.yaml` berubah tanpa YAML aturan berubah, salinan `version_scope`/`reference_role` bisa usang (di freeze v0.90.2 YAML ikut berubah → baris baru; `kb_hash` di `RuleSet` mendeteksi bedanya) · (3) `/api/health` tanpa auth kini memuat `rules.code`, `rule_set_hash`, `kb_hash` (lanjutan catatan `app_env` v0.10; pertimbangkan membatasi bila dipakai di luar localhost) · (4) `KnowledgeBaseLoader.load_to_db` menimpa baris `kb_sources` tanpa riwayat tiap startup · (5) tanpa penguncian bila dua worker start bersamaan; tak ada UNIQUE `(family_id, profile_id, content_hash)` — aman untuk satu proses uvicorn.
 
