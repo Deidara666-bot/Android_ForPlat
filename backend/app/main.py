@@ -23,6 +23,7 @@ from app.api.routes import (
     health,
     rules,
 )
+from app.core.build_info import read_code_commit
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.session import SessionLocal
@@ -98,6 +99,7 @@ def load_rules_on_startup(app: FastAPI) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    app.state.code_commit = read_code_commit()  # once per start (REF section ENGINE, "Run")
     load_rules_on_startup(app)
     yield
 

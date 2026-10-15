@@ -28,9 +28,10 @@ from app.core.constants import EvidenceMode, TemporalSemantics, UnknownReason
 from app.models.acquisition_operation import AcquisitionOperation
 from app.models.acquisition_session import AcquisitionSession
 from app.models.artifact import Artifact
+from app.models.evidence import Evidence
 from app.models.normalized_event import NormalizedEvent
 from app.research.coverage import Coverage, CoverageService, PartSpec, Scope, parts_for
-from app.research.engine.operators import FactRef, SourceRef, ValueEvidence
+from app.research.engine.operators import FactRef, Observation, SourceRef, ValueEvidence
 
 # Android user ids start at 100000 per user: a UID at or above it is not an Android user 0 app.
 FIRST_NON_USER0_UID = 100000
@@ -177,6 +178,40 @@ class FactSelector:
         return [
             self._value_evidence(subject, event_type, value)
             for value in (values if values is not None else [None])
+        ]
+
+    def condition_observations(self, subject: Subject, event_type: str) -> list[Observation]:
+        """The sessions that hold facts of `event_type` for the subject, for `delta_greater_than`.
+
+        Only an event type without a producer is read here: it has no source coverage, so every
+        observation has `source=None` and the operator can never answer TRUE or FALSE from it.
+        An event type with a producer needs the coverage of each session, which no condition
+        uses yet: it gives no observation, so the delta stays UNKNOWN `coverage_incomplete`.
+        """
+        if parts_for(event_type, None, self.mode):
+            return []
+        binding = self._binding(subject, event_type)
+        if isinstance(binding, UnknownReason):
+            return []
+        rows = self._facts(
+            event_type, package=None if binding.by_uid else subject.package, uid=binding.uid
+        )
+        sessions = {
+            evidence_id: (session_id, started_at)
+            for evidence_id, session_id, started_at in self.db.execute(
+                select(Evidence.id, AcquisitionSession.id, AcquisitionSession.started_at)
+                .join(AcquisitionSession, AcquisitionSession.id == Evidence.acquisition_session_id)
+                .where(Evidence.id.in_({evidence_id for _, evidence_id in rows}))
+            )
+        }
+        grouped: dict[uuid.UUID, list[FactRef]] = {}
+        for row, evidence_id in rows:
+            if row.predicate_value is True:
+                grouped.setdefault(sessions[evidence_id][0], []).append(_fact_ref(row, evidence_id))
+        started = {session_id: started_at for session_id, started_at in sessions.values()}
+        return [
+            Observation(session_id, started[session_id], None, tuple(facts))
+            for session_id, facts in sorted(grouped.items(), key=lambda item: str(item[0]))
         ]
 
     def _value_evidence(
