@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.core.constants import ConditionState, Operator, TimeBinding, UnknownReason
+from app.research.engine.conflict import conflict_reason, conflicting_fact_ids
 from app.research.engine.windows import (
     RunWindow,
     binding_uses_window,
@@ -97,6 +98,14 @@ class ConditionOutcome:
             raise ValueError("a condition is UNKNOWN if and only if it has a reason")
         if self.state is ConditionState.UNKNOWN and self.fact_ids:
             raise ValueError("an UNKNOWN condition has no supporting fact")
+        in_conflict = self.reason is UnknownReason.conflicting_evidence
+        if in_conflict != bool(self.conflict_fact_ids):
+            raise ValueError("a conflict names its facts, and only a conflict does")
+
+    @property
+    def conflict_reason(self) -> dict[str, list[str]] | None:
+        """`conflict_reason` of the condition result: `{"fact_ids": [...]}` or None."""
+        return conflict_reason(self.conflict_fact_ids)
 
 
 @dataclass(frozen=True)
@@ -133,9 +142,11 @@ def _value_result(evidence: ValueEvidence) -> _ValueResult:
         if evidence.positives:
             return _ValueResult(ConditionState.TRUE, None, _ids(evidence.positives))
         return _ValueResult(ConditionState.UNKNOWN, UnknownReason.not_acquired, ())
-    if evidence.positives and evidence.negatives:
-        both = _ids([*evidence.positives, *evidence.negatives])
-        return _ValueResult(ConditionState.UNKNOWN, UnknownReason.conflicting_evidence, (), both)
+    conflict = conflicting_fact_ids(evidence.positives, evidence.negatives)
+    if conflict:
+        return _ValueResult(
+            ConditionState.UNKNOWN, UnknownReason.conflicting_evidence, (), conflict
+        )
     if evidence.positives:
         return _ValueResult(ConditionState.TRUE, None, _ids(evidence.positives))
     if evidence.negatives and all(source.can_be_false for source in evidence.sources):
@@ -255,15 +266,11 @@ def _in_scope(
 
 
 def _unknown(
-    reason: UnknownReason, sources: tuple[SourceRef, ...] | None, conflicts: Sequence[FactRef] = ()
+    reason: UnknownReason,
+    sources: tuple[SourceRef, ...] | None,
+    conflicts: tuple[uuid.UUID, ...] = (),
 ) -> ConditionOutcome:
-    return ConditionOutcome(
-        ConditionState.UNKNOWN,
-        (),
-        reason,
-        sources,
-        tuple(sorted({fact.id for fact in conflicts}, key=str)),
-    )
+    return ConditionOutcome(ConditionState.UNKNOWN, (), reason, sources, conflicts)
 
 
 def _single(values: Sequence[ValueEvidence]) -> ValueEvidence:
@@ -288,8 +295,9 @@ def evaluate_overlaps_window(
     if window is None:
         return _unknown(UnknownReason.coverage_incomplete, sources)
     inside = [f for f in evidence.positives if _meets_window(f, window)]
-    if inside and evidence.negatives:
-        return _unknown(UnknownReason.conflicting_evidence, sources, [*inside, *evidence.negatives])
+    conflict = conflicting_fact_ids(inside, evidence.negatives)
+    if conflict:
+        return _unknown(UnknownReason.conflicting_evidence, sources, conflict)
     if inside:
         return ConditionOutcome(ConditionState.TRUE, _ids(inside), None, sources)
     if not evidence.sources:
