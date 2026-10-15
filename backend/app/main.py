@@ -14,6 +14,7 @@ from app.api.audit_handlers import audit_http_exception, audit_validation_error
 from app.api.routes import (
     acquisitions,
     agents,
+    analysis,
     auth,
     cases,
     coverage,
@@ -23,6 +24,7 @@ from app.api.routes import (
     health,
     rules,
 )
+from app.core.build_info import read_code_commit
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.session import SessionLocal
@@ -98,6 +100,7 @@ def load_rules_on_startup(app: FastAPI) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    app.state.code_commit = read_code_commit()  # once per start (REF section ENGINE, "Run")
     load_rules_on_startup(app)
     yield
 
@@ -123,6 +126,7 @@ def create_app() -> FastAPI:
     app.include_router(cases.router, prefix="/api")
     app.include_router(events.router, prefix="/api")
     app.include_router(coverage.router, prefix="/api")
+    app.include_router(analysis.router, prefix="/api")
     app.include_router(agents.router, prefix="/api")
     app.include_router(devices.router, prefix="/api")
     app.include_router(acquisitions.router, prefix="/api")

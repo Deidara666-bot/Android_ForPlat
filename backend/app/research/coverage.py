@@ -8,9 +8,10 @@ evidence and artifact rows as they are; it creates no facts.
 
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
 from app.core import raw_sources as src
@@ -24,6 +25,7 @@ from app.models.acquisition_operation import AcquisitionOperation
 from app.models.acquisition_session import AcquisitionSession
 from app.models.artifact import Artifact
 from app.models.evidence import Evidence
+from app.normalization.event_schema import EVENT_TYPE_CATALOG
 
 
 class Scope(StrEnum):
@@ -51,6 +53,9 @@ _USAGESTATS = PartSpec("collect_usage_state", src.DUMPSYS_USAGESTATS, Scope.devi
 _ACTIVITY = PartSpec("collect_usage_state", src.DUMPSYS_ACTIVITY, Scope.device)
 _PS = PartSpec("collect_usage_state", src.PS, Scope.device)
 _STATIC_MANIFEST = PartSpec("pull_subject_apk", src.STATIC_MANIFEST, Scope.subject)
+_STATIC_PERMISSIONS = PartSpec("pull_subject_apk", src.STATIC_PERMISSIONS, Scope.subject)
+_STATIC_APK_SHA256 = PartSpec("pull_subject_apk", src.STATIC_APK_SHA256, Scope.subject)
+_STATIC_URLS = PartSpec("pull_subject_apk", src.STATIC_STRINGS_URLS, Scope.subject)
 
 _STATIC_BUNDLE = tuple(
     PartSpec("pull_subject_apk", label, Scope.subject)
@@ -96,33 +101,98 @@ _SPECIAL_ACCESS_ENABLED: dict[str, PartSpec] = {
     "notification_listener": _NLS,
     "draw_over_other_apps": _OVERLAY,
 }
+# Facts that the bundle extractor alone produces: their source is the same in every mode.
+_STATIC_ANY_MODE: dict[str, PartSpec] = {
+    "apk_identity_observed": _STATIC_APK_SHA256,
+    "apk_endpoint_reference_observed": _STATIC_URLS,
+}
+_STATIC_PERMISSION_EVENTS = frozenset(
+    {
+        "permission_observed_requested",
+        "sensitive_communication_capability_observed_declared",
+    }
+)
+_STATIC_MANIFEST_EVENTS = frozenset(
+    {
+        "service_observed_declared",
+        "accessibility_service_observed_declared",
+        "event_trigger_capability_observed_declared",
+    }
+)
+# `special_access_capability_observed_declared` in `apk_static`: the value says which part.
+_STATIC_SPECIAL_ACCESS_DECLARED: dict[str, PartSpec] = {
+    "draw_over_other_apps": _STATIC_PERMISSIONS,  # from SYSTEM_ALERT_WINDOW
+    "accessibility_service": _STATIC_MANIFEST,
+    "notification_listener": _STATIC_MANIFEST,
+}
 _DEVICE_SIMPLE: dict[str, PartSpec] = {
-    "package_observed_installed": _INVENTORY,
-    "uid_observed": _INVENTORY,
     "app_usage_observed": _USAGESTATS,
     "activity_observed_resumed": _ACTIVITY,
     "process_observed_running": _PS,
 }
+# Identity and UID have two sources: the inventory (device scope) and the package dump (subject).
+_IDENTITY_EVENT_TYPES = frozenset({"package_observed_installed", "uid_observed"})
+
+# Event types no normalizer produces yet (REF §COV "tanpa produsen"). Their absence says nothing,
+# so they never have a coverage and can never be FALSE; the engine reports UNKNOWN `not_acquired`.
+# A producer moves its event type out of this set in the card that creates it.
+NO_PRODUCER_EVENT_TYPES = frozenset(
+    {
+        "scenario_subject_binding_observed",
+        "synthetic_exclusion_marker_observed",
+        "event_trigger_execution_observed",
+        "uid_network_activity_observed",
+        "local_endpoint_request_observed",
+        "lab_network_flow_observed",
+        "sms_record_observed",
+        "contact_record_observed",
+        "call_log_record_observed",
+        "notification_context_observed",
+    }
+)
 
 
-def part_for(
+def parts_for(
     event_type: str,
     object_value: str | None = None,
     evidence_mode: EvidenceMode = EvidenceMode.installed_runtime,
-) -> PartSpec:
-    """The part that is the source of a fact (REF §COV)."""
-    if evidence_mode is EvidenceMode.apk_static:
-        if event_type == "event_trigger_capability_observed_declared":
-            return _STATIC_MANIFEST
-        raise UnknownCoverageSourceError(f"no static source defined for {event_type!r}")
-    if event_type in _DEVICE_SIMPLE:
-        return _DEVICE_SIMPLE[event_type]
-    if event_type in _DETAIL_EVENT_TYPES:
-        return _DETAIL
+) -> tuple[PartSpec, ...]:
+    """The parts that are the sources of a fact (REF §COV), in table order.
+
+    An empty tuple means the event type has no producer. `UnknownCoverageSourceError` is only
+    for an event type outside the catalog, an unknown `object_value`, or an event type that has
+    no source in the given mode (a runtime-only fact asked for in `apk_static`).
+    """
+    if event_type not in EVENT_TYPE_CATALOG:
+        raise UnknownCoverageSourceError(f"{event_type!r} is not in the event type catalog")
+    if event_type in NO_PRODUCER_EVENT_TYPES:
+        return ()
+    if event_type in _STATIC_ANY_MODE:
+        return (_STATIC_ANY_MODE[event_type],)
     if event_type == "special_access_capability_observed_enabled":
         if object_value in _SPECIAL_ACCESS_ENABLED:
-            return _SPECIAL_ACCESS_ENABLED[object_value]
+            return (_SPECIAL_ACCESS_ENABLED[object_value],)
         raise UnknownCoverageSourceError(f"unknown special access kind {object_value!r}")
+    if event_type == "special_access_capability_observed_declared":
+        if object_value is not None and object_value not in _SPECIAL_ACCESS_ENABLED:
+            raise UnknownCoverageSourceError(f"unknown special access kind {object_value!r}")
+        if evidence_mode is EvidenceMode.apk_static:
+            if object_value is None:
+                raise UnknownCoverageSourceError("a special access kind is required in apk_static")
+            return (_STATIC_SPECIAL_ACCESS_DECLARED[object_value],)
+        return (_DETAIL,)
+    if evidence_mode is EvidenceMode.apk_static:
+        if event_type in _STATIC_PERMISSION_EVENTS:
+            return (_STATIC_PERMISSIONS,)
+        if event_type in _STATIC_MANIFEST_EVENTS:
+            return (_STATIC_MANIFEST,)
+        raise UnknownCoverageSourceError(f"no static source defined for {event_type!r}")
+    if event_type in _IDENTITY_EVENT_TYPES:
+        return (_INVENTORY, _DETAIL)
+    if event_type in _DEVICE_SIMPLE:
+        return (_DEVICE_SIMPLE[event_type],)
+    if event_type in _DETAIL_EVENT_TYPES:
+        return (_DETAIL,)
     raise UnknownCoverageSourceError(f"no source defined for {event_type!r}")
 
 
@@ -136,6 +206,8 @@ class Coverage:
     evidence_ids: list[uuid.UUID] = field(default_factory=list)
     reason: str | None = None
     session_id: uuid.UUID | None = None
+    # (start, end) the source covers for history/aggregate facts; None while no producer reports it.
+    time_range: tuple[datetime, datetime] | None = None
 
 
 @dataclass(frozen=True)
@@ -159,12 +231,16 @@ class CoverageService:
         object_value: str | None = None,
         *,
         evidence_mode: EvidenceMode = EvidenceMode.installed_runtime,
-    ) -> Coverage:
-        """Coverage of the source of `event_type` for the subject, from the newest session of
-        the case that holds that part (subject scope: a session with that subject)."""
-        return CoverageService.for_part(
-            db, case_id, subject_package, part_for(event_type, object_value, evidence_mode)
-        )
+    ) -> list[Coverage]:
+        """Coverage of every source of `event_type` for the subject, in `parts_for` order.
+
+        One entry per source part (identity and UID have two); empty for an event type without a
+        producer. Each part uses the session chosen for that subject (see `for_part`).
+        """
+        return [
+            CoverageService.for_part(db, case_id, subject_package, part)
+            for part in parts_for(event_type, object_value, evidence_mode)
+        ]
 
     @staticmethod
     def for_part(
@@ -239,8 +315,9 @@ class CoverageService:
     def matrix(db: Session, case_id: uuid.UUID, subject: str | None = None) -> list[CoverageRow]:
         """Every part with a parser: device-scope parts once, subject-scope parts per subject."""
         subjects = [subject] if subject is not None else CoverageService.subjects(db, case_id)
+        # Device-scope parts are listed once; with a subject they come from that subject's session.
         rows = [
-            CoverageRow(None, part.scope, CoverageService.for_part(db, case_id, None, part))
+            CoverageRow(None, part.scope, CoverageService.for_part(db, case_id, subject, part))
             for part in PARTS
             if part.scope is Scope.device
         ]
@@ -272,25 +349,34 @@ class CoverageService:
     def _latest_session(
         db: Session, case_id: uuid.UUID, subject_package: str | None, part: PartSpec
     ) -> uuid.UUID | None:
-        query = (
+        """Newest session of the case that holds the part, chosen per subject (REF §COV).
+
+        A subject first uses its own newest session holding the part, so its coverage does not
+        depend on which subject was acquired last. A device-scope part falls back to the newest
+        session holding it; a subject-scope part without a session of that subject is absent.
+        """
+        holds_part = exists().where(
+            AcquisitionOperation.session_id == AcquisitionSession.id,
+            AcquisitionOperation.operation_id == part.operation_id,
+        )
+        newest = (
             select(AcquisitionSession.id)
-            .join(AcquisitionOperation, AcquisitionOperation.session_id == AcquisitionSession.id)
-            .where(
-                AcquisitionSession.case_id == case_id,
-                AcquisitionOperation.operation_id == part.operation_id,
-            )
+            .where(AcquisitionSession.case_id == case_id, holds_part)
+            .order_by(AcquisitionSession.started_at.desc(), AcquisitionSession.id.desc())
+            .limit(1)
         )
-        if part.scope is Scope.subject:
-            if subject_package is None:
+        if subject_package is None:
+            if part.scope is Scope.subject:
                 raise UnknownCoverageSourceError("a subject is required for a subject-scope part")
-            query = query.where(
-                AcquisitionOperation.parameters["package_name"].astext == subject_package
-            )
-        return db.scalar(
-            query.order_by(
-                AcquisitionSession.started_at.desc(), AcquisitionSession.id.desc()
-            ).limit(1)
+            return db.scalar(newest)
+        of_subject = exists().where(
+            AcquisitionOperation.session_id == AcquisitionSession.id,
+            AcquisitionOperation.parameters["package_name"].astext == subject_package,
         )
+        own = db.scalar(newest.where(of_subject))
+        if own is not None or part.scope is Scope.subject:
+            return own
+        return db.scalar(newest)
 
     @staticmethod
     def _parsed_completely(db: Session, evidence_id: uuid.UUID) -> bool:

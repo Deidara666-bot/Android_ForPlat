@@ -153,6 +153,37 @@ button.secondary {
   margin-top: 8px;
 }
 
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 0.85rem;
+}
+
+.profile {
+  margin-top: 8px;
+}
+
+.profile summary {
+  cursor: pointer;
+}
+
+.sources {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+select {
+  font: inherit;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-h);
+  background: var(--bg);
+}
+
 .muted {
   color: var(--text);
   opacity: 0.8;

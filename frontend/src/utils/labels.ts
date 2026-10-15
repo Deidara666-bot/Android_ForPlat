@@ -51,7 +51,67 @@ const PARSE_STATUS: Record<string, string> = {
   empty: 'kosong',
 }
 
-export const epistemicClassLabel = (value: string): string => EPISTEMIC_CLASS[value] ?? value
+// Evaluation labels: outcome / condition state follow 4.7; the rest are working labels (REF ENGINE
+// "Label kerja UI"), always shown with the raw value.
+const OUTCOME: Record<string, string> = {
+  matched: 'terpenuhi',
+  not_matched: 'tidak terpenuhi',
+  insufficient_evidence: 'bukti tidak memadai',
+}
+
+const CONDITION_STATE: Record<string, string> = {
+  TRUE: 'terpenuhi',
+  FALSE: 'tidak terpenuhi',
+  UNKNOWN: 'tidak diketahui',
+}
+
+const CONDITION_ROLE: Record<string, string> = {
+  required: 'wajib',
+  optional: 'opsional',
+  contextual: 'kontekstual',
+  exclusionary: 'eksklusioner',
+}
+
+const EVALUATION_STATUS: Record<string, string> = {
+  evaluated: 'dievaluasi',
+  skipped_not_applicable: 'tidak berlaku',
+}
+
+const INTERPRETATION_STATUS: Record<string, string> = {
+  normal: 'normal',
+  constrained: 'tertahan',
+}
+
+const CLAIM_LEVEL: Record<string, string> = {
+  identity: 'identitas',
+  capability: 'kapabilitas',
+  observed_activity: 'aktivitas teramati',
+  contextual_cooccurrence: 'ko-okurensi kontekstual',
+}
+
+const EVIDENCE_MODE: Record<string, string> = {
+  installed_runtime: 'runtime terpasang',
+  apk_static: 'APK statis',
+}
+
+const RUN_PURPOSE: Record<string, string> = {
+  authoring: 'authoring',
+  holdout: 'holdout',
+  benign_control: 'kontrol benign',
+  production: 'produksi',
+}
+
+export const outcomeLabel = (value: string): string => OUTCOME[value] ?? value
+export const conditionStateLabel = (value: string): string => CONDITION_STATE[value] ?? value
+export const conditionRoleLabel = (value: string): string => CONDITION_ROLE[value] ?? value
+export const evaluationStatusLabel = (value: string): string => EVALUATION_STATUS[value] ?? value
+export const interpretationStatusLabel = (value: string): string =>
+  INTERPRETATION_STATUS[value] ?? value
+export const claimLevelLabel = (value: string): string => CLAIM_LEVEL[value] ?? value
+export const evidenceModeLabel = (value: string): string => EVIDENCE_MODE[value] ?? value
+export const runPurposeLabel = (value: string): string => RUN_PURPOSE[value] ?? value
+
+export const epistemicClassLabel =(value: string): string => EPISTEMIC_CLASS[value] ?? value
 export const availabilityLabel = (value: string): string => AVAILABILITY_STATUS[value] ?? value
 export const evidenceStateLabel = (value: string): string => EVIDENCE_STATE[value] ?? value
 export const temporalSemanticsLabel = (value: string): string => TEMPORAL_SEMANTICS[value] ?? value

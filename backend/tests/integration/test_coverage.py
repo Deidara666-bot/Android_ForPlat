@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -12,12 +12,8 @@ from app.core import raw_sources as src
 from app.core.constants import AvailabilityStatus, EvidenceMode
 from app.models.acquisition_operation import AcquisitionOperation
 from app.models.acquisition_session import AcquisitionSession
-from app.models.agent import Agent
 from app.models.artifact import Artifact
-from app.models.case import Case
-from app.models.device import Device
 from app.models.evidence import Evidence
-from app.models.user import User
 from app.research.coverage import (
     PARTS,
     CoverageService,
@@ -32,106 +28,6 @@ _SUBJECT = "com.android.stk"
 _A11Y = "collect_accessibility_state"
 
 
-@pytest.fixture
-def world(session: Session, user: User) -> dict[str, Any]:
-    case = Case(case_number="C-COV-1", title="uji", created_by=user.id)
-    device = Device(
-        serial="emulator-5554",
-        manufacturer="Google",
-        model="sdk",
-        android_version="16",
-        api_level=36,
-        device_build="BUILD",
-        last_seen_at=_T0,
-    )
-    agent = Agent(agent_id="agent-cov", version="0.1.0")
-    session.add_all([case, device, agent])
-    session.flush()
-    return {"case": case, "device": device, "agent": agent}
-
-
-@pytest.fixture
-def new_session(session: Session, world: dict[str, Any]) -> Callable[..., AcquisitionSession]:
-    counter = {"n": 0}
-
-    def make(operations: dict[str, dict[str, str]], status: str = "running") -> AcquisitionSession:
-        counter["n"] += 1
-        row = AcquisitionSession(
-            case_id=world["case"].id,
-            device_id=world["device"].id,
-            agent_id=world["agent"].id,
-            agent_version="0.1.0",
-            android_version="16",
-            api_level=36,
-            device_build="BUILD",
-            started_at=_T0 + timedelta(minutes=counter["n"]),
-            timezone="unknown",
-            status=status,
-        )
-        session.add(row)
-        session.flush()
-        for index, (operation, parameters) in enumerate(operations.items(), start=1):
-            session.add(
-                AcquisitionOperation(
-                    session_id=row.id,
-                    sequence=index,
-                    operation_id=operation,
-                    parameters=parameters,
-                )
-            )
-        session.flush()
-        return row
-
-    return make
-
-
-@pytest.fixture
-def add_evidence(session: Session, world: dict[str, Any]) -> Callable[..., Evidence]:
-    def make(acquisition: AcquisitionSession, operation: str, raw_source: str, **o: Any) -> Any:
-        status = o.pop("availability_status", "acquired")
-        values: dict[str, Any] = {
-            "case_id": world["case"].id,
-            "device_id": world["device"].id,
-            "acquisition_session_id": acquisition.id,
-            "operation_id": operation,
-            "source_name": operation,
-            "raw_source": raw_source,
-            "acquired_at": _T0,
-            "availability_status": status,
-            "availability_reason": None if status == "acquired" else "uji",
-        }
-        values.update(o)
-        row = Evidence(**values)
-        session.add(row)
-        session.flush()
-        return row
-
-    return make
-
-
-@pytest.fixture
-def add_artifact(session: Session) -> Callable[..., Artifact]:
-    def make(evidence: Evidence, status: str = "parsed", **o: Any) -> Artifact:
-        values: dict[str, Any] = {
-            "evidence_id": evidence.id,
-            "artifact_type": "settings_secure_list",
-            "parser_name": "settings_state.secure",
-            "parser_version": "1",
-            "subject_key": None,
-            "raw_value": "null",
-            "parsed_value_json": {},
-            "parse_status": status,
-            "parse_note": "",
-        }
-        values.update(o)
-        row = Artifact(**values)
-        session.add(row)
-        session.flush()
-        return row
-
-    return make
-
-
 def _cover(
     session: Session,
     world: dict[str, Any],
@@ -139,7 +35,17 @@ def _cover(
     object_value: str | None = None,
     subject: str | None = _SUBJECT,
 ) -> Any:
-    return CoverageService.for_subject(session, world["case"].id, subject, event_type, object_value)
+    sources = CoverageService.for_subject(
+        session, world["case"].id, subject, event_type, object_value
+    )
+    assert len(sources) == 1, "this helper is for events with exactly one source"
+    return sources[0]
+
+
+def _inventory(session: Session, world: dict[str, Any], event_type: str) -> Any:
+    """The inventory source of an identity event (it also has the package dump as source)."""
+    sources = CoverageService.for_subject(session, world["case"].id, _SUBJECT, event_type)
+    return next(c for c in sources if c.raw_source == src.PM_LIST_PACKAGES)
 
 
 @pytest.mark.parametrize("status", [s.value for s in AvailabilityStatus if s.value != "acquired"])
@@ -154,7 +60,7 @@ def test_a_source_that_is_not_acquired_is_unknown_with_its_status_as_reason(
     add_evidence(
         acquisition, "collect_package_inventory", src.PM_LIST_PACKAGES, availability_status=status
     )
-    coverage = _cover(session, world, "package_observed_installed", subject=None)
+    coverage = _inventory(session, world, "package_observed_installed")
     assert coverage.availability_status == status
     assert coverage.reason == f"availability_{status}"
     assert coverage.can_be_false is False and coverage.parse_complete is False
@@ -206,7 +112,7 @@ def test_acquired_evidence_without_any_artifact_is_not_a_complete_parse(
 ) -> None:
     acquisition = new_session({"collect_package_inventory": {}})
     add_evidence(acquisition, "collect_package_inventory", src.PM_LIST_PACKAGES)
-    coverage = _cover(session, world, "uid_observed", subject=None)
+    coverage = _inventory(session, world, "uid_observed")
     assert coverage.can_be_false is False and coverage.reason == "parse_incomplete"
 
 
@@ -325,7 +231,7 @@ def test_rows_from_before_raw_source_was_reported_are_still_found(
         "collect_package_inventory",
         availability_status="failed",
     )
-    coverage = _cover(session, world, "uid_observed", subject=None)
+    coverage = _inventory(session, world, "uid_observed")
     assert coverage.reason == "availability_failed"
 
 
@@ -343,7 +249,7 @@ def test_static_mode_reads_the_bundle_manifest_part(
         availability_status="failed",
         availability_reason="prasyarat part 2 tidak diperoleh",
     )
-    coverage = CoverageService.for_subject(
+    (coverage,) = CoverageService.for_subject(
         session,
         world["case"].id,
         _SUBJECT,
@@ -360,7 +266,6 @@ def test_static_mode_reads_the_bundle_manifest_part(
 @pytest.mark.parametrize(
     ("event_type", "value"),
     [
-        ("apk_identity_observed", None),
         ("not_in_catalog", None),
         ("special_access_capability_observed_enabled", None),
         ("special_access_capability_observed_enabled", "something_else"),
