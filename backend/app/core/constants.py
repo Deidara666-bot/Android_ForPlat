@@ -257,3 +257,36 @@ class Operator(StrEnum):
     greater_than = "greater_than"
     delta_greater_than = "delta_greater_than"
     overlaps_window = "overlaps_window"
+
+
+class ConditionState(StrEnum):
+    """Three-state result of one rule condition (REF §ENUM2)."""
+
+    TRUE = "TRUE"
+    FALSE = "FALSE"
+    UNKNOWN = "UNKNOWN"
+
+
+class Outcome(StrEnum):
+    """Output of a profile or a family: no fourth value, no score (D-6)."""
+
+    matched = "matched"
+    not_matched = "not_matched"
+    insufficient_evidence = "insufficient_evidence"
+
+
+class EvaluationStatus(StrEnum):
+    evaluated = "evaluated"
+    skipped_not_applicable = "skipped_not_applicable"
+
+
+class ConditionRole(StrEnum):
+    required = "required"
+    optional = "optional"
+    contextual = "contextual"
+    exclusionary = "exclusionary"
+
+
+class InterpretationStatus(StrEnum):
+    normal = "normal"
+    constrained = "constrained"
