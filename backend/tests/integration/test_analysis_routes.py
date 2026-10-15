@@ -2,11 +2,12 @@
 
 import json
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import event, func, select
+from sqlalchemy import event, func, select, update
 from sqlalchemy.orm import Session
 
 from app.models.correlation_run import CorrelationRun
@@ -253,6 +254,13 @@ def test_evaluations_default_to_the_latest_run_and_an_empty_case_has_none(
     assert empty == {"run": None, "families": []}
     _world(scene)
     first = _run(client, auth_headers, scene)
+    # `created_at` is the transaction time and both runs share this test's transaction: date the
+    # first one explicitly (in production every run is its own transaction)
+    scene.session.execute(
+        update(CorrelationRun)
+        .where(CorrelationRun.id == uuid.UUID(first))
+        .values(created_at=datetime(2000, 1, 1, tzinfo=UTC))
+    )
     second = _run(client, auth_headers, scene, subjects=["com.ghost"])
     latest = client.get(f"/api/cases/{scene.case.id}/evaluations", headers=auth_headers).json()
     assert latest["run"]["id"] == second != first
