@@ -2,6 +2,21 @@
 
 Satu entri per tag milestone. Rincian kartu: `docs/progress.md`; bukti: `docs/smoke/`.
 
+## v0.60 — 2026-10-15
+
+Mesin aturan tiga keadaan. Akhir Increment 3 (penalaran): aturan dievaluasi atas fakta ternormalisasi.
+
+- Enam tabel evaluasi (migrasi `287322bf5aa5`): `correlation_runs`, `rule_family_evaluations`, `rule_profile_evaluations`, `rule_condition_results`, `rule_condition_facts`, `correlation_findings`; CHECK enum tertutup, `skipped_not_applicable` ⇔ tanpa `outcome`, kondisi `UNKNOWN` ⇔ beralasan, satu temuan per evaluasi profil.
+- Cakupan sumber per subjek dan per bagian (`parts_for`, sesi sumber per subjek, dua sumber identitas/UID, event tanpa produsen) dan selector fakta (versi pengurai terbaru, subjek per mode, pengikatan UID hanya bila unik).
+- Operator `exists`/`equals`/`in`/`greater_than`/`delta_greater_than`/`overlaps_window` sebagai fungsi murni: TRUE dari fakta positif; FALSE hanya dari fakta negatif eksplisit + cakupan lengkap; selain itu `UNKNOWN` beserta alasan. Konflik (positif + negatif untuk satu nilai) → `UNKNOWN` `conflicting_evidence` dengan id faktanya; tanpa jendela bawaan.
+- Profil → keluarga: semua wajib TRUE → terpenuhi; ada wajib FALSE → tidak terpenuhi; selain itu bukti tidak memadai; eksklusioner TRUE → `constrained`; profil tak berlaku dilewati. `RuleEngine` mencatat semua kondisi dalam satu transaksi dan satu `CorrelationFinding` hanya untuk profil terpenuhi; `code_commit` dibaca sekali (run `holdout` menolak commit `-dirty`/`unknown`).
+- `POST /api/cases/{id}/analyze`, `GET /api/correlation-runs/{id}`, `/evaluations`, `/findings` (JWT; hanya `analyze` menulis); halaman `/cases/:id/evaluations`: form Analisis, tiga tingkat (keluarga → profil/kondisi → fakta penopang), alasan UNKNOWN selalu tampil, konflik menampilkan semua id fakta.
+- Matriks skenario kelas A, B, C, D1, D2, E, F (32 skenario, runtime dan statis) dengan oracle dari aturan; kelas tak terjangkau (K04·B, K05 kecuali D2) dicatat dengan alasan yang dibuktikan test. `semantic_snapshot` + tiga run atas masukan sama → snapshot identik. Laporan: `docs/results/v0.60_unit_matrix.md`.
+- Analisis nyata (kasus G1, AVD #1): K01 dan K03 terpenuhi; K02, K04, K05 bukti tidak memadai; K03-P03, K05-P01/P02/P03 tertahan di fakta tanpa produsen (hasil sah, bukan cacat). Satu bug ditemukan dari data nyata dan diperbaiki: konflik kini per nilai, bukan antar-nilai berbeda.
+- 1332 test backend + 214 test agen; `check.sh all` OK di `main`. Review `claim-auditor` + `forensic-integrity-reviewer`: 0 blocking; catatan non-blocking di `docs/progress.md`.
+- Tidak ada skor, bobot, ambang, atau peringkat. Aturan masih `design_baseline` (belum dibekukan): `production`/`holdout` ditolak 409. Belum ada rekonstruksi atau hipotesis (`v0.70`). UI belum diverifikasi visual oleh pemeriksa saat tagging.
+- Tag ditempatkan di `main` (`f5ce3ad` + commit progress); tanpa AVD (milestone hanya membutuhkan PostgreSQL).
+
 ## v0.50 — 2026-10-13
 
 Basis pengetahuan + pemuat YAML APKF. Awal Increment 3 (penalaran): aturan dimuat, divalidasi, dan dapat dibaca; belum dievaluasi.
